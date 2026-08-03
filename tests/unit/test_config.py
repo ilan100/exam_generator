@@ -3,7 +3,12 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from exam_generator.config.loader import ConfigError, load_app_config, load_llm_config
+from exam_generator.config.loader import (
+    ConfigError,
+    load_app_config,
+    load_category_mapping,
+    load_llm_config,
+)
 from exam_generator.config.models import GenerationBehaviorConfig, LLMConfig
 
 
@@ -19,6 +24,14 @@ def test_load_default_app_config_succeeds():
     assert config.generation.max_generation_attempts > 0
     assert config.chunking.chunk_size > 0
     assert 0 <= config.chunking.chunk_overlap < config.chunking.chunk_size
+    assert config.retrieval.top_k > 0
+    assert config.retrieval.ngram_min <= config.retrieval.ngram_max
+
+
+def test_load_default_category_mapping_succeeds():
+    config = load_category_mapping()
+
+    assert isinstance(config.mapping, dict)
 
 
 def test_load_default_llm_config_succeeds():

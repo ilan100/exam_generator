@@ -19,8 +19,16 @@ def _reject_bool(value: object) -> object:
     return value
 
 
+def _reject_blank(value: object) -> object:
+    """Reject strings that are empty or contain only whitespace."""
+    if isinstance(value, str) and value.strip() == "":
+        raise ValueError("value must not be empty or whitespace-only")
+    return value
+
+
 StrictPositiveInt = Annotated[int, BeforeValidator(_reject_bool), Field(gt=0)]
 StrictNonNegativeInt = Annotated[int, BeforeValidator(_reject_bool), Field(ge=0)]
+NonBlankConfigStr = Annotated[str, BeforeValidator(_reject_blank)]
 
 
 class PathsConfig(BaseModel):
@@ -78,6 +86,28 @@ class ChunkingConfig(BaseModel):
         return self
 
 
+class RetrievalConfig(BaseModel):
+    """Local lexical (TF-IDF) retrieval parameters (WP-006).
+
+    The analyzer itself (character n-grams) is a fixed internal policy, not
+    configuration - see docs/ARCHITECTURE.md.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    top_k: StrictPositiveInt
+    ngram_min: StrictPositiveInt
+    ngram_max: StrictPositiveInt
+
+    @model_validator(mode="after")
+    def _check_ngram_bounds(self) -> "RetrievalConfig":
+        if self.ngram_min > self.ngram_max:
+            raise ValueError(
+                f"ngram_min ({self.ngram_min}) must not exceed ngram_max ({self.ngram_max})"
+            )
+        return self
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration (config/app.yaml)."""
 
@@ -86,6 +116,21 @@ class AppConfig(BaseModel):
     paths: PathsConfig
     generation: GenerationBehaviorConfig
     chunking: ChunkingConfig
+    retrieval: RetrievalConfig
+
+
+class CategoryMappingConfig(BaseModel):
+    """Manual category alias/override configuration (config/category_mapping.yaml).
+
+    Structural validation only (non-empty keys/targets); cross-checking
+    alias targets against the actual canonical category list requires the
+    WP-003 historical repository and is performed by
+    ``exam_generator.retrieval.categories.CategoryResolver``, not here.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mapping: dict[NonBlankConfigStr, NonBlankConfigStr] = Field(default_factory=dict)
 
 
 class LLMGenerationParams(BaseModel):

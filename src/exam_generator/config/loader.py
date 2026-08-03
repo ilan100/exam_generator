@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from exam_generator.config.models import AppConfig, LLMConfig
+from exam_generator.config.models import AppConfig, CategoryMappingConfig, LLMConfig
 
 _ROOT_MARKER = "pyproject.toml"
 
@@ -81,3 +81,21 @@ def load_llm_config(config_dir: Path | str | None = None) -> LLMConfig:
         return LLMConfig.model_validate(raw)
     except ValidationError as exc:
         raise ConfigError(f"Invalid LLM configuration in {directory / 'llm.yaml'}:\n{exc}") from exc
+
+
+def load_category_mapping(config_dir: Path | str | None = None) -> CategoryMappingConfig:
+    """Load and validate config/category_mapping.yaml into a CategoryMappingConfig.
+
+    Only structural validation (non-empty alias keys/targets) happens here;
+    cross-checking alias targets against actual canonical categories requires
+    the historical repository and is performed by
+    ``exam_generator.retrieval.categories.CategoryResolver``.
+    """
+    directory = Path(config_dir) if config_dir is not None else _default_config_dir()
+    raw = _read_yaml(directory / "category_mapping.yaml")
+    try:
+        return CategoryMappingConfig.model_validate(raw)
+    except ValidationError as exc:
+        raise ConfigError(
+            f"Invalid category mapping configuration in {directory / 'category_mapping.yaml'}:\n{exc}"
+        ) from exc

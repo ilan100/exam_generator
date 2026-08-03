@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-005 — Factual source chunking and corpus construction**
-* Current/next planned WP: **WP-006**
+* Last completed WP: **WP-006 — Local retrieval and category integration**
+* Current/next planned WP: **WP-007**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-005 complete**
+* Repository implementation state: **WP-006 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-006 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-007 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -34,8 +34,10 @@ Implementation will proceed sequentially from WP-006 using Work Packages supplie
 * Unit tests for PDF ingestion (`tests/unit/test_ingestion.py`), 47 tests, using synthetic in-memory PDFs built with `pymupdf` itself (no extra test-only dependency, no committed binary fixtures).
 * Factual-source chunking and corpora (`src/exam_generator/chunking/`): deterministic, character-based, boundary-aware chunking of `ExtractedDocument` pages into `SourceEvidenceChunk` objects (never spanning physical pages), stable deterministic chunk IDs, and read-only `FactualSourceCorpus` construction with per-source/per-page querying and statistics. `build_student_summary_corpus()`/`build_course_book_corpus()` provide the application-level entry points. New `chunking` section added to `config/app.yaml`/`ChunkingConfig`.
 * Unit tests for chunking (`tests/unit/test_chunking.py`), 80 tests, using synthetic `ExtractedDocument` objects (no dependency on the real PDFs for correctness tests).
+* Local lexical retrieval and category integration (`src/exam_generator/retrieval/`): deterministic character n-gram TF-IDF retrieval (`scikit-learn`) over a WP-005 `FactualSourceCorpus`, one-source-type-per-index enforcement, deterministic tie-breaking, zero-score filtering; canonical-category resolution/alias handling activating `config/category_mapping.yaml`; `ExamRequest` category resolution (with alias-count combination); category-based student-summary retrieval. New `retrieval` config section added to `config/app.yaml`/`AppConfig`; `config/category_mapping.yaml` schema changed from the WP-001 placeholder `aliases: {}` to the now-activated `mapping: {}`.
+* Unit tests for retrieval/categories (`tests/unit/test_retrieval.py`), 71 tests, using synthetic corpora/resolvers (no dependency on the real PDFs/workbook for correctness tests).
 
-No retrieval, embeddings, indexing, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No embeddings, vector databases, semantic/neural retrieval, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -82,6 +84,19 @@ Chunking/corpora, importable from `exam_generator.chunking`:
 * `build_student_summary_corpus(chunk_size=None, chunk_overlap=None, data_dir=None)` / `build_course_book_corpus(...)` — default chunk params come from `config/app.yaml`'s `chunking` section when not supplied
 * Error hierarchy: `ChunkingError`; `CorpusConstructionError` → `DuplicateChunkIdError`
 * Config: `exam_generator.config.models.ChunkingConfig` (`chunk_size`, `chunk_overlap`), new `AppConfig.chunking` field, `config/app.yaml`'s `chunking:` section (defaults `1800`/`300`)
+
+Retrieval/categories, importable from `exam_generator.retrieval`:
+
+* `FactualRetrievalIndex.from_corpus(corpus, *, source_type, top_k, ngram_range)` — one index = one `SourceType`, rejects mixed-source corpora
+* `FactualRetrievalIndex.search(query, *, top_k=None) -> tuple[RetrievalResult, ...]` — best-first, rank starts at 1, zero-score results omitted, deterministic tie-break by corpus position
+* `RetrievalResult` (`chunk`, `score` in `[0.0, 1.0]`, `rank`) — frozen, structurally separate from `SourceEvidenceChunk`
+* `build_student_summary_retrieval_index(top_k=None, ngram_range=None, data_dir=None)` / `build_course_book_retrieval_index(...)`
+* `CategoryResolver(canonical_categories, aliases)` — `.resolve(category)`, `.canonical_categories`
+* `build_category_resolver()` — wires the real `HistoricalQuestionRepository` + `config/category_mapping.yaml`
+* `resolve_exam_request_categories(request, resolver) -> ExamRequest` — combines alias-collapsed counts, preserves total
+* `retrieve_for_category(category, resolver, index, *, top_k=None) -> tuple[RetrievalResult, ...]`
+* Error hierarchy: `RetrievalError` → `RetrievalIndexError` (→ `SourceTypeMismatchError`), `RetrievalQueryError`; `CategoryResolutionError` → `UnknownCategoryError`, `InvalidCategoryMappingError`
+* Config: `RetrievalConfig` (`top_k`, `ngram_min`, `ngram_max`), `AppConfig.retrieval`; `CategoryMappingConfig` (`mapping: dict[str,str]`), `load_category_mapping()`
 
 ## Established Requirements / Decisions
 
@@ -209,10 +224,26 @@ If implementation convenience conflicts with an established architectural decisi
 * `ChunkingConfig`'s bool-rejection helper (`_reject_bool`) is defined locally in `config/models.py` rather than imported from `exam_generator.models._common`, to avoid introducing a `config → models` package dependency; this duplicates ~3 lines of logic already used by the domain-model layer, which was judged preferable to a cross-layer import for a foundational config module.
 * Chunk text is `.strip()`-ped only at emission time (leading/trailing whitespace); all boundary-offset arithmetic operates on the original untouched page text, so overlap/boundary calculations are unaffected by the trim.
 
+## Decisions Made (WP-006)
+
+* **Retrieval baseline: `scikit-learn` char n-gram TF-IDF** (`analyzer="char_wb"`, `ngram_range=(3,5)`), installed version **1.9.0**. The analyzer is kept as a fixed internal constant rather than configuration (explicitly permitted by the WP when only one analyzer is supported in V1), keeping the validated config surface to just `top_k`/`ngram_min`/`ngram_max`.
+* **Zero-score tolerance**: `1e-9`, applied to absorb floating-point noise around true-zero cosine similarity (not a meaningful similarity threshold) - documented in `exam_generator/retrieval/index.py` and `docs/ARCHITECTURE.md`.
+* **`config/category_mapping.yaml` schema changed** from WP-001's placeholder `aliases: {canonical: [alias, ...]}` shape (never populated, never consumed by any code) to the WP-006-suggested `mapping: {alias: canonical}` shape, since this WP is the one that "activates" the file and no real content existed to migrate. `CategoryMappingConfig` validates structural non-emptiness only; cross-checking alias targets against real canonical categories happens in `CategoryResolver`, which needs the historical repository.
+* **Alias-collision rule**: any alias *key* that equals an existing canonical category name is rejected outright at resolver construction (`InvalidCategoryMappingError`), rather than only rejecting when its target differs from itself. This is a stricter, simpler, and unambiguous reading of the WP's rule ("an alias key that exactly equals an existing canonical category must not redirect that canonical name to a different category") - a same-name self-alias would be redundant configuration with zero benefit.
+* `CategoryMappingConfig`'s bool/blank-rejection helpers are defined locally in `config/models.py` (not imported from `exam_generator.models._common`), continuing the same config-layer-purity rationale already established for `ChunkingConfig` in WP-005. `RetrievalResult.rank`, by contrast, *does* import `PositiveIntStrict` from `exam_generator.models._common`, since `exam_generator.retrieval` is an application-level package that (like `historical`/`ingestion`/`chunking`) already legitimately depends on `exam_generator.models` - only `config` avoids that dependency direction.
+* Package structure: `retrieval/{errors,models,index,categories}.py` (matches the WP's own suggested structure exactly).
+
+## Known Retrieval-Quality Observations (WP-006, for architect review)
+
+* **Canonical-category retrieval (the actual production use case) is healthy**: querying every one of the 20 real canonical categories against the student-summary index returned 8/8 positive results for all 20 - zero categories with no results. Scores ranged `0.088`–`0.486`; the weakest were `מבוא` ("Introduction", 0.088 - a generic/short category name with little distinctive vocabulary) and `חדרי המוח` ("ventricles", 0.136).
+* **Short/common-term exact-match ranking is imperfect**: for single short terms (e.g. `trabeculae`, `קליפת המוח`), the literal containing chunk is reliably present in the top 3–5 results but not always ranked #1 - a different chunk with more overlapping character n-grams can score marginally higher. Longer, more distinctive queries (full canonical category names, two-word English terms like `Medulla Oblongata`) rank the correct chunk #1 reliably. This is an expected characteristic of a character-n-gram TF-IDF baseline on short queries, not a broken implementation, and is exactly the kind of finding WP-006 asked to be surfaced honestly rather than tuned around.
+* **Multi-column PDF text interleaving**: one inspected student-summary chunk (page 32) showed Hebrew "קליפה" (cortex) and its English gloss "cortex" interleaved/fragmented mid-word (`"קליפ cort ex"`), apparently from PyMuPDF's default reading-order handling of a multi-column layout. The chunk remains topically on-subject (discusses gray/white matter and cortex) and is not corrupted Unicode - just non-linear reading order in that specific passage. This is an extraction-layer (WP-004) characteristic, not something WP-006 attempted to fix; noted here since it surfaced during retrieval-quality inspection.
+* No category or query produced garbled/corrupted Unicode; no action was taken to "fix" any of the above per the WP's explicit instruction not to solve retrieval-quality issues in this WP.
+
 ## Tests
 
-* Total: **293** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005)
-* Passing: **293**
+* Total: **365** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 new category-mapping config test)
+* Passing: **365**
 * Failing: **0**
 
 Verification commands and results:
@@ -220,12 +251,14 @@ Verification commands and results:
 * `.venv/bin/python --version` → `Python 3.12.3`
 * `.venv/bin/python -c "import openpyxl; print(openpyxl.__version__)"` → `3.1.5`
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
-* `.venv/bin/python -m pytest -v` → 293 passed
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003/WP-004/WP-005 - `SourceEvidenceChunk` itself did not change).
-* Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API (see Real-Workbook Verification below); confirmed no wording corruption on a Hebrew question with embedded English terminology (`Corona radiata`) and English-only answer options.
-* Real-source PDF verification against all four real PDFs via the public `exam_generator.ingestion` API (see Real-Source PDF Verification below); confirmed Hebrew and English/mixed content preserved without corruption.
-* Real corpus verification against all four real PDFs via `build_student_summary_corpus()`/`build_course_book_corpus()` (see Real Corpus Verification below); confirmed chunk coverage invariants, ID uniqueness/determinism, and readable overlap with no corruption.
-* `git status --short` / `git add -A --dry-run` → only WP-005 files (plus intentional `config/app.yaml`/`pyproject.toml`-adjacent changes - no new runtime dependency this WP) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
+* `.venv/bin/python -c "import sklearn; print(sklearn.__version__)"` → `1.9.0`
+* `.venv/bin/python -m pytest -v` → 365 passed
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - `SourceEvidenceChunk`/`ExamRequest`/`ExamOutput`/`ExamAudit` themselves did not change in WP-006).
+* Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API; confirmed no wording corruption on a Hebrew question with embedded English terminology and English-only answer options.
+* Real-source PDF verification against all four real PDFs via the public `exam_generator.ingestion` API; confirmed Hebrew and English/mixed content preserved without corruption.
+* Real corpus verification against all four real PDFs via `build_student_summary_corpus()`/`build_course_book_corpus()`; confirmed chunk coverage invariants, ID uniqueness/determinism, and readable overlap with no corruption.
+* Real retrieval-index verification against both real corpora (see Real Retrieval Verification below); confirmed deterministic reconstruction, all 20 real canonical categories return positive results, and representative Hebrew/English/mixed queries return relevant (non-corrupted) chunks.
+* `git status --short` / `git add -A --dry-run` → only WP-006 files (plus intentional `config/app.yaml`, `config/category_mapping.yaml`, and `pyproject.toml` changes) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 
 ## Real-Workbook Verification (WP-003)
 
@@ -307,10 +340,50 @@ Built via `build_student_summary_corpus()` / `build_course_book_corpus()` (chunk
 
 **Manual quality inspection** (student_summary_1.pdf beginning/middle/end, a mixed Hebrew/English page, and course_book.pdf): chunks read as coherent Hebrew/English prose, not arbitrarily truncated mid-boundary; page-5 mixed content (`trabeculae`, `Pia`, `Ventral root`) preserved intact. Precisely verified overlap on page 5: chunk 2 begins at character offset 1454 within chunk 1 (length 1752) - a ~298-character overlap, matching the configured 300, with the shared Hebrew/English text identical in both chunks.
 
+## Real Retrieval Verification (WP-006)
+
+Built via `build_student_summary_retrieval_index()` / `build_course_book_retrieval_index()` (top_k=8, ngram_range=(3,5), from `config/app.yaml`):
+
+**Student-summary index:** 506 indexed chunks (matches WP-005's corpus exactly), 3 source files, 98,105 TF-IDF features, source_type=STUDENT_SUMMARY, construction ~1.66s, deterministic reconstruction confirmed (identical chunk IDs/scores/ranks across two independent builds).
+
+**Course-book index:** 994 indexed chunks (matches exactly), 1 source file, 84,211 TF-IDF features, source_type=COURSE_BOOK, construction ~1.94s, deterministic reconstruction confirmed.
+
+**Canonical-category retrieval smoke test** (all 20 real canonical categories, top_k=8, against the student-summary index): **all 20 returned 8/8 positive-score results — zero categories with no results.** Scores ranged 0.088–0.486. Full table (category: result_count, top_score, top_chunk_id):
+
+| category | results | top_score | top_chunk_id |
+|---|---|---|---|
+| התעלה השדרתית ותכולתה | 8 | 0.3029 | STUDENT_SUMMARY:student_summary_2.pdf:0003:0001 |
+| לוקליזציה פונקציונלית | 8 | 0.3394 | STUDENT_SUMMARY:student_summary_2.pdf:0049:0001 |
+| חומר לבן | 8 | 0.2694 | STUDENT_SUMMARY:student_summary_2.pdf:0032:0001 |
+| עצבים קרניאליים | 8 | 0.3680 | STUDENT_SUMMARY:student_summary_3.pdf:0124:0001 |
+| מיפוי ודימות מוחי | 8 | 0.3243 | STUDENT_SUMMARY:student_summary_3.pdf:0080:0001 |
+| היסטולוגיה | 8 | 0.3273 | STUDENT_SUMMARY:student_summary_2.pdf:0047:0001 |
+| המערכת הלימבית | 8 | 0.4416 | STUDENT_SUMMARY:student_summary_2.pdf:0139:0001 |
+| אספקת דם | 8 | 0.4301 | STUDENT_SUMMARY:student_summary_2.pdf:0069:0001 |
+| קרומים וסינוסים דוראליים | 8 | 0.2197 | STUDENT_SUMMARY:student_summary_2.pdf:0070:0001 |
+| גזע המוח | 8 | 0.4855 | STUDENT_SUMMARY:student_summary_2.pdf:0089:0001 |
+| מסילות עצביות | 8 | 0.3774 | STUDENT_SUMMARY:student_summary_2.pdf:0108:0001 |
+| גרעיני הבסיס | 8 | 0.3282 | STUDENT_SUMMARY:student_summary_2.pdf:0036:0001 |
+| המוח הקטן | 8 | 0.2441 | STUDENT_SUMMARY:student_summary_2.pdf:0120:0001 |
+| מערכת העצבים ההיקפית | 8 | 0.4124 | STUDENT_SUMMARY:student_summary_2.pdf:0149:0001 |
+| דיאנצפלון | 8 | 0.4808 | STUDENT_SUMMARY:student_summary_2.pdf:0113:0001 |
+| אמבריולוגיה | 8 | 0.2069 | STUDENT_SUMMARY:student_summary_2.pdf:0011:0001 |
+| טופוגרפיה של ההמיספרות | 8 | 0.3991 | STUDENT_SUMMARY:student_summary_2.pdf:0018:0001 |
+| חדרי המוח | 8 | 0.1361 | STUDENT_SUMMARY:student_summary_2.pdf:0089:0001 |
+| תאי מערכת העצבים | 8 | 0.3735 | STUDENT_SUMMARY:student_summary_1.pdf:0024:0002 |
+| מבוא | 8 | 0.0878 | STUDENT_SUMMARY:student_summary_2.pdf:0001:0001 |
+
+Total query time for all 20 categories: ~0.17s (~8.4ms/query average).
+
+**Representative content smoke tests** (see Known Retrieval-Quality Observations below for the honest ranking-quality finding):
+* Hebrew term `קליפת המוח` (cerebral cortex) → top chunk `STUDENT_SUMMARY:student_summary_3.pdf:0032:0001`, score 0.1421, topically relevant (discusses gray/white matter and cortex) though the literal phrase isn't in the #1 chunk specifically - the literal phrase appears in 18 chunks corpus-wide, three of which appear at ranks 3-5.
+* English term `Medulla Oblongata` → top chunk `COURSE_BOOK:course_book.pdf:0091:0001`, score 0.3097, contains the exact phrase.
+* Mixed-content term `trabeculae` (confirmed present in exactly 1 real chunk, from WP-005's precise overlap verification) → that exact chunk (`STUDENT_SUMMARY:student_summary_1.pdf:0005:0001`) appears at rank 3, score 0.0777; no Unicode corruption in any result.
+
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-005 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl` and `pymupdf` were both confirmed to install and work correctly under 3.12.3.
-* No new known issues from WP-005. No new runtime dependency was needed (pure standard library + existing Pydantic/config/WP-002/WP-004 infrastructure, as the WP required).
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-006 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl`, `pymupdf`, and now `scikit-learn` were all confirmed to install and work correctly under 3.12.3.
+* See "Known Retrieval-Quality Observations" above for WP-006-specific findings (all explicitly non-blocking per the WP's own acceptance criteria - honest reporting was required, not resolution).
 
 ## Files Added
 
@@ -351,22 +424,32 @@ WP-004 (carried forward, unchanged this WP):
 * `src/exam_generator/ingestion/discovery.py`
 * `tests/unit/test_ingestion.py`
 
-WP-005 (new):
+WP-005 (carried forward, unchanged this WP):
 * `src/exam_generator/chunking/__init__.py`
 * `src/exam_generator/chunking/errors.py`
 * `src/exam_generator/chunking/chunker.py`
 * `src/exam_generator/chunking/corpus.py`
 * `tests/unit/test_chunking.py`
 
+WP-006 (new):
+* `src/exam_generator/retrieval/__init__.py`
+* `src/exam_generator/retrieval/errors.py`
+* `src/exam_generator/retrieval/models.py`
+* `src/exam_generator/retrieval/index.py`
+* `src/exam_generator/retrieval/categories.py`
+* `tests/unit/test_retrieval.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section recording the page-boundary rule, chunk-ID format, boundary-aware splitting/overlap policy, and corpus-separation policy).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency.).
-* `config/app.yaml` (added `chunking:` section: `chunk_size: 1800`, `chunk_overlap: 300`).
-* `src/exam_generator/config/models.py` (added `ChunkingConfig`, `StrictPositiveInt`/`StrictNonNegativeInt` helpers, `AppConfig.chunking` field).
-* `src/exam_generator/config/__init__.py` (exported `ChunkingConfig`).
-* `tests/unit/test_config.py` (added `chunking` field assertions to the existing default-app-config test).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section recording the TF-IDF baseline/rationale, one-source-type-per-index rule, score-vs-grounding separation, zero-score tolerance, tie-breaking, and canonical-category/alias semantics).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`).
+* `config/app.yaml` (WP-006: added `retrieval:` section: `top_k: 8`, `ngram_min: 3`, `ngram_max: 5`).
+* `config/category_mapping.yaml` (WP-006: schema changed from placeholder `aliases: {}` to activated `mapping: {}` - see Decisions Made).
+* `src/exam_generator/config/models.py` (WP-006: added `RetrievalConfig`, `CategoryMappingConfig`, `NonBlankConfigStr`/`_reject_blank` helpers, `AppConfig.retrieval` field).
+* `src/exam_generator/config/loader.py` (WP-006: added `load_category_mapping()`).
+* `src/exam_generator/config/__init__.py` (WP-006: exported `RetrievalConfig`, `CategoryMappingConfig`, `load_category_mapping`).
+* `tests/unit/test_config.py` (WP-006: added `retrieval` field assertions and a `load_category_mapping()` test).
 
 ## Deferred Work
 
@@ -397,16 +480,16 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-005 are complete. `src/exam_generator/config` provides configuration loading (now including chunking parameters); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking into `SourceEvidenceChunk` and read-only `FactualSourceCorpus` construction (`build_student_summary_corpus()`, `build_course_book_corpus()`). None of the following exists yet:
+WP-001 through WP-006 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution. None of the following exists yet:
 
-* `ExamRequest` still validates request *structure* only; it does **not** yet check requested category names against `HistoricalQuestionRepository.canonical_categories`. That cross-check is explicitly deferred to a later orchestration WP.
-* **No embeddings, vector/keyword index, or retrieval exists yet.** `FactualSourceCorpus` is an in-memory, unindexed collection of chunks queryable only by exact source-file/page - there is no similarity search, ranking, or category-aware retrieval. A future WP must build an index (embeddings or otherwise) over `build_student_summary_corpus()`'s and/or `build_course_book_corpus()`'s `.all_chunks`, and implement retrieval/context-selection on top of it. Corpus construction is deliberately independent of whatever indexing approach is chosen next.
-* No category assignment exists on chunks (`SourceEvidenceChunk` carries no category field) - a later WP must decide how requested exam categories interact with retrieval over the category-agnostic corpus.
-* All validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) exist as contracts only; no validator logic exists yet.
-* No historical-question selection/similarity logic exists — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals.
-* No LLM client/provider, prompts, generation, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
+* **No LLM client/provider, prompts, or generation logic exists.** `retrieve_for_category()` returns ranked `SourceEvidenceChunk` candidates - it does not decide whether they're sufficient to generate or ground a question. A future WP must introduce the LLM abstraction/provider (per `docs/MASTER_PROJECT_BRIEF.md`'s "LLM provider and model dynamically configurable" requirement) and external prompt files before any generation can occur.
+* No validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) have validator logic yet - they exist as WP-002 contracts only. In particular, **no retrieval score is, or should be, treated as a grounding decision** - the future grounding validator must independently assess whether retrieved evidence supports a candidate's claimed correct answer.
+* No historical-question selection/similarity logic exists (no STYLE_SIMILAR/INDEPENDENT alternation, no historical-question sampling) — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals; WP-006 did not touch this either.
+* No diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
+* Retrieval/category-resolution integration point for the next generation-facing WP: `build_category_resolver()` + `resolve_exam_request_categories()` give a validated, alias-collapsed `ExamRequest`; `build_student_summary_retrieval_index()` + `retrieve_for_category()` give ranked candidate evidence per canonical category. Neither commits to a specific generation architecture beyond that.
+* See "Known Retrieval-Quality Observations" above: canonical-category retrieval is healthy (20/20 categories return positive results), but short/common-term exact-match ranking is imperfect (correct chunk usually top-3-5, not always top-1) - a future WP may need to account for this when deciding how many candidate chunks to feed into generation/grounding per category.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) and `pymupdf>=1.24` (installed: 1.28.0) are the real runtime dependencies so far; WP-005 added no new dependency. The next WP's author should account for the environment note when specifying dependencies/tooling, and should be aware that corpus chunks are plain in-memory Python objects with no persistence yet (WP-005 explicitly did not add any persistence layer).
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), and now `scikit-learn>=1.4` (1.9.0) are the real runtime dependencies so far. The next WP's author should account for the environment note when specifying dependencies/tooling, and should be aware that neither the corpus nor the retrieval index is persisted (both are rebuilt in memory on demand).
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -414,7 +497,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-006** (per the roadmap: Retrieval/category mapping). Claude must not invent or begin WP-006's specification; wait for it to be supplied.
+**WP-007** (per the roadmap: LLM abstraction + OpenAI provider). Claude must not invent or begin WP-007's specification; wait for it to be supplied.
 
 ---
 

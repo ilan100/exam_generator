@@ -22,3 +22,11 @@ generation:
 chunking:
   chunk_size: 1800
   chunk_overlap: 300
+
+# Local lexical (TF-IDF) retrieval (WP-006). The analyzer (character
+# n-grams) is a fixed internal policy, not configuration - see
+# docs/ARCHITECTURE.md.
+retrieval:
+  top_k: 8
+  ngram_min: 3
+  ngram_max: 5

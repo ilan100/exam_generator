@@ -1,16 +1,16 @@
-# Manual category alias/override configuration.
+# Manual category alias/override configuration (WP-006 activates this file).
 #
 # Canonical categories originate from the historical workbook's `category`
-# column (established in a later Work Package) and must NOT be guessed or
-# duplicated here.
+# column (WP-003) and must NOT be guessed or duplicated here.
 #
-# This file only maps alternative/observed wording (e.g. from student-summary
-# chapter headings) onto an already-canonical category name. Do not populate
-# guessed mappings in this Work Package.
+# Each entry maps one alternative/observed wording (e.g. from a student-
+# summary chapter heading) onto an already-canonical category name. An alias
+# key must never equal an existing canonical category name, and every target
+# must itself be a real canonical category - both are validated when the
+# category resolver is constructed.
 #
-# Example (illustrative only - not a real mapping):
-# aliases:
-#   "עצבים קרניאליים":
-#     - "עצבי גולגולת"
+# Example (illustrative only - not a real/approved mapping):
+# mapping:
+#   "עצבי גולגולת": "עצבים קרניאליים"
 
-aliases: {}
+mapping: {}
