@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-002 — Domain models and schemas**
-* Current/next planned WP: **WP-003**
+* Last completed WP: **WP-003 — Historical exam question ingestion**
+* Current/next planned WP: **WP-004**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-002 complete**
+* Repository implementation state: **WP-003 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-003 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-004 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -28,8 +28,10 @@ Implementation will proceed sequentially from WP-003 using Work Packages supplie
 * Core domain models (`src/exam_generator/models/`): `GenerationMode`, `ExamQuestion`, `CandidateQuestion`, `candidate_to_exam_question()` (question.py); `ExamRequest`, `ExamOutput` (exam.py); `SourceType`, `SourceEvidenceChunk`, `HistoricalStyleReference` (source.py); `GroundingValidationResult` (with `.passed`), `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckStatus`, `TextbookCheckResult` (validation.py); `QuestionAudit`, `ExamAudit` (audit.py). Shared strict-validation helpers (bool-rejecting positive ints, non-blank text, unit-interval floats, strict bool) live in the private `_common.py`.
 * JSON Schema artifacts generated from the Pydantic models via `scripts/generate_schemas.py` (no network access, deterministic, re-running produces byte-identical output): `schemas/exam_request.schema.json`, `schemas/exam_output.schema.json`, `schemas/exam_audit.schema.json`, plus a hand-written `schemas/exam_request.example.json`.
 * Unit tests for all new contracts (`tests/unit/test_models.py`), 97 tests, covering every case enumerated in WP-002 section 25.
+* Historical workbook ingestion (`src/exam_generator/historical/`): loads `data/questions_full_export.xlsx` via `openpyxl` into WP-002 `HistoricalStyleReference` objects, and a read-only `HistoricalQuestionRepository` exposing all questions, canonical categories (first-seen order), exact per-category lookup, and total/per-category statistics. Fails closed with domain-specific exceptions on malformed workbooks/rows.
+* Unit tests for historical ingestion (`tests/unit/test_historical.py`), 59 tests, using synthetic in-memory `.xlsx` fixtures built with `openpyxl.Workbook()` (no dependency on the real workbook for correctness tests).
 
-No ingestion, PDF processing, Excel processing, retrieval, embeddings, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet. WP-002 implements contracts only.
+No PDF processing, retrieval, embeddings, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -49,6 +51,15 @@ Public domain models, importable from `exam_generator.models`:
 * `QuestionAudit`, `ExamAudit` — per-question and top-level audit contracts
 
 JSON Schemas (regenerate via `python scripts/generate_schemas.py`, no network access, deterministic): `schemas/exam_request.schema.json`, `schemas/exam_output.schema.json`, `schemas/exam_audit.schema.json`; example request at `schemas/exam_request.example.json`.
+
+Historical ingestion, importable from `exam_generator.historical`:
+
+* `HistoricalQuestionRepository.from_workbook(path, sheet_name=None)` — load from an explicit path (used by tests/fixtures)
+* `HistoricalQuestionRepository.from_default_location()` — load from the WP-001-configured `data` directory + fixed filename `questions_full_export.xlsx`
+* Repository API: `.all_questions` (tuple, workbook order), `.canonical_categories` (tuple, first-seen order), `.questions_for_category(name)` (tuple, exact match only, empty tuple if unknown), `.total_questions`, `.category_count`, `.counts_per_category` (read-only `Mapping`)
+* `load_historical_questions(path, sheet_name=None)` — lower-level function returning `(questions, categories_order)`
+* `default_workbook_path()`, `DEFAULT_WORKBOOK_FILENAME`
+* Error hierarchy: `HistoricalIngestionError` → `WorkbookNotFoundError`, `WorkbookFormatError`, `WorkbookSchemaError`, `HistoricalQuestionRowError`
 
 ## Established Requirements / Decisions
 
@@ -147,25 +158,68 @@ If implementation convenience conflicts with an established architectural decisi
 * Domain modules are split as `models/{question,exam,source,validation,audit}.py` plus a private `models/_common.py` holding shared strict-validation type aliases (`NonBlankStr`, `PositiveIntStrict`, `CorrectAnswerId`, `UnitInterval`, `StrictBool`) used across the other five modules to avoid repeating the same bool-rejection/blank-rejection logic in ~15 places.
 * `docs/ARCHITECTURE.md` updated with one small addition: `SourceType`'s exact enum values (`STUDENT_SUMMARY`, `COURSE_BOOK`) are now spelled out under Retrieval; all other WP-002 contract decisions were already pre-documented there ahead of this implementation and matched exactly, so no other architecture edits were needed.
 
+## Decisions Made (WP-003)
+
+* Row-level validation is delegated entirely to the existing `HistoricalStyleReference` pydantic model rather than re-implemented in the ingestion loader (e.g. no custom numeric-coercion function was written): pydantic v2's built-in lax `int` handling already coerces exact-integral floats (`3.0` → `3`) and clean numeric strings, rejects fractional floats (`3.5`) and non-numeric strings, and our existing `_reject_bool` before-validator already rejects `bool`. This matches WP-003's numeric-handling requirements exactly with no new code, and keeps ingestion unable to silently diverge from the WP-002 domain contract.
+* Worksheet selection policy: if the workbook has exactly one worksheet, it is auto-selected; if more than one, an explicit `sheet_name` must be passed or ingestion fails clearly (`WorkbookFormatError`) rather than guessing. The real workbook (`data/questions_full_export.xlsx`) has exactly one worksheet, named `"Questions - Full"`.
+* Canonical category ordering policy: first-seen order in workbook row order (not alphabetical, not a `set`), matching the WP's stated V1 preference.
+* Duplicate-ID and unknown-category behavior: duplicate `id` values fail ingestion immediately (reporting the duplicated ID and both the duplicate and first-occurrence row numbers); `questions_for_category()` for an unknown category returns an empty tuple rather than raising, per the WP's stated preferred behavior.
+* Default workbook filename (`questions_full_export.xlsx`) is a fixed constant (`DEFAULT_WORKBOOK_FILENAME`) combined with WP-001's configured `paths.data_dir`, rather than a new `config/app.yaml` field — there is only one historical workbook in V1, so a dedicated config field would add complexity without benefit (per the WP's own guidance not to add configuration without clear benefit). `config/app.yaml` and the WP-001 config model/tests were therefore left unchanged.
+* `openpyxl` added as a genuine runtime dependency in `pyproject.toml` (`openpyxl>=3.1`, installed version `3.1.5`), verified working under the project's Python 3.12.3 environment.
+
 ## Tests
 
-* Total: **107** (10 from WP-001 + 97 from WP-002)
-* Passing: **107**
+* Total: **166** (10 from WP-001 + 97 from WP-002 + 59 from WP-003)
+* Passing: **166**
 * Failing: **0**
 
 Verification commands and results:
 
 * `.venv/bin/python --version` → `Python 3.12.3`
-* `.venv/bin/python -m pytest -v` → 107 passed
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic).
-* Serialization smoke test: built a synthetic `CandidateQuestion` with Hebrew question text and embedded `Corona radiata`, converted to `ExamQuestion`, wrapped in `ExamOutput`, serialized to JSON — Hebrew and `Corona radiata` both survived unchanged in the printed output.
-* Manually inspected all three generated schema files: required fields, enum constraints, 1-based answer-ID bounds, exactly-four-answer-field structure on `ExamQuestion`, `questions` array on `ExamOutput`/`ExamAudit`, and nested audit sub-structures are all present as expected.
-* `git status --short` / `git add -A --dry-run` → only WP-002 files added; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts staged.
+* `.venv/bin/python -c "import openpyxl; print(openpyxl.__version__)"` → `3.1.5`
+* `.venv/bin/python -m pytest -v` → 166 passed
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003).
+* Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API (see Real-Workbook Verification below); confirmed no wording corruption on a Hebrew question with embedded English terminology (`Corona radiata`) and English-only answer options.
+* `git status --short` / `git add -A --dry-run` → only WP-003 files (plus intentional `pyproject.toml` dependency addition) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
+
+## Real-Workbook Verification (WP-003)
+
+Against the actual `data/questions_full_export.xlsx` (not modified):
+
+* Worksheet selected: `Questions - Full` (the workbook's only worksheet)
+* Total questions loaded: **459**
+* Total canonical categories: **20**
+* Category names and counts (first-seen workbook order):
+  * התעלה השדרתית ותכולתה: 35
+  * לוקליזציה פונקציונלית: 36
+  * חומר לבן: 32
+  * עצבים קרניאליים: 26
+  * מיפוי ודימות מוחי: 24
+  * היסטולוגיה: 33
+  * המערכת הלימבית: 7
+  * אספקת דם: 27
+  * קרומים וסינוסים דוראליים: 19
+  * גזע המוח: 17
+  * מסילות עצביות: 23
+  * גרעיני הבסיס: 34
+  * המוח הקטן: 19
+  * מערכת העצבים ההיקפית: 13
+  * דיאנצפלון: 15
+  * אמבריולוגיה: 34
+  * טופוגרפיה של ההמיספרות: 30
+  * חדרי המוח: 6
+  * תאי מערכת העצבים: 18
+  * מבוא: 11
+* First loaded historical question: id=1, category=`התעלה השדרתית ותכולתה`
+* Last loaded historical question (last workbook row, id is not sequential): id=471, category=`היסטולוגיה`
+* All 459 rows loaded with native-integer `id`/`correct_answer_id` cells (no fractional or numeric-string values encountered); no duplicate IDs; no blank rows present in the real workbook.
+
+These figures (459 questions / 20 categories) match the WP's stated expectation ("approximately 459 questions / 20 categories") — no discrepancy to investigate.
 
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, this and WP-002 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. Later WPs/environment setup should target 3.12+ (or upgrade the machine's interpreter) rather than assuming 3.14 is available.
-* No other known issues from WP-002.
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-003 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. Later WPs/environment setup should target 3.12+ (or upgrade the machine's interpreter) rather than assuming 3.14 is available. `openpyxl` was confirmed to install and work correctly under 3.12.3.
+* No other known issues from WP-003.
 
 ## Files Added
 
@@ -176,7 +230,7 @@ WP-001 (carried forward, unchanged this WP):
 * `tests/unit/test_config.py`
 * `output/.gitkeep`, `index/.gitkeep`
 
-WP-002 (new):
+WP-002 (carried forward, unchanged this WP):
 * `src/exam_generator/models/__init__.py`
 * `src/exam_generator/models/_common.py`
 * `src/exam_generator/models/question.py`
@@ -191,10 +245,18 @@ WP-002 (new):
 * `schemas/exam_request.example.json`
 * `tests/unit/test_models.py`
 
+WP-003 (new):
+* `src/exam_generator/historical/__init__.py`
+* `src/exam_generator/historical/errors.py`
+* `src/exam_generator/historical/loader.py`
+* `src/exam_generator/historical/repository.py`
+* `tests/unit/test_historical.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (one addition: `SourceType` enum values spelled out under Retrieval).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section recording the workbook contract, fail-closed row validation, canonical-category derivation/ordering, exact-match category querying, and read-only repository behavior).
+* `pyproject.toml` (added `openpyxl>=3.1` runtime dependency).
 
 ## Deferred Work
 
@@ -225,15 +287,15 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 and WP-002 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` (see Important Interfaces above) provides every domain contract needed by ingestion, retrieval, generation, validation, orchestration, and output — but none of that behavior is implemented yet. In particular:
+WP-001 through WP-003 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references. None of the following exists yet:
 
-* `ExamRequest` validates request *structure* only; it does not yet check requested category names against canonical categories (that requires WP-003's historical-Excel-derived category list).
-* `HistoricalStyleReference` exists as a contract, but no Excel ingestion/parsing exists yet.
-* `SourceEvidenceChunk` exists as a contract, but no PDF ingestion, chunking, embeddings, indexing, or retrieval exists yet.
+* `ExamRequest` still validates request *structure* only; it does **not** yet check requested category names against `HistoricalQuestionRepository.canonical_categories`. That cross-check (hard-fail on unknown requested categories) is explicitly deferred to a later orchestration WP — WP-003 intentionally did not wire this up.
+* `SourceEvidenceChunk` exists as a contract, but no PDF ingestion, chunking, embeddings, indexing, or retrieval exists yet (WP-004/WP-005/WP-006 territory per the roadmap).
 * All validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) exist as contracts only; no validator logic exists yet.
+* No historical-question selection/similarity logic exists (no random selection, no nearest-neighbor search, no STYLE_SIMILAR/INDEPENDENT alternation) — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals.
 * No LLM client/provider, prompts, generation, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. The next WP's author should account for this when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) is now a real runtime dependency. The next WP's author should account for both when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -241,7 +303,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-003** (per the roadmap: Historical Excel ingestion). Claude must not invent or begin WP-003's specification; wait for it to be supplied.
+**WP-004** (per the roadmap: PDF extraction). Claude must not invent or begin WP-004's specification; wait for it to be supplied.
 
 ---
 

@@ -38,6 +38,16 @@ The code and prompts must preserve this distinction explicitly.
 ## Canonical Categories
 Canonical categories are derived from the historical workbook's `category` column rather than duplicated as Python constants where avoidable.
 
+## Historical Question Ingestion (WP-003)
+`src/exam_generator/historical/` loads `data/questions_full_export.xlsx` (via `openpyxl`, not pandas) into WP-002 `HistoricalStyleReference` objects, exposed through a read-only `HistoricalQuestionRepository`.
+
+- **V1 workbook contract**: only `id`, `category`, `question`, `answer1..4`, `correct_answer_id` are required headers; column order does not matter; extra columns (`categories_json`, `accuracy_values`, `distinction_values`, `source`, `uploaded_at`, `created_at`, `updated_at`, or any future addition) are ignored by this subsystem rather than part of the contract.
+- Row-level structural validation is delegated to `HistoricalStyleReference` itself (not re-implemented at the ingestion boundary), so ingestion cannot silently diverge from the WP-002 domain contract. Ingestion fails closed: a malformed/partially-populated row raises a `HistoricalQuestionRowError` identifying the worksheet row rather than being skipped or repaired.
+- Canonical categories are derived only from successfully ingested historical questions' `category` values, in **first-seen workbook order** (not alphabetical, not a `set`). Duplicate category text collapses to one canonical category; category text is preserved verbatim (no aliasing, no fuzzy matching at this layer).
+- `HistoricalQuestionRepository.questions_for_category()` does exact string matching only; an unknown category returns an empty tuple rather than raising, since callers may legitimately probe availability. `ExamRequest` still does not validate against this list — that remains deferred to a later orchestration WP.
+- Historical question order is preserved (workbook row order), both in `all_questions` and within `questions_for_category()`.
+- The repository is read-only after construction (tuples / `MappingProxyType`); nothing in this subsystem constructs or exposes a `SourceEvidenceChunk` from historical data.
+
 ## LLM Boundary
 Application logic uses an LLM abstraction/factory rather than provider SDK calls directly.
 
