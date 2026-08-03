@@ -48,6 +48,17 @@ Canonical categories are derived from the historical workbook's `category` colum
 - Historical question order is preserved (workbook row order), both in `all_questions` and within `questions_for_category()`.
 - The repository is read-only after construction (tuples / `MappingProxyType`); nothing in this subsystem constructs or exposes a `SourceEvidenceChunk` from historical data.
 
+## PDF Text Extraction (WP-004)
+`src/exam_generator/ingestion/` extracts the project's factual-source PDFs (student summaries and `course_book.pdf`) into typed, page-aware in-memory representations, stopping before chunking.
+
+- **Library**: [PyMuPDF](https://pypi.org/project/PyMuPDF/) (`pymupdf`), not pypdf/pdfminer. Selected after directly comparing extraction of the real student-summary PDFs: PyMuPDF returns Hebrew/RTL text in correct logical reading order and extracts ~14x faster, whereas pypdf returned Hebrew visually reversed (e.g. `ןילוסא ריש` instead of `שיר אסולין`) and emitted xref warnings. `pymupdf.open(path, filetype="pdf")` is used explicitly (not relying on extension-based auto-detection) so a non-PDF file cannot be silently accepted as some other MuPDF-supported document type.
+- **Extraction-layer models** (`ExtractedPage`, `ExtractedDocument`) are structurally separate from `SourceEvidenceChunk` (WP-002): they represent raw page-aware extraction output, not post-chunking factual evidence. Nothing in this subsystem constructs a `SourceEvidenceChunk`; chunking is an explicitly separate, later WP's responsibility.
+- Page numbers are human-readable, 1-based, and must form the contiguous sequence `1..N` in physical PDF order - consistent with the 1-based page convention already established by `SourceEvidenceChunk` (WP-002).
+- Text is preserved as extracted (no translation, lowercasing, or semantic normalization); only the underlying library's own text-layer extraction is used - no OCR.
+- **Blank-page policy**: an individual page may legitimately have empty extracted text (real course-book/summary PDFs contain scattered blank/divider pages) without failing the document; page numbering and ordering are never altered because of a blank page. A whole document containing **no** usable text on any page fails closed (`PdfTextExtractionError`).
+- **Source-discovery policy**: student-summary PDFs are every `*.pdf` file in the configured data directory except the fixed `course_book.pdf` filename, sorted lexically by filename for determinism; the course book is resolved via that same fixed filename. Source classification (`SourceType.STUDENT_SUMMARY` vs. `COURSE_BOOK`) happens only at this discovery boundary - the generic `extract_pdf()` API requires the caller to pass `source_type` explicitly and never infers it from a filename.
+- Extracted documents/pages are read-only after construction (frozen models, `tuple` page sequence).
+
 ## LLM Boundary
 Application logic uses an LLM abstraction/factory rather than provider SDK calls directly.
 

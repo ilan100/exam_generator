@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-003 — Historical exam question ingestion**
-* Current/next planned WP: **WP-004**
+* Last completed WP: **WP-004 — PDF text extraction and source document ingestion**
+* Current/next planned WP: **WP-005**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-003 complete**
+* Repository implementation state: **WP-004 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-004 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-005 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -30,8 +30,10 @@ Implementation will proceed sequentially from WP-004 using Work Packages supplie
 * Unit tests for all new contracts (`tests/unit/test_models.py`), 97 tests, covering every case enumerated in WP-002 section 25.
 * Historical workbook ingestion (`src/exam_generator/historical/`): loads `data/questions_full_export.xlsx` via `openpyxl` into WP-002 `HistoricalStyleReference` objects, and a read-only `HistoricalQuestionRepository` exposing all questions, canonical categories (first-seen order), exact per-category lookup, and total/per-category statistics. Fails closed with domain-specific exceptions on malformed workbooks/rows.
 * Unit tests for historical ingestion (`tests/unit/test_historical.py`), 59 tests, using synthetic in-memory `.xlsx` fixtures built with `openpyxl.Workbook()` (no dependency on the real workbook for correctness tests).
+* PDF text extraction (`src/exam_generator/ingestion/`): deterministic page-aware extraction of student-summary PDFs and `course_book.pdf` via PyMuPDF, into typed `ExtractedPage`/`ExtractedDocument` models; deterministic student-summary discovery and course-book resolution using the WP-001 configured data directory; domain-specific error hierarchy; fails closed when a document has no usable text anywhere.
+* Unit tests for PDF ingestion (`tests/unit/test_ingestion.py`), 47 tests, using synthetic in-memory PDFs built with `pymupdf` itself (no extra test-only dependency, no committed binary fixtures).
 
-No PDF processing, retrieval, embeddings, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No retrieval, embeddings, chunking, indexing, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -60,6 +62,16 @@ Historical ingestion, importable from `exam_generator.historical`:
 * `load_historical_questions(path, sheet_name=None)` — lower-level function returning `(questions, categories_order)`
 * `default_workbook_path()`, `DEFAULT_WORKBOOK_FILENAME`
 * Error hierarchy: `HistoricalIngestionError` → `WorkbookNotFoundError`, `WorkbookFormatError`, `WorkbookSchemaError`, `HistoricalQuestionRowError`
+
+PDF ingestion, importable from `exam_generator.ingestion`:
+
+* `extract_pdf(path, source_type)` — required explicit `SourceType`; returns `ExtractedDocument`
+* `ExtractedPage` — `page` (1-based), `text` (may be empty for a legitimate blank page); frozen
+* `ExtractedDocument` — `source_file`, `source_type`, `pages` (`tuple[ExtractedPage, ...]`, min 1, enforced contiguous `1..N`); frozen
+* `discover_student_summary_pdfs(data_dir=None)` — every `*.pdf` in the data dir except `course_book.pdf`, sorted by filename
+* `default_course_book_path(data_dir=None)`, `DEFAULT_COURSE_BOOK_FILENAME`
+* `load_student_summaries(data_dir=None)` / `load_course_book(data_dir=None)` — discovery/resolution + extraction combined
+* Error hierarchy: `PdfIngestionError` → `PdfNotFoundError`, `PdfFormatError`, `PdfEncryptedError`, `PdfTextExtractionError`
 
 ## Established Requirements / Decisions
 
@@ -167,20 +179,32 @@ If implementation convenience conflicts with an established architectural decisi
 * Default workbook filename (`questions_full_export.xlsx`) is a fixed constant (`DEFAULT_WORKBOOK_FILENAME`) combined with WP-001's configured `paths.data_dir`, rather than a new `config/app.yaml` field — there is only one historical workbook in V1, so a dedicated config field would add complexity without benefit (per the WP's own guidance not to add configuration without clear benefit). `config/app.yaml` and the WP-001 config model/tests were therefore left unchanged.
 * `openpyxl` added as a genuine runtime dependency in `pyproject.toml` (`openpyxl>=3.1`, installed version `3.1.5`), verified working under the project's Python 3.12.3 environment.
 
+## Decisions Made (WP-004)
+
+* **PDF library: PyMuPDF (`pymupdf`)**, not pypdf/pdfminer/pdfplumber. Chosen after directly extracting from the real `student_summary_1.pdf` with both PyMuPDF and pypdf: PyMuPDF returned Hebrew in correct logical reading order and ran in ~0.17s for 77 pages, while pypdf returned Hebrew *visually reversed* (e.g. `ןילוסא ריש` instead of `שיר אסולין`), emitted dozens of "Ignoring wrong pointing object" xref warnings, and took ~2.3s (≈14x slower) for the same file. pypdf was installed only for this comparison and uninstalled immediately after; it was never added as a project dependency.
+* `pymupdf.open(path, filetype="pdf")` is called with an explicit `filetype="pdf"` rather than relying on PyMuPDF's extension-based auto-detection. Discovered during testing: MuPDF auto-detects format from the file extension, so a plain `.txt` file was silently "opened" as a one-page text document instead of failing — forcing `filetype="pdf"` makes any non-PDF content fail clearly with `PdfFormatError`, as WP-004 requires.
+* Blank-page policy: an individual page may have empty extracted text without failing the document (real PDFs have legitimate blank/divider pages — e.g. course_book.pdf has 18, confirmed to be section-boundary pages by inspection, not extraction failures); only a document with **zero** non-blank pages fails (`PdfTextExtractionError`).
+* Encrypted-PDF detection: `document.is_encrypted and not document.authenticate("")` — checked immediately after opening, before any per-page extraction is attempted, so encrypted input never reaches the extraction loop.
+* Source discovery: every `*.pdf` file in the configured data directory is treated as a student summary except the fixed `course_book.pdf` filename (mirrors WP-003's fixed-filename pattern for the historical workbook — no new `config/app.yaml` field, since there is exactly one course book by design). Discovery ordering is lexical by filename.
+* Package structure deviates slightly from the WP's suggested `{__init__, pdf, models, errors}.py`: a `discovery.py` module was added to separate source-discovery/resolution policy (which PDFs count as "student summary", where the course book lives) from the generic, source-agnostic `extract_pdf()` API in `pdf.py` — mirroring the loader/repository separation already used in WP-003's `historical` package.
+* Zero-page-PDF handling (`PdfFormatError` on `page_count == 0`) is implemented defensively but **not exercised by a real test**: PyMuPDF itself refuses to save a zero-page document (`ValueError: cannot save with zero pages`), so no such fixture is constructible with the selected library, matching WP-004's own "if constructible with the selected library" qualifier on that test case.
+
 ## Tests
 
-* Total: **166** (10 from WP-001 + 97 from WP-002 + 59 from WP-003)
-* Passing: **166**
+* Total: **213** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004)
+* Passing: **213**
 * Failing: **0**
 
 Verification commands and results:
 
 * `.venv/bin/python --version` → `Python 3.12.3`
 * `.venv/bin/python -c "import openpyxl; print(openpyxl.__version__)"` → `3.1.5`
-* `.venv/bin/python -m pytest -v` → 166 passed
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003).
+* `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
+* `.venv/bin/python -m pytest -v` → 213 passed
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003/WP-004).
 * Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API (see Real-Workbook Verification below); confirmed no wording corruption on a Hebrew question with embedded English terminology (`Corona radiata`) and English-only answer options.
-* `git status --short` / `git add -A --dry-run` → only WP-003 files (plus intentional `pyproject.toml` dependency addition) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
+* Real-source PDF verification against all four real PDFs via the public `exam_generator.ingestion` API (see Real-Source PDF Verification below); confirmed Hebrew and English/mixed content preserved without corruption.
+* `git status --short` / `git add -A --dry-run` → only WP-004 files (plus intentional `pyproject.toml` dependency addition) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 
 ## Real-Workbook Verification (WP-003)
 
@@ -216,10 +240,30 @@ Against the actual `data/questions_full_export.xlsx` (not modified):
 
 These figures (459 questions / 20 categories) match the WP's stated expectation ("approximately 459 questions / 20 categories") — no discrepancy to investigate.
 
+## Real-Source PDF Verification (WP-004)
+
+Against the actual PDFs in `data/` (none modified), via `exam_generator.ingestion`'s public API:
+
+* Student summaries: **3** (`student_summary_1.pdf`, `student_summary_2.pdf`, `student_summary_3.pdf`)
+
+| filename | source_type | pages | non_empty_pages | empty_pages |
+|---|---|---|---|---|
+| student_summary_1.pdf | STUDENT_SUMMARY | 77 | 77 | 0 |
+| student_summary_2.pdf | STUDENT_SUMMARY | 156 | 156 | 0 |
+| student_summary_3.pdf | STUDENT_SUMMARY | 176 | 172 | 4 |
+| course_book.pdf | COURSE_BOOK | 435 | 417 | 18 |
+
+* Total student-summary pages: **409**
+* Page counts for every document match `pdfinfo`'s independently-reported physical page count exactly (77 / 156 / 176 / 435).
+* None of the four PDFs are encrypted (confirmed via `pdfinfo`); none are scanned/image-only (ordinary embedded-text extraction succeeded for all four; `pdftotext` cross-check also succeeded before implementation).
+* **Hebrew verification**: 77/77 pages of `student_summary_1.pdf` contain Hebrew characters; a representative page (id/page 5) contains readable Hebrew text with embedded English terms (`trabeculae`, `Pia`) in correct logical reading order, not corrupted or reversed.
+* **English/mixed terminology verification**: 417/435 `course_book.pdf` pages contain English text runs (exactly matching its non-empty-page count); anatomical terms (e.g. "Medulla Oblongata", "spinal cord") appear intact and untranslated. A mixed Hebrew/English excerpt from a student summary (`... Corona radiata ...`) was also confirmed intact.
+* The empty pages found (18 in `course_book.pdf`: pages 1, 2, 4, 12, 44, 72, 98, 168, 210, 238, 270, 278, 294, 314, 330, 366, 380, 434; 4 in `student_summary_3.pdf`: pages 31, 137, 147, 176) were individually inspected and are consistent with legitimate blank/section-divider pages in a textbook/summary, not extraction failures — no document has zero non-empty pages.
+
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-003 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. Later WPs/environment setup should target 3.12+ (or upgrade the machine's interpreter) rather than assuming 3.14 is available. `openpyxl` was confirmed to install and work correctly under 3.12.3.
-* No other known issues from WP-003.
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-004 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl` and `pymupdf` were both confirmed to install and work correctly under 3.12.3.
+* No other known issues from WP-004.
 
 ## Files Added
 
@@ -245,18 +289,26 @@ WP-002 (carried forward, unchanged this WP):
 * `schemas/exam_request.example.json`
 * `tests/unit/test_models.py`
 
-WP-003 (new):
+WP-003 (carried forward, unchanged this WP):
 * `src/exam_generator/historical/__init__.py`
 * `src/exam_generator/historical/errors.py`
 * `src/exam_generator/historical/loader.py`
 * `src/exam_generator/historical/repository.py`
 * `tests/unit/test_historical.py`
 
+WP-004 (new):
+* `src/exam_generator/ingestion/__init__.py`
+* `src/exam_generator/ingestion/errors.py`
+* `src/exam_generator/ingestion/models.py`
+* `src/exam_generator/ingestion/pdf.py`
+* `src/exam_generator/ingestion/discovery.py`
+* `tests/unit/test_ingestion.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section recording the workbook contract, fail-closed row validation, canonical-category derivation/ordering, exact-match category querying, and read-only repository behavior).
-* `pyproject.toml` (added `openpyxl>=3.1` runtime dependency).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section recording the PyMuPDF selection/rationale, extraction-layer vs. evidence-chunk separation, page-numbering/blank-page policy, and source-discovery policy).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`).
 
 ## Deferred Work
 
@@ -287,15 +339,16 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-003 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references. None of the following exists yet:
+WP-001 through WP-004 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction stopping at page-aware `ExtractedDocument`/`ExtractedPage` objects. None of the following exists yet:
 
-* `ExamRequest` still validates request *structure* only; it does **not** yet check requested category names against `HistoricalQuestionRepository.canonical_categories`. That cross-check (hard-fail on unknown requested categories) is explicitly deferred to a later orchestration WP — WP-003 intentionally did not wire this up.
-* `SourceEvidenceChunk` exists as a contract, but no PDF ingestion, chunking, embeddings, indexing, or retrieval exists yet (WP-004/WP-005/WP-006 territory per the roadmap).
+* `ExamRequest` still validates request *structure* only; it does **not** yet check requested category names against `HistoricalQuestionRepository.canonical_categories`. That cross-check is explicitly deferred to a later orchestration WP.
+* **No chunking exists.** `ExtractedDocument`/`ExtractedPage` (WP-004) are extraction-layer-only representations; nothing converts them into `SourceEvidenceChunk` (WP-002) yet. A future WP must split extracted page text into chunks, assign `chunk_id`s, and produce `SourceEvidenceChunk` objects carrying `source_file`/`page`/`text`/`source_type` provenance forward from the `ExtractedPage`s that produced them.
+* No embeddings, vector/keyword index, or retrieval exists yet (WP-005/WP-006 territory per the roadmap).
 * All validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) exist as contracts only; no validator logic exists yet.
-* No historical-question selection/similarity logic exists (no random selection, no nearest-neighbor search, no STYLE_SIMILAR/INDEPENDENT alternation) — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals.
+* No historical-question selection/similarity logic exists — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals.
 * No LLM client/provider, prompts, generation, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) is now a real runtime dependency. The next WP's author should account for both when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) and `pymupdf>=1.24` (installed: 1.28.0) are now real runtime dependencies. The next WP's author should account for all of this when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -303,7 +356,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-004** (per the roadmap: PDF extraction). Claude must not invent or begin WP-004's specification; wait for it to be supplied.
+**WP-005** (per the roadmap: Chunking + indexing). Claude must not invent or begin WP-005's specification; wait for it to be supplied.
 
 ---
 
