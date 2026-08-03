@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-001 — Repository skeleton + configuration**
-* Current/next planned WP: **WP-002**
+* Last completed WP: **WP-002 — Domain models and schemas**
+* Current/next planned WP: **WP-003**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-001 complete**
+* Repository implementation state: **WP-002 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-002 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-003 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -25,8 +25,30 @@ Implementation will proceed sequentially from WP-002 using Work Packages supplie
 * `.gitignore` excluding `.venv/`, `.env`, `data/*` (source PDFs/Excel), and generated `output/`/`index/` contents, while keeping `config/`, `prompts/`, `schemas/`, `docs/`, `src/`, `tests/`, and `.gitkeep` placeholders trackable.
 * Directory placeholders: `prompts/{system,generation,validation,ingestion}/`, `schemas/`, `output/`, `index/` (empty, `.gitkeep`-tracked where needed).
 * Unit tests for configuration (`tests/unit/test_config.py`), 10 tests.
+* Core domain models (`src/exam_generator/models/`): `GenerationMode`, `ExamQuestion`, `CandidateQuestion`, `candidate_to_exam_question()` (question.py); `ExamRequest`, `ExamOutput` (exam.py); `SourceType`, `SourceEvidenceChunk`, `HistoricalStyleReference` (source.py); `GroundingValidationResult` (with `.passed`), `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckStatus`, `TextbookCheckResult` (validation.py); `QuestionAudit`, `ExamAudit` (audit.py). Shared strict-validation helpers (bool-rejecting positive ints, non-blank text, unit-interval floats, strict bool) live in the private `_common.py`.
+* JSON Schema artifacts generated from the Pydantic models via `scripts/generate_schemas.py` (no network access, deterministic, re-running produces byte-identical output): `schemas/exam_request.schema.json`, `schemas/exam_output.schema.json`, `schemas/exam_audit.schema.json`, plus a hand-written `schemas/exam_request.example.json`.
+* Unit tests for all new contracts (`tests/unit/test_models.py`), 97 tests, covering every case enumerated in WP-002 section 25.
 
-No ingestion, PDF processing, Excel processing, retrieval, embeddings, LLM integration, prompts content, generation, validation, orchestration, output handling, or CLI functionality has been implemented yet.
+No ingestion, PDF processing, Excel processing, retrieval, embeddings, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet. WP-002 implements contracts only.
+
+## Important Interfaces
+
+Public domain models, importable from `exam_generator.models`:
+
+* `GenerationMode` (str enum: `STYLE_SIMILAR`, `INDEPENDENT`)
+* `ExamRequest` — `{"categories": {name: count}}`, structural validation only
+* `ExamQuestion` — clean external question contract (`number`, `question`, `answer1..4`, `correct_answer` 1-4, `category`)
+* `CandidateQuestion` — internal pre-acceptance representation (`question`, `answers` list[4], `correct_answer`, `category`, `generation_mode`)
+* `candidate_to_exam_question(candidate, number)` — deterministic conversion
+* `ExamOutput` — `{"questions": [ExamQuestion, ...]}`, enforces unique contiguous `1..N` numbering
+* `SourceType` (str enum: `STUDENT_SUMMARY`, `COURSE_BOOK`)
+* `SourceEvidenceChunk` — `chunk_id`, `source_file`, `page` (1-based), `text`, `source_type`
+* `HistoricalStyleReference` — `historical_question_id` (positive int), `category`, `question`, `answers` list[4], `correct_answer`; structurally separate from `SourceEvidenceChunk`
+* `GroundingValidationResult` — `grounded`, `correct_answer_supported`, `other_answers_not_equally_correct`, `evidence_chunk_ids`, `evidence_text`, `reason`, `confidence`; centralized `.passed` property
+* `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckStatus` (str enum: `CONSISTENT`, `NOT_FOUND`, `POTENTIAL_CONFLICT`), `TextbookCheckResult`
+* `QuestionAudit`, `ExamAudit` — per-question and top-level audit contracts
+
+JSON Schemas (regenerate via `python scripts/generate_schemas.py`, no network access, deterministic): `schemas/exam_request.schema.json`, `schemas/exam_output.schema.json`, `schemas/exam_audit.schema.json`; example request at `schemas/exam_request.example.json`.
 
 ## Established Requirements / Decisions
 
@@ -119,42 +141,60 @@ These documents represent approved project decisions and remain authoritative ev
 
 If implementation convenience conflicts with an established architectural decision, Claude must report the conflict rather than silently changing the architecture.
 
+## Decisions Made (WP-002)
+
+* `HistoricalStyleReference.historical_question_id` is typed as a strict positive integer. This was chosen after narrowly inspecting `data/questions_full_export.xlsx`'s `id` column (header + first rows only, via a temporarily-installed, not-committed `openpyxl`, immediately uninstalled afterward) to confirm real IDs are plain positive integers (1, 2, 3, ...) — no Excel ingestion was implemented, and no new project dependency was added.
+* Domain modules are split as `models/{question,exam,source,validation,audit}.py` plus a private `models/_common.py` holding shared strict-validation type aliases (`NonBlankStr`, `PositiveIntStrict`, `CorrectAnswerId`, `UnitInterval`, `StrictBool`) used across the other five modules to avoid repeating the same bool-rejection/blank-rejection logic in ~15 places.
+* `docs/ARCHITECTURE.md` updated with one small addition: `SourceType`'s exact enum values (`STUDENT_SUMMARY`, `COURSE_BOOK`) are now spelled out under Retrieval; all other WP-002 contract decisions were already pre-documented there ahead of this implementation and matched exactly, so no other architecture edits were needed.
+
 ## Tests
 
-* Total: **10**
-* Passing: **10**
+* Total: **107** (10 from WP-001 + 97 from WP-002)
+* Passing: **107**
 * Failing: **0**
 
 Verification commands and results:
 
 * `.venv/bin/python --version` → `Python 3.12.3`
-* `.venv/bin/python -m pytest -v` → 10 passed
-* `git status --short` → only new untracked files/directories introduced by WP-001 plus the pre-existing untracked `data/`, `docs/`, `implementation/`; no `.venv/`, `.env`, or `data/` source files (PDFs/xlsx/`question_format.json`) appear in a `git add -A --dry-run` listing.
-* Manual smoke test of the public loader API (`load_app_config()`, `load_llm_config()`) succeeded and printed valid parsed values.
+* `.venv/bin/python -m pytest -v` → 107 passed
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic).
+* Serialization smoke test: built a synthetic `CandidateQuestion` with Hebrew question text and embedded `Corona radiata`, converted to `ExamQuestion`, wrapped in `ExamOutput`, serialized to JSON — Hebrew and `Corona radiata` both survived unchanged in the printed output.
+* Manually inspected all three generated schema files: required fields, enum constraints, 1-based answer-ID bounds, exactly-four-answer-field structure on `ExamQuestion`, `questions` array on `ExamOutput`/`ExamAudit`, and nested audit sub-structures are all present as expected.
+* `git status --short` / `git add -A --dry-run` → only WP-002 files added; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts staged.
 
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec.** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, this WP was implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change; all other WP-001 scope/requirements are implemented as specified. Later WPs/environment setup should target 3.12+ (or upgrade the machine's interpreter) rather than assuming 3.14 is available.
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, this and WP-002 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. Later WPs/environment setup should target 3.12+ (or upgrade the machine's interpreter) rather than assuming 3.14 is available.
+* No other known issues from WP-002.
 
 ## Files Added
 
-* `pyproject.toml`
-* `.gitignore`
-* `.env.example`
-* `config/app.yaml`
-* `config/llm.yaml`
-* `config/category_mapping.yaml`
-* `src/exam_generator/__init__.py`
-* `src/exam_generator/config/__init__.py`
-* `src/exam_generator/config/models.py`
-* `src/exam_generator/config/loader.py`
+WP-001 (carried forward, unchanged this WP):
+* `pyproject.toml`, `.gitignore`, `.env.example`
+* `config/app.yaml`, `config/llm.yaml`, `config/category_mapping.yaml`
+* `src/exam_generator/__init__.py`, `src/exam_generator/config/__init__.py`, `src/exam_generator/config/models.py`, `src/exam_generator/config/loader.py`
 * `tests/unit/test_config.py`
-* `output/.gitkeep`, `index/.gitkeep` (placeholders for gitignored runtime directories)
-* `prompts/system/`, `prompts/generation/`, `prompts/validation/`, `prompts/ingestion/`, `schemas/` (empty directories established for future WPs; no content added)
+* `output/.gitkeep`, `index/.gitkeep`
+
+WP-002 (new):
+* `src/exam_generator/models/__init__.py`
+* `src/exam_generator/models/_common.py`
+* `src/exam_generator/models/question.py`
+* `src/exam_generator/models/exam.py`
+* `src/exam_generator/models/source.py`
+* `src/exam_generator/models/validation.py`
+* `src/exam_generator/models/audit.py`
+* `scripts/generate_schemas.py`
+* `schemas/exam_request.schema.json`
+* `schemas/exam_output.schema.json`
+* `schemas/exam_audit.schema.json`
+* `schemas/exam_request.example.json`
+* `tests/unit/test_models.py`
 
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
+* `docs/ARCHITECTURE.md` (one addition: `SourceType` enum values spelled out under Retrieval).
 
 ## Deferred Work
 
@@ -185,7 +225,13 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 is complete. `src/exam_generator/config` provides `load_app_config()`, `load_llm_config()`, the models listed above, and `ConfigError`/`find_project_root()`. No ingestion, PDF/Excel parsing, canonical-category derivation, embeddings, indexing, LLM calls, prompt content, generation, validation, diversity/retry logic, orchestration, output writing, or CLI exists yet — all of that remains for later WPs per the roadmap below.
+WP-001 and WP-002 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` (see Important Interfaces above) provides every domain contract needed by ingestion, retrieval, generation, validation, orchestration, and output — but none of that behavior is implemented yet. In particular:
+
+* `ExamRequest` validates request *structure* only; it does not yet check requested category names against canonical categories (that requires WP-003's historical-Excel-derived category list).
+* `HistoricalStyleReference` exists as a contract, but no Excel ingestion/parsing exists yet.
+* `SourceEvidenceChunk` exists as a contract, but no PDF ingestion, chunking, embeddings, indexing, or retrieval exists yet.
+* All validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) exist as contracts only; no validator logic exists yet.
+* No LLM client/provider, prompts, generation, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
 
 The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. The next WP's author should account for this when specifying dependencies/tooling.
 
@@ -195,7 +241,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-002** (per the roadmap: Domain models and schemas). Claude must not invent or begin WP-002's specification; wait for it to be supplied.
+**WP-003** (per the roadmap: Historical Excel ingestion). Claude must not invent or begin WP-003's specification; wait for it to be supplied.
 
 ---
 

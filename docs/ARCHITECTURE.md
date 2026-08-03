@@ -29,6 +29,7 @@ The code and prompts must preserve this distinction explicitly.
 ## Retrieval
 - Use a local searchable index for V1.
 - Preserve at minimum: `chunk_id`, `source_file`, `page`, `text`, and `source_type`.
+- `source_type` (`SourceType`, WP-002) is exactly `STUDENT_SUMMARY` or `COURSE_BOOK`; historical exam questions are never a `SourceType` value.
 - `page` uses human-readable, 1-based PDF page numbering (frozen by WP-002's `SourceEvidenceChunk` domain model).
 - Retrieval must be semantic enough to handle category/chapter wording differences.
 - Support external category aliases/manual overrides via configuration.

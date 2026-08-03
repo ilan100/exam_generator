@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "ExamQuestion": {
+      "additionalProperties": false,
+      "description": "The authoritative, externally-facing exam question contract.\n\nContains only clean question content - no source, grounding, validation,\nhistorical-reference, generation-mode, model, confidence, or other audit\ninformation. See ``exam_generator.models.audit.QuestionAudit`` for that.",
+      "properties": {
+        "number": {
+          "gt": 0,
+          "title": "Number",
+          "type": "integer"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "answer1": {
+          "title": "Answer1",
+          "type": "string"
+        },
+        "answer2": {
+          "title": "Answer2",
+          "type": "string"
+        },
+        "answer3": {
+          "title": "Answer3",
+          "type": "string"
+        },
+        "answer4": {
+          "title": "Answer4",
+          "type": "string"
+        },
+        "correct_answer": {
+          "ge": 1,
+          "le": 4,
+          "title": "Correct Answer",
+          "type": "integer"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "question",
+        "answer1",
+        "answer2",
+        "answer3",
+        "answer4",
+        "correct_answer",
+        "category"
+      ],
+      "title": "ExamQuestion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "The V1 clean exam output contract: ``{\"questions\": [...]}``.\n\nContains only clean question content, no audit/traceability information.",
+  "properties": {
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/ExamQuestion"
+      },
+      "minItems": 1,
+      "title": "Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "questions"
+  ],
+  "title": "ExamOutput",
+  "type": "object"
+}

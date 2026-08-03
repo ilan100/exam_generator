@@ -1,0 +1,377 @@
+{
+  "$defs": {
+    "CategoryValidationResult": {
+      "additionalProperties": false,
+      "description": "Category-appropriateness validation result.",
+      "properties": {
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        },
+        "requested_category": {
+          "title": "Requested Category",
+          "type": "string"
+        },
+        "assessed_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessed Category"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "valid",
+        "requested_category",
+        "reason"
+      ],
+      "title": "CategoryValidationResult",
+      "type": "object"
+    },
+    "GenerationMode": {
+      "description": "How a candidate question was produced.\n\nBoth modes still require independent student-summary grounding; neither\nmode is itself evidence of factual validity.",
+      "enum": [
+        "STYLE_SIMILAR",
+        "INDEPENDENT"
+      ],
+      "title": "GenerationMode",
+      "type": "string"
+    },
+    "GroundingValidationResult": {
+      "additionalProperties": false,
+      "description": "Result of independently checking a candidate against source evidence.\n\nA generator's own claim that its question is grounded is never trusted;\nthis result is produced only by an independent validator.",
+      "properties": {
+        "grounded": {
+          "title": "Grounded",
+          "type": "boolean"
+        },
+        "correct_answer_supported": {
+          "title": "Correct Answer Supported",
+          "type": "boolean"
+        },
+        "other_answers_not_equally_correct": {
+          "title": "Other Answers Not Equally Correct",
+          "type": "boolean"
+        },
+        "evidence_chunk_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Chunk Ids",
+          "type": "array"
+        },
+        "evidence_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Text"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Confidence",
+          "type": "number"
+        }
+      },
+      "required": [
+        "grounded",
+        "correct_answer_supported",
+        "other_answers_not_equally_correct",
+        "reason",
+        "confidence"
+      ],
+      "title": "GroundingValidationResult",
+      "type": "object"
+    },
+    "MCQValidationResult": {
+      "additionalProperties": false,
+      "description": "Structural/semantic MCQ validation result.",
+      "properties": {
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        },
+        "exactly_four_answers": {
+          "title": "Exactly Four Answers",
+          "type": "boolean"
+        },
+        "single_best_answer": {
+          "title": "Single Best Answer",
+          "type": "boolean"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "valid",
+        "exactly_four_answers",
+        "single_best_answer",
+        "reason"
+      ],
+      "title": "MCQValidationResult",
+      "type": "object"
+    },
+    "QualityValidationResult": {
+      "additionalProperties": false,
+      "description": "Minimal stylistic/quality validation result.",
+      "properties": {
+        "valid": {
+          "title": "Valid",
+          "type": "boolean"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "valid",
+        "reason"
+      ],
+      "title": "QualityValidationResult",
+      "type": "object"
+    },
+    "QuestionAudit": {
+      "additionalProperties": false,
+      "description": "Traceability/diagnostics for a single generated question.",
+      "properties": {
+        "number": {
+          "gt": 0,
+          "title": "Number",
+          "type": "integer"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "generation_mode": {
+          "$ref": "#/$defs/GenerationMode"
+        },
+        "historical_reference_id": {
+          "anyOf": [
+            {
+              "gt": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Historical Reference Id"
+        },
+        "grounding": {
+          "$ref": "#/$defs/GroundingValidationResult"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/SourceEvidenceChunk"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "mcq_validation": {
+          "$ref": "#/$defs/MCQValidationResult"
+        },
+        "category_validation": {
+          "$ref": "#/$defs/CategoryValidationResult"
+        },
+        "quality_validation": {
+          "$ref": "#/$defs/QualityValidationResult"
+        },
+        "textbook_check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextbookCheckResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "generation_attempts": {
+          "gt": 0,
+          "title": "Generation Attempts",
+          "type": "integer"
+        },
+        "diversity_target": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Diversity Target",
+          "type": "number"
+        }
+      },
+      "required": [
+        "number",
+        "category",
+        "generation_mode",
+        "grounding",
+        "mcq_validation",
+        "category_validation",
+        "quality_validation",
+        "generation_attempts",
+        "diversity_target"
+      ],
+      "title": "QuestionAudit",
+      "type": "object"
+    },
+    "SourceEvidenceChunk": {
+      "additionalProperties": false,
+      "description": "A chunk of factual source text produced by future ingestion/retrieval.",
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "source_file": {
+          "title": "Source File",
+          "type": "string"
+        },
+        "page": {
+          "gt": 0,
+          "title": "Page",
+          "type": "integer"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "source_type": {
+          "$ref": "#/$defs/SourceType"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "source_file",
+        "page",
+        "text",
+        "source_type"
+      ],
+      "title": "SourceEvidenceChunk",
+      "type": "object"
+    },
+    "SourceType": {
+      "description": "Factual source types. Historical exam questions are intentionally not\na member of this enum - see ``HistoricalStyleReference``.",
+      "enum": [
+        "STUDENT_SUMMARY",
+        "COURSE_BOOK"
+      ],
+      "title": "SourceType",
+      "type": "string"
+    },
+    "TextbookCheckResult": {
+      "additionalProperties": false,
+      "description": "Secondary textbook validation result.\n\nA ``CONSISTENT`` result does not itself satisfy student-summary grounding,\nand a missing/absent textbook check does not invalidate an otherwise\nproperly grounded question.",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/TextbookCheckStatus"
+        },
+        "source_page": {
+          "anyOf": [
+            {
+              "gt": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Page"
+        },
+        "reference_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Text"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "title": "TextbookCheckResult",
+      "type": "object"
+    },
+    "TextbookCheckStatus": {
+      "description": "Secondary, non-authoritative textbook consistency status.",
+      "enum": [
+        "CONSISTENT",
+        "NOT_FOUND",
+        "POTENTIAL_CONFLICT"
+      ],
+      "title": "TextbookCheckStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Top-level audit contract for one exam-generation run.",
+  "properties": {
+    "exam_id": {
+      "title": "Exam Id",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "provider": {
+      "title": "Provider",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/QuestionAudit"
+      },
+      "minItems": 1,
+      "title": "Questions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "exam_id",
+    "generated_at",
+    "provider",
+    "model",
+    "questions"
+  ],
+  "title": "ExamAudit",
+  "type": "object"
+}

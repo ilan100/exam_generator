@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "Structural contract for an exam-generation request.\n\nValidates structure only: category names are checked for non-emptiness\nand requested counts for strict positivity, but whether a category name\nis a *known* canonical category is not checked here (that requires the\nhistorical-Excel-derived category list from a later Work Package).",
+  "properties": {
+    "categories": {
+      "additionalProperties": {
+        "gt": 0,
+        "type": "integer"
+      },
+      "minProperties": 1,
+      "title": "Categories",
+      "type": "object"
+    }
+  },
+  "required": [
+    "categories"
+  ],
+  "title": "ExamRequest",
+  "type": "object"
+}
