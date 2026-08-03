@@ -93,6 +93,18 @@ Target conceptual interface:
 
 Provider, model, and generation/validation parameters are external configuration.
 
+### LLM Abstraction and OpenAI Provider (WP-007)
+`src/exam_generator/llm/` (`errors.py`, `models.py`, `provider.py`, `factory.py`, `openai_provider.py`) implements this boundary concretely.
+
+- **`LLMProvider`** (abstract base class) exposes `generate_structured(*, messages, response_model, profile) -> response_model instance`, `provider_name`, `model_name`. Only `openai_provider.py` imports the `openai` SDK; `models.py`/`provider.py`/`factory.py` are provider-independent and never import it, so a future provider can be added without touching those modules or any caller.
+- **Structured output**: uses the OpenAI SDK's Responses API (`client.responses.parse(..., text_format=response_model)`), which returns a validated instance of the caller-supplied Pydantic model directly via `response.output_parsed` - no hand-maintained JSON Schema duplication, no `json.loads` of raw prose. Any arbitrary caller-supplied Pydantic model works; the provider never hard-codes a specific response model.
+- **`LLMMessage`** (`role` ∈ `{system, user, assistant}`, non-blank `content`) is the provider-independent message contract; OpenAI SDK message/input types are never exposed to callers. **`LLMProfile`** (`GENERATION`, `VALIDATION`) selects the matching `config/llm.yaml` parameter section - generation and validation parameters can never be accidentally interchanged.
+- **Provider construction**: `build_llm_provider(llm_config, api_key=None)` is a factory keyed on `llm_config.provider`; only `"openai"` is supported in V1, anything else fails clearly (`LLMConfigurationError`) rather than silently falling back. `OPENAI_API_KEY` is read from the environment only at provider-construction time, never during ordinary configuration loading (preserving the WP-001 decision that config loading never requires a key) and never accepted via `config/llm.yaml` or any committed file.
+- **Retry policy (frozen V1 decision)**: the OpenAI client is constructed with `max_retries=0`, disabling the SDK's default transport-level retries. One `generate_structured()` call = exactly one logical application LLM call; future generation-attempt/retry/diversity control happens entirely outside the provider, with no hidden SDK-level retries to confuse attempt accounting.
+- **Error hierarchy**: `LLMError` → `LLMConfigurationError`, `LLMRequestError` (invalid caller input, e.g. empty messages), `LLMProviderError` (→ `LLMAuthenticationError`, `LLMRateLimitError`), `LLMResponseError` (→ `LLMRefusalError`). Expected OpenAI SDK exceptions are translated with the original exception preserved as `__cause__`; secrets never appear in any exception message.
+- Structured-output refusals (`content.type == "refusal"` in the Responses API output) are never parsed as if successful; they raise `LLMRefusalError`. A missing/absent parsed object, or a parsed object of the wrong type, raises `LLMResponseError` - the provider never returns `None`/a raw dict/raw text when a response model was requested, and never repairs an invalid parsed result.
+- Synchronous V1 API only (no `async`); no production prompts exist yet (WP-008's responsibility) - WP-007 only makes arbitrary structured-output requests possible for later layers.
+
 ## Prompt Boundary
 Substantial prompts are external files organized by purpose, for example:
 - system

@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-006 — Local retrieval and category integration**
-* Current/next planned WP: **WP-007**
+* Last completed WP: **WP-007 — LLM abstraction and OpenAI provider**
+* Current/next planned WP: **WP-008**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-006 complete**
+* Repository implementation state: **WP-007 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-007 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-008 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -36,8 +36,10 @@ Implementation will proceed sequentially from WP-007 using Work Packages supplie
 * Unit tests for chunking (`tests/unit/test_chunking.py`), 80 tests, using synthetic `ExtractedDocument` objects (no dependency on the real PDFs for correctness tests).
 * Local lexical retrieval and category integration (`src/exam_generator/retrieval/`): deterministic character n-gram TF-IDF retrieval (`scikit-learn`) over a WP-005 `FactualSourceCorpus`, one-source-type-per-index enforcement, deterministic tie-breaking, zero-score filtering; canonical-category resolution/alias handling activating `config/category_mapping.yaml`; `ExamRequest` category resolution (with alias-count combination); category-based student-summary retrieval. New `retrieval` config section added to `config/app.yaml`/`AppConfig`; `config/category_mapping.yaml` schema changed from the WP-001 placeholder `aliases: {}` to the now-activated `mapping: {}`.
 * Unit tests for retrieval/categories (`tests/unit/test_retrieval.py`), 71 tests, using synthetic corpora/resolvers (no dependency on the real PDFs/workbook for correctness tests).
+* Provider-independent LLM abstraction + OpenAI provider (`src/exam_generator/llm/`): `LLMProvider` (abstract), `LLMMessage`/`MessageRole`/`LLMProfile` contracts, `build_llm_provider()` factory, `OpenAIProvider` using the OpenAI SDK's Responses API structured-output mechanism (`client.responses.parse(..., text_format=<any Pydantic model>)`). Focused LLM error hierarchy with OpenAI exception translation. `scripts/smoke_openai.py`: optional, non-pytest, one-request manual live smoke test.
+* Unit tests for the LLM layer (`tests/unit/test_llm.py`), 49 tests, all OpenAI calls mocked - zero network access, no API key required.
 
-No embeddings, vector databases, semantic/neural retrieval, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No embeddings, vector databases, semantic/neural retrieval, production prompts, question generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -97,6 +99,17 @@ Retrieval/categories, importable from `exam_generator.retrieval`:
 * `retrieve_for_category(category, resolver, index, *, top_k=None) -> tuple[RetrievalResult, ...]`
 * Error hierarchy: `RetrievalError` → `RetrievalIndexError` (→ `SourceTypeMismatchError`), `RetrievalQueryError`; `CategoryResolutionError` → `UnknownCategoryError`, `InvalidCategoryMappingError`
 * Config: `RetrievalConfig` (`top_k`, `ngram_min`, `ngram_max`), `AppConfig.retrieval`; `CategoryMappingConfig` (`mapping: dict[str,str]`), `load_category_mapping()`
+
+LLM abstraction, importable from `exam_generator.llm`:
+
+* `LLMProvider` (ABC) — `.provider_name`, `.model_name`, `.generate_structured(*, messages, response_model, profile)`
+* `LLMMessage(role, content)` — `role` ∈ `MessageRole.{SYSTEM, USER, ASSISTANT}`, non-blank content, frozen
+* `LLMProfile.{GENERATION, VALIDATION}` — selects the matching `config/llm.yaml` parameter section
+* `build_llm_provider(llm_config, api_key=None) -> LLMProvider` — factory keyed on `llm_config.provider`; only `"openai"` supported
+* `OpenAIProvider` (concrete) — `.from_config(llm_config, api_key=None, client=None)`, constructor accepts an injectable `client` for tests
+* `API_KEY_ENV_VAR = "OPENAI_API_KEY"`
+* Error hierarchy: `LLMError` → `LLMConfigurationError`, `LLMRequestError`, `LLMProviderError` (→ `LLMAuthenticationError`, `LLMRateLimitError`), `LLMResponseError` (→ `LLMRefusalError`)
+* `scripts/smoke_openai.py` — optional manual live smoke test (not part of pytest)
 
 ## Established Requirements / Decisions
 
@@ -240,10 +253,32 @@ If implementation convenience conflicts with an established architectural decisi
 * **Multi-column PDF text interleaving**: one inspected student-summary chunk (page 32) showed Hebrew "קליפה" (cortex) and its English gloss "cortex" interleaved/fragmented mid-word (`"קליפ cort ex"`), apparently from PyMuPDF's default reading-order handling of a multi-column layout. The chunk remains topically on-subject (discusses gray/white matter and cortex) and is not corrupted Unicode - just non-linear reading order in that specific passage. This is an extraction-layer (WP-004) characteristic, not something WP-006 attempted to fix; noted here since it surfaced during retrieval-quality inspection.
 * No category or query produced garbled/corrupted Unicode; no action was taken to "fix" any of the above per the WP's explicit instruction not to solve retrieval-quality issues in this WP.
 
+## Decisions Made (WP-007)
+
+* **Structured-output mechanism: the OpenAI Responses API** (`client.responses.parse(model=..., input=[...], text_format=response_model, temperature=..., max_output_tokens=...)`), inspected directly on the installed SDK rather than assumed from older documentation/examples (the SDK also exposes the older `client.beta.chat.completions.parse`/`client.chat.completions.parse`, but Responses + `text_format` is the current first-class mechanism and returns `response.output_parsed` as a ready validated Pydantic instance).
+* **`max_retries=0` on the constructed OpenAI client** (SDK default is 2): explicitly disables transport-level retries so `generate_structured()` always corresponds to exactly one logical application LLM call, per the WP's own preferred architecture ("provider call = one logical application LLM call") - documented in `docs/ARCHITECTURE.md` per the WP's explicit request to record this decision.
+* **Error hierarchy nesting** (WP's suggested list was flat): `LLMAuthenticationError`/`LLMRateLimitError` nested under `LLMProviderError`; `LLMRefusalError` nested under `LLMResponseError`. One addition beyond the WP's suggested names: `LLMRequestError` (direct child of `LLMError`) for caller-input problems that must fail before any provider call (currently: empty message sequence) - mirrors `RetrievalQueryError`'s role from WP-006.
+* **`LLMProvider` is an ABC**, not a `Protocol` - the WP explicitly permitted this "if there is a clear reason"; a concrete factory-constructed hierarchy (one real implementation today, future providers subclassing it) fits an ABC more naturally than structural typing.
+* Refusal detection inspects `response.output` for any `content.type == "refusal"` item *before* falling back to `response.output_parsed is None`, so a refusal produces a specific, informative `LLMRefusalError` (with the model's stated refusal reason) rather than a generic "no parsed response" error.
+* Package structure: `llm/{errors,models,provider,factory,openai_provider}.py` (matches the WP's own suggested structure exactly). Only `openai_provider.py` imports the `openai` SDK.
+
+## Live Smoke Test (WP-007)
+
+**Executed successfully** by the user with a real `OPENAI_API_KEY`, once against the live OpenAI API:
+
+```
+provider: openai
+model: gpt-4o-mini
+response type: _SmokeTestResponse
+response.value: 'ok'
+```
+
+This confirms the configured `gpt-4o-mini` model, the Responses API structured-output mechanism (`client.responses.parse(..., text_format=...)`), and the configured `temperature`/`max_output_tokens` generation parameters all work correctly together end-to-end against the live API - not just in mocked tests. `scripts/smoke_openai.py` was also manually verified beforehand (before a key was available) to fail with a clean, project-specific `LLMConfigurationError` rather than a raw SDK exception or a hang when `OPENAI_API_KEY` is absent, confirming the missing-key path behaves as designed too. Only one live request was made, per the WP's cost/frequency constraint.
+
 ## Tests
 
-* Total: **365** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 new category-mapping config test)
-* Passing: **365**
+* Total: **414** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007)
+* Passing: **414**
 * Failing: **0**
 
 Verification commands and results:
@@ -252,13 +287,15 @@ Verification commands and results:
 * `.venv/bin/python -c "import openpyxl; print(openpyxl.__version__)"` → `3.1.5`
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
 * `.venv/bin/python -c "import sklearn; print(sklearn.__version__)"` → `1.9.0`
-* `.venv/bin/python -m pytest -v` → 365 passed
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - `SourceEvidenceChunk`/`ExamRequest`/`ExamOutput`/`ExamAudit` themselves did not change in WP-006).
-* Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API; confirmed no wording corruption on a Hebrew question with embedded English terminology and English-only answer options.
-* Real-source PDF verification against all four real PDFs via the public `exam_generator.ingestion` API; confirmed Hebrew and English/mixed content preserved without corruption.
-* Real corpus verification against all four real PDFs via `build_student_summary_corpus()`/`build_course_book_corpus()`; confirmed chunk coverage invariants, ID uniqueness/determinism, and readable overlap with no corruption.
-* Real retrieval-index verification against both real corpora (see Real Retrieval Verification below); confirmed deterministic reconstruction, all 20 real canonical categories return positive results, and representative Hebrew/English/mixed queries return relevant (non-corrupted) chunks.
-* `git status --short` / `git add -A --dry-run` → only WP-006 files (plus intentional `config/app.yaml`, `config/category_mapping.yaml`, and `pyproject.toml` changes) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
+* `.venv/bin/python -c "import openai; print(openai.__version__)"` → `2.52.0`
+* `.venv/bin/python -m pytest -v` → 414 passed, in ~3s with zero network access and no `OPENAI_API_KEY` set (confirmed absent from the environment) - satisfies the WP's mandatory offline-test requirement.
+* `.venv/bin/python -m pytest tests/unit/test_llm.py -v` → 49 passed.
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - no WP-002 model changed in WP-007).
+* Real-workbook smoke test against `data/questions_full_export.xlsx`; confirmed no wording corruption.
+* Real-source PDF verification against all four real PDFs; confirmed Hebrew/English/mixed content preserved.
+* Real corpus + real retrieval-index verification against all four real PDFs; confirmed coverage invariants, ID uniqueness/determinism, and 20/20 canonical categories returning positive retrieval results.
+* Live OpenAI smoke test: **not executed** (see Live Smoke Test section below) - explicitly permitted by the WP when no key is available.
+* `git status --short` / `git add -A --dry-run` → only WP-007 files (plus intentional `pyproject.toml` change) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 
 ## Real-Workbook Verification (WP-003)
 
@@ -382,8 +419,9 @@ Total query time for all 20 categories: ~0.17s (~8.4ms/query average).
 
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-006 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl`, `pymupdf`, and now `scikit-learn` were all confirmed to install and work correctly under 3.12.3.
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-007 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl`, `pymupdf`, `scikit-learn`, and now `openai` were all confirmed to install and work correctly under 3.12.3.
 * See "Known Retrieval-Quality Observations" above for WP-006-specific findings (all explicitly non-blocking per the WP's own acceptance criteria - honest reporting was required, not resolution).
+* No open issues from WP-007. Live OpenAI compatibility (`gpt-4o-mini` + Responses API + `temperature` + structured output) was verified end-to-end against the real API by the user after this WP's initial completion report - see Live Smoke Test above.
 
 ## Files Added
 
@@ -431,7 +469,7 @@ WP-005 (carried forward, unchanged this WP):
 * `src/exam_generator/chunking/corpus.py`
 * `tests/unit/test_chunking.py`
 
-WP-006 (new):
+WP-006 (carried forward, unchanged this WP):
 * `src/exam_generator/retrieval/__init__.py`
 * `src/exam_generator/retrieval/errors.py`
 * `src/exam_generator/retrieval/models.py`
@@ -439,11 +477,21 @@ WP-006 (new):
 * `src/exam_generator/retrieval/categories.py`
 * `tests/unit/test_retrieval.py`
 
+WP-007 (new):
+* `src/exam_generator/llm/__init__.py`
+* `src/exam_generator/llm/errors.py`
+* `src/exam_generator/llm/models.py`
+* `src/exam_generator/llm/provider.py`
+* `src/exam_generator/llm/factory.py`
+* `src/exam_generator/llm/openai_provider.py`
+* `scripts/smoke_openai.py`
+* `tests/unit/test_llm.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section recording the TF-IDF baseline/rationale, one-source-type-per-index rule, score-vs-grounding separation, zero-score tolerance, tie-breaking, and canonical-category/alias semantics).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`).
 * `config/app.yaml` (WP-006: added `retrieval:` section: `top_k: 8`, `ngram_min: 3`, `ngram_max: 5`).
 * `config/category_mapping.yaml` (WP-006: schema changed from placeholder `aliases: {}` to activated `mapping: {}` - see Decisions Made).
 * `src/exam_generator/config/models.py` (WP-006: added `RetrievalConfig`, `CategoryMappingConfig`, `NonBlankConfigStr`/`_reject_blank` helpers, `AppConfig.retrieval` field).
@@ -480,16 +528,16 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-006 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution. None of the following exists yet:
+WP-001 through WP-007 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution; `src/exam_generator/llm` provides the provider-independent LLM abstraction + a working OpenAI provider (`build_llm_provider()`, `LLMMessage`, `LLMProfile`, `generate_structured()`). None of the following exists yet:
 
-* **No LLM client/provider, prompts, or generation logic exists.** `retrieve_for_category()` returns ranked `SourceEvidenceChunk` candidates - it does not decide whether they're sufficient to generate or ground a question. A future WP must introduce the LLM abstraction/provider (per `docs/MASTER_PROJECT_BRIEF.md`'s "LLM provider and model dynamically configurable" requirement) and external prompt files before any generation can occur.
-* No validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) have validator logic yet - they exist as WP-002 contracts only. In particular, **no retrieval score is, or should be, treated as a grounding decision** - the future grounding validator must independently assess whether retrieved evidence supports a candidate's claimed correct answer.
-* No historical-question selection/similarity logic exists (no STYLE_SIMILAR/INDEPENDENT alternation, no historical-question sampling) — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals; WP-006 did not touch this either.
-* No diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
-* Retrieval/category-resolution integration point for the next generation-facing WP: `build_category_resolver()` + `resolve_exam_request_categories()` give a validated, alias-collapsed `ExamRequest`; `build_student_summary_retrieval_index()` + `retrieve_for_category()` give ranked candidate evidence per canonical category. Neither commits to a specific generation architecture beyond that.
-* See "Known Retrieval-Quality Observations" above: canonical-category retrieval is healthy (20/20 categories return positive results), but short/common-term exact-match ranking is imperfect (correct chunk usually top-3-5, not always top-1) - a future WP may need to account for this when deciding how many candidate chunks to feed into generation/grounding per category.
+* **No production prompts or prompt-loading infrastructure exists.** `src/exam_generator/llm` can send arbitrary messages and get back an arbitrary Pydantic response model, but nothing populates `prompts/system/`, `prompts/generation/`, `prompts/validation/` with real content, and no code loads/renders prompt templates yet. That is WP-008's explicit responsibility.
+* **No question generation or validation behavior exists.** `CandidateQuestion` has never been produced by an LLM call; `GroundingValidationResult`/`MCQValidationResult`/`CategoryValidationResult`/`QualityValidationResult`/`TextbookCheckResult` still have no validator logic - they remain WP-002 contracts only. WP-007 only makes it *possible* for later code to request these as structured outputs; it does not call the LLM with any of them yet.
+* **No retrieval-to-generation wiring exists.** `retrieve_for_category()` (WP-006) and `generate_structured()` (WP-007) have not been connected - no code retrieves evidence and passes it to an LLM prompt. That connection requires prompt infrastructure (WP-008) and generation logic (WP-009) first.
+* No historical-question selection/similarity logic, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
+* **Live OpenAI compatibility is confirmed** - `gpt-4o-mini` + Responses API + `temperature` + structured output all work correctly together against the real API (see Live Smoke Test above). WP-008/WP-009 can rely on the provider for real generation work.
+* Integration point for WP-008/WP-009: `build_llm_provider(load_llm_config())` gives a ready `LLMProvider`; `provider.generate_structured(messages=[LLMMessage(...)], response_model=<any Pydantic model>, profile=LLMProfile.GENERATION|VALIDATION)` is the call shape prompt/generation code should target. No hidden system prompt is inserted automatically (by design - WP-008 owns that).
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), and now `scikit-learn>=1.4` (1.9.0) are the real runtime dependencies so far. The next WP's author should account for the environment note when specifying dependencies/tooling, and should be aware that neither the corpus nor the retrieval index is persisted (both are rebuilt in memory on demand).
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and now `openai>=2.0` (2.52.0) are the real runtime dependencies so far. The next WP's author should account for the environment note when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -497,7 +545,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-007** (per the roadmap: LLM abstraction + OpenAI provider). Claude must not invent or begin WP-007's specification; wait for it to be supplied.
+**WP-008** (per the roadmap: external prompt infrastructure). Claude must not invent or begin WP-008's specification; wait for it to be supplied.
 
 ---
 
