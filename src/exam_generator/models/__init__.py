@@ -3,6 +3,7 @@ from exam_generator.models.exam import ExamOutput, ExamRequest
 from exam_generator.models.question import (
     CandidateQuestion,
     ExamQuestion,
+    GeneratedQuestionResponse,
     GenerationMode,
     candidate_to_exam_question,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "ExamOutput",
     "ExamQuestion",
     "ExamRequest",
+    "GeneratedQuestionResponse",
     "GenerationMode",
     "GroundingValidationResult",
     "HistoricalStyleReference",
