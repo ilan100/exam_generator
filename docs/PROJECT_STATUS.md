@@ -4,10 +4,10 @@
 
 ## Current State
 
-* Last completed WP: **WP-009 — Question generation**
-* Current/next planned WP: **WP-010**
+* Last completed WP: **WP-010 — Independent grounding validation**
+* Current/next planned WP: **WP-011**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-009 complete**
+* Repository implementation state: **WP-010 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
@@ -42,8 +42,11 @@ Implementation will proceed sequentially from WP-008 using Work Packages supplie
 * Unit tests for the prompt infrastructure (`tests/unit/test_prompts.py`), 110 tests, zero LLM/provider calls, zero network access, no API key required.
 * First real question-generation path (`src/exam_generator/generation/`): `QuestionGenerator` (`generate_candidate_question(*, category, generation_mode) -> CandidateQuestion`, `.from_default_configuration()`), a new LLM-facing `GeneratedQuestionResponse` model (`src/exam_generator/models/question.py`), deterministic historical-reference selection for `STYLE_SIMILAR`, and application-side provenance validation that rejects any LLM-claimed evidence-chunk-id/historical-reference-id not matching the actual generation context. Wires together WP-006 retrieval, WP-003 historical data, WP-008 prompt infrastructure, and WP-007's LLM abstraction into exactly one LLM call per invocation - no retry loop.
 * Unit tests for question generation (`tests/unit/test_generation.py`), 28 tests, LLM fully mocked, zero network access, no API key required.
+* Independent grounding validation (`src/exam_generator/validation/`): `GroundingValidator` (`validate_grounding(candidate) -> GroundingValidationResult`, `.from_default_configuration()`), independent deterministic student-summary retrieval (never trusting generation-time claims), and provenance verification identical in spirit to WP-009's (any LLM-claimed supporting-evidence id not actually supplied is rejected). A negative grounding verdict is a normal return value, never an exception; provider/LLM failures remain distinguishable operational errors.
+* Unit tests for grounding validation (`tests/unit/test_grounding_validation.py`), 22 tests, LLM fully mocked, zero network access, no API key required.
+* **Live-test-driven prompt fix (WP-010, applies retroactively to WP-008/WP-009's prompt content)**: `prompts/generation/question.txt` and `prompts/validation/grounding.txt` were both updated to instruct the model to copy evidence-chunk identifiers character-for-character (including the `SourceType:` prefix) - the live smoke test found the model otherwise sometimes drops that prefix, which the (correct, working-as-designed) provenance checks in both WP-009 and WP-010 then reject as an invented id. See "Decisions Made (WP-010)" below.
 
-No embeddings, vector databases, semantic/neural retrieval, downstream (grounding/MCQ/category/quality/textbook) validation, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No embeddings, vector databases, semantic/neural retrieval, MCQ/semantic-category/quality/textbook validation, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -133,6 +136,13 @@ Question generation, importable from `exam_generator.generation`:
 * `QuestionGenerator.from_default_configuration()` — normal application wiring (real resolver/index/historical repository/prompt repository/OpenAI provider); requires `OPENAI_API_KEY`
 * Error hierarchy: `GenerationError` → `GenerationContextError`, `MissingEvidenceError`, `MissingHistoricalReferenceError`, `InvalidGeneratedOutputError`
 * `GeneratedQuestionResponse` (in `exam_generator.models`) — the LLM-facing structured-output contract: `question`, `answers` (list[4]), `correct_answer` (1-4), `evidence_chunk_ids` (list, may be empty), `historical_reference_id` (optional); deliberately excludes `category`/`generation_mode`, which are always application-assigned
+
+Independent grounding validation, importable from `exam_generator.validation`:
+
+* `GroundingValidator(*, student_summary_index, prompt_repository, llm_provider)` — every dependency injected explicitly; `.validate_grounding(candidate: CandidateQuestion) -> GroundingValidationResult` makes exactly one `LLMProfile.VALIDATION` call, independently retrieves its own evidence, and performs no other validation stage
+* `GroundingValidator.from_default_configuration()` — normal application wiring (real student-summary index/prompt repository/OpenAI provider); requires `OPENAI_API_KEY`
+* Error hierarchy: `GroundingValidationError` → `NoValidationEvidenceError`, `InvalidGroundingOutputError`
+* Deterministic V1 validation-retrieval query: `f"{candidate.category} {candidate.question} {<intended correct answer text>}"` (distractor text excluded)
 
 ## Established Requirements / Decisions
 
@@ -308,6 +318,15 @@ If implementation convenience conflicts with an established architectural decisi
 * **No course-book retrieval index is a constructor dependency of `QuestionGenerator` at all** (not merely "unused") - there is no parameter through which one could even be supplied, which is the simplest possible way to guarantee WP-009's "do not retrieve course-book evidence" rule structurally rather than by convention. Verified by a test that inspects `QuestionGenerator.__init__`'s parameter names directly.
 * Package structure: `generation/{errors,generator}.py` (a `historical_selection.py`/`context.py` split was considered but rejected as premature - the selection policy is four lines and has no independent invariant worth a dedicated module, unlike WP-008's `context.py`, which enforces a real mode/reference invariant across multiple call sites).
 
+## Decisions Made (WP-010)
+
+* **Deterministic validation-retrieval query: `f"{candidate.category} {candidate.question} {<intended correct answer text>}"`, distractors excluded.** The WP explicitly left this as an engineering decision requiring documentation/tests. Category text is included for the same "category-aware retrieval" reason WP-006's `retrieve_for_category()` uses canonical category text as its query; only the *intended* correct answer's text is included (not the three distractors) because that is the specific factual claim actually being validated - adding wrong-answer text would only dilute the TF-IDF query with text the validator does not need to confirm.
+* **No `candidate.evidence_chunk_ids`/`historical_reference_id` exist to "not blindly trust" in the first place - this WP-010 invariant is structurally guaranteed, not enforced by validator logic.** `CandidateQuestion` (frozen WP-002/WP-009 contract) carries neither field; `GroundingValidator.validate_grounding(candidate)` and `GroundingPromptContext` also have no parameter for either. This was verified directly in tests (`CandidateQuestion.model_fields`, `inspect.signature()`, `dataclasses.fields()`) rather than merely asserted in prose, since the WP's own pseudocode ("do not simply take `candidate.evidence_chunk_ids`") describes a field that does not actually exist on the real domain model - see WP-009's own parallel note about this in its Decisions Made section.
+* **`GroundingValidator` has no course-book retrieval dependency at all** (no constructor parameter, matching `QuestionGenerator`'s identical WP-009 decision) - the simplest structural guarantee that course-book evidence is never used for primary grounding, rather than relying on the validator simply choosing not to call one.
+* **Two already-shipped production prompts were modified during this WP's live smoke test**: `prompts/generation/question.txt` (WP-008/WP-009) and `prompts/validation/grounding.txt` (WP-008). Both were found, live, to cause a reproducible failure - the model reports an `evidence_chunk_ids` value with the `SourceType:` prefix dropped (e.g. `student_summary_2.pdf:0008:0001` instead of the real `STUDENT_SUMMARY:student_summary_2.pdf:0008:0001`), which the (intentionally strict) provenance checks in both WP-009 and WP-010 then correctly reject as an invented id - confirmed reproducible across two consecutive live generation attempts before the fix, and confirmed resolved by a subsequent successful live generation-then-validation call after it. This is the specific, narrow exception both WPs' "do not tune prompts speculatively" rules explicitly carve out ("unless the live smoke test exposes a clear correctness/contract defect" / "a genuine API/model compatibility problem") - the fix only clarifies that `evidence_chunk_ids` must be copied character-for-character from the evidence's `Chunk:` line, and changes no other prompt content, requirement, or policy. The user was asked before this change was made (an already-shipped, committed prompt file), and explicitly chose to have it fixed rather than retried-as-is or deferred. New prompt version hashes: `QUESTION_GENERATION` → `d4f9940c31f9d703`, `GROUNDING_VALIDATION` → `c1b8df1b03518333` (both prefixes; supersede the ones recorded in WP-008's "Real Prompt Verification" table, which remains an accurate snapshot of that file's content *at that time*, not the current content).
+* One WP-008 test (`tests/unit/test_prompts.py::test_grounding_prompt_evidence_ids_must_come_from_supplied_evidence`) asserted the exact old wording of the changed sentence; updated to assert the equivalent new wording rather than being weakened or removed.
+* Package structure: `validation/{errors,grounding}.py` - `errors.py`'s base class is named `GroundingValidationError`, not the more generic `ValidationError`, specifically to avoid colliding with `pydantic.ValidationError`, which this exact same module already imports/uses throughout (`GroundingValidationResult` construction, `CandidateQuestion`, etc.). Future validation stages (WP-011 MCQ/category/quality, WP-012 textbook) are expected to land as sibling modules in this same `validation/` package.
+
 ## Live Smoke Test (WP-007)
 
 **Executed successfully** by the user with a real `OPENAI_API_KEY`, once against the live OpenAI API:
@@ -336,10 +355,27 @@ This confirms the configured `gpt-4o-mini` model, the Responses API structured-o
 * Structural checks: a valid `CandidateQuestion` was returned (pydantic-validated); Hebrew question/answer text present; exactly four answers; `correct_answer` is a valid 1-based position (2); category/mode provenance correct; no `InvalidGeneratedOutputError` was raised, confirming any evidence/historical-reference provenance the model claimed (if any) was consistent with what was actually supplied - `INDEPENDENT` claimed no historical reference, as required.
 * Only one live request was made, per the WP's cost/frequency constraint ("do not make repeated live calls trying to improve the question"). Generation success is **not** treated as proof of factual grounding - that remains WP-010's job.
 
+## Live Grounding Smoke Test (WP-010)
+
+**Executed successfully**, once the two prompt fixes described in "Decisions Made (WP-010)" above were applied. One real generate-then-validate pair: `QuestionGenerator.from_default_configuration().generate_candidate_question(category=<first real canonical category>, generation_mode=GenerationMode.INDEPENDENT)` immediately followed by `GroundingValidator.from_default_configuration().validate_grounding(candidate)`.
+
+* Category used: `התעלה השדרתית ותכולתה` (same first canonical category as the WP-009 live test).
+* Generated question: `מהו המבנה של התעלה השדרתית?`
+* Answers:
+  1. **מקום מושבו של מוח השדרה, העובר דרך ה-Vertebral Foramen** (`correct_answer` = 1)
+  2. מבנה של החוליות הצוואריות בלבד
+  3. מקום לעצבוב גפיים תחתונות בלבד
+  4. חלק מהחוליות המותניות בלבד
+* Grounding verdict: **`passed = True`** (`grounded=True`, `correct_answer_supported=True`, `other_answers_not_equally_correct=True`), `confidence = 0.95`.
+* Reason (verbatim): "The candidate question about the structure of the spinal canal is supported by the evidence, which states that the spinal canal is the location of the spinal cord passing through the vertebral foramen. The intended correct answer (Answer 1) is also supported by this evidence. Other answers do not have equivalent support, as they either misrepresent the structure or limit it incorrectly to specific vertebrae or functions."
+* Supporting evidence ids returned by the validator (all verified against the actual independently-retrieved evidence, per WP-010's provenance check): `STUDENT_SUMMARY:student_summary_2.pdf:0003:0001`, `STUDENT_SUMMARY:student_summary_1.pdf:0003:0001`.
+* **Attempt history (recorded honestly, per the WP's explicit instruction not to hide observations)**: this succeeded on the third live generation attempt. The first two attempts (before the prompt fix) failed *during generation* with `InvalidGeneratedOutputError` - not a grounding failure - because the model reported an `evidence_chunk_ids` value with the `SourceType:` prefix dropped, which WP-009's provenance check correctly rejected. See "Decisions Made (WP-010)" for the fix and full reasoning. No attempt was made to re-roll for a "better" question once a structurally valid one was produced; the smoke test stopped at the first successful generate-then-validate pair.
+* This is one observation, not a systematic grounding-quality measurement - a `passed=True` result here says nothing about the validator's or generator's behavior across many questions/categories. No prompt/retrieval tuning was performed in response to this specific outcome (there was nothing to react to - it passed).
+
 ## Tests
 
-* Total: **552** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007 + 110 from WP-008 + 28 from WP-009)
-* Passing: **552**
+* Total: **574** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007 + 110 from WP-008 + 28 from WP-009 + 22 from WP-010)
+* Passing: **574**
 * Failing: **0**
 
 Verification commands and results:
@@ -349,11 +385,12 @@ Verification commands and results:
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
 * `.venv/bin/python -c "import sklearn; print(sklearn.__version__)"` → `1.9.0`
 * `.venv/bin/python -c "import openai; print(openai.__version__)"` → `2.52.0`
-* `.venv/bin/python -m pytest -v` → 552 passed, in ~3s with zero network access and no `OPENAI_API_KEY` set (confirmed absent from the environment) - satisfies the WP's mandatory offline-test requirement.
+* `.venv/bin/python -m pytest -v` → 574 passed, in ~4s with zero network access and no `OPENAI_API_KEY` set (confirmed absent from the environment) - satisfies the WP's mandatory offline-test requirement.
 * `.venv/bin/python -m pytest tests/unit/test_llm.py -v` → 49 passed.
-* `.venv/bin/python -m pytest tests/unit/test_prompts.py -v` → 110 passed, zero network access, no API key required, no `LLMProvider.generate_structured()` call anywhere in the WP-008 test suite.
+* `.venv/bin/python -m pytest tests/unit/test_prompts.py -v` → 110 passed, zero network access, no API key required, no `LLMProvider.generate_structured()` call anywhere in the WP-008 test suite (includes one WP-010 wording update - see Decisions Made).
 * `.venv/bin/python -m pytest tests/unit/test_generation.py -v` → 28 passed, LLM provider fully mocked (`MagicMock(spec=LLMProvider)`), zero network access, no API key required.
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - `GeneratedQuestionResponse` is not one of the three schema-exported models).
+* `.venv/bin/python -m pytest tests/unit/test_grounding_validation.py -v` → 22 passed, LLM provider fully mocked, zero network access, no API key required.
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - `GeneratedQuestionResponse`/`GroundingValidationResult` are not newly schema-exported).
 * Real-workbook smoke test against `data/questions_full_export.xlsx`; confirmed no wording corruption.
 * Real-source PDF verification against all four real PDFs; confirmed Hebrew/English/mixed content preserved.
 * Real corpus + real retrieval-index verification against all four real PDFs; confirmed coverage invariants, ID uniqueness/determinism, and 20/20 canonical categories returning positive retrieval results.
@@ -514,6 +551,7 @@ Loaded every production prompt through the real `PromptRepository.from_default_l
 * No open issues from WP-007. Live OpenAI compatibility (`gpt-4o-mini` + Responses API + `temperature` + structured output) was verified end-to-end against the real API by the user after this WP's initial completion report - see Live Smoke Test above.
 * No open issues from WP-008. The real course-book retrieval index returned zero results for the specific canonical-category text queried during the real-data smoke test (a known, previously-documented WP-006 short-query ranking characteristic, not a WP-008 defect); the smoke test used a real course-book chunk taken directly from the real corpus instead so `TEXTBOOK_VALIDATION` was still exercised against genuine course-book content.
 * No open issues from WP-009. The live generation smoke test (initially skipped - no key available at implementation time) was run successfully once the user supplied `OPENAI_API_KEY` - see "Live Generation Smoke Test (WP-009)" above for the generated question/answers.
+* No open issues from WP-010. The live smoke test initially exposed a real, reproducible provenance-check failure caused by prompt wording (see "Decisions Made (WP-010)"); it was fixed (with explicit user approval, since it meant editing already-shipped WP-008 prompt files) and confirmed resolved by a subsequent successful live call. Only one real grounding verdict has been observed so far (`passed=True`, high confidence) - this is not a quality/accuracy measurement across multiple questions or categories, just a confirmation that the pipeline works end-to-end. WP-013 (diversity/retry) and broader manual review will be where real grounding-quality patterns get surfaced.
 
 ## Files Added
 
@@ -596,17 +634,23 @@ WP-008 (carried forward, unchanged this WP):
 * `prompts/validation/textbook.txt`
 * `tests/unit/test_prompts.py`
 
-WP-009 (new):
+WP-009 (carried forward, unchanged this WP):
 * `src/exam_generator/generation/__init__.py`
 * `src/exam_generator/generation/errors.py`
 * `src/exam_generator/generation/generator.py`
 * `tests/unit/test_generation.py`
 
+WP-010 (new):
+* `src/exam_generator/validation/__init__.py`
+* `src/exam_generator/validation/errors.py`
+* `src/exam_generator/validation/grounding.py`
+* `tests/unit/test_grounding_validation.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection. WP-008: expanded the existing "Prompt Boundary" section with a new "External Prompt Infrastructure" subsection. WP-009: new "Question Generation" section).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`. WP-008: no new dependency. WP-009: no new dependency).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection. WP-008: expanded the existing "Prompt Boundary" section with a new "External Prompt Infrastructure" subsection. WP-009: new "Question Generation" section. WP-010: new "Independent Grounding Validation" section, plus an evidence-identifier-fidelity note appended to the WP-009 section).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`. WP-008: no new dependency. WP-009: no new dependency. WP-010: no new dependency).
 * `config/app.yaml` (WP-006: added `retrieval:` section: `top_k: 8`, `ngram_min: 3`, `ngram_max: 5`).
 * `config/category_mapping.yaml` (WP-006: schema changed from placeholder `aliases: {}` to activated `mapping: {}` - see Decisions Made).
 * `src/exam_generator/config/models.py` (WP-006: added `RetrievalConfig`, `CategoryMappingConfig`, `NonBlankConfigStr`/`_reject_blank` helpers, `AppConfig.retrieval` field).
@@ -615,6 +659,9 @@ WP-009 (new):
 * `tests/unit/test_config.py` (WP-006: added `retrieval` field assertions and a `load_category_mapping()` test).
 * `src/exam_generator/models/question.py` (WP-009: added `GeneratedQuestionResponse`, the LLM-facing structured-output contract for generation).
 * `src/exam_generator/models/__init__.py` (WP-009: exported `GeneratedQuestionResponse`).
+* `prompts/generation/question.txt` (WP-008, content changed in WP-010: the `evidence_chunk_ids` guidance now requires copying the identifier character-for-character including the `SourceType:` prefix - see Decisions Made. New version hash prefix: `d4f9940c31f9d703`).
+* `prompts/validation/grounding.txt` (WP-008, content changed in WP-010: identical `evidence_chunk_ids` fidelity fix - see Decisions Made. New version hash prefix: `c1b8df1b03518333`).
+* `tests/unit/test_prompts.py` (WP-010: one assertion in `test_grounding_prompt_evidence_ids_must_come_from_supplied_evidence` updated to match the new grounding-prompt wording; no test coverage removed).
 
 ## Deferred Work
 
@@ -645,15 +692,15 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-009 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract including the new `GeneratedQuestionResponse`; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution; `src/exam_generator/llm` provides the provider-independent LLM abstraction + a working OpenAI provider; `src/exam_generator/prompts` provides the external prompt repository/rendering/formatting infrastructure and all seven production prompt files; `src/exam_generator/generation` provides `QuestionGenerator`, the first real generation path from category to `CandidateQuestion`. None of the following exists yet:
+WP-001 through WP-010 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract including `GeneratedQuestionResponse`; `src/exam_generator/historical`, `src/exam_generator/ingestion`, `src/exam_generator/chunking`, `src/exam_generator/retrieval` provide historical data, PDF extraction, chunking/corpora, and local retrieval respectively; `src/exam_generator/llm` provides the provider-independent LLM abstraction + OpenAI provider; `src/exam_generator/prompts` provides the external prompt repository/rendering/formatting infrastructure and all seven production prompt files; `src/exam_generator/generation` provides `QuestionGenerator` (category -> `CandidateQuestion`); `src/exam_generator/validation` now provides `GroundingValidator` (`CandidateQuestion` -> independently-checked `GroundingValidationResult`). Both the generation and grounding-validation paths have been confirmed working end-to-end against the real OpenAI API, not just in mocked tests. None of the following exists yet:
 
-* **No independent validation behavior exists.** `GroundingValidationResult`/`MCQValidationResult`/`CategoryValidationResult`/`QualityValidationResult`/`TextbookCheckResult` still have no validator logic - they remain WP-002 contracts only, and the five WP-008 validation prompts have never been sent to an LLM. `CandidateQuestion` instances returned by WP-009's `QuestionGenerator` are not grounded, not MCQ-checked, not category-checked, not quality-checked, and not textbook-checked - that independent evaluation is WP-010 (grounding) and WP-011/WP-012 (the rest).
-* **`QuestionGenerator` generates exactly one candidate per call, with no retry/diversity/duplicate-avoidance.** A failed/rejected generation (missing evidence, missing historical reference, invalid provenance, any `LLMError`) simply raises - nothing retries it, alternates modes automatically, or avoids repeating the same historical reference across multiple calls for the same category. That is WP-013's explicit responsibility.
-* **No exam orchestration, multi-question generation loop, output-file writing, or CLI exists yet.** `QuestionGenerator` produces one in-memory `CandidateQuestion`; nothing yet assembles multiple candidates into an `ExamOutput`/`ExamAudit` or writes `exam_<timestamp>.json`/`.audit.json`.
-* **Live end-to-end generation is confirmed working** - `QuestionGenerator.from_default_configuration()` was exercised once against the real OpenAI API (real category resolver/retrieval index/historical repository/production prompts), producing a structurally valid Hebrew `CandidateQuestion` - see "Live Generation Smoke Test (WP-009)" above for the exact question/answers. WP-010 can build on this path with confidence it works end-to-end, not just in mocked tests.
-* Integration point for WP-010: `QuestionGenerator.from_default_configuration().generate_candidate_question(category=<canonical or alias>, generation_mode=GenerationMode.STYLE_SIMILAR|INDEPENDENT) -> CandidateQuestion` is the whole WP-009 surface. WP-010's grounding validator will need the *same* retrieved student-summary evidence that produced a given candidate (to validate against) - `QuestionGenerator` does not currently expose the evidence chunks it used alongside the returned `CandidateQuestion`; WP-010 should decide whether `QuestionGenerator` needs a small return-shape change (e.g. returning `(CandidateQuestion, evidence_chunks)` or re-retrieving deterministically) rather than inventing a parallel retrieval path. `PromptRepository.from_default_location().get(PromptId.GROUNDING_VALIDATION)` plus `GroundingPromptContext(candidate=..., source_evidence=...).render_variables()` (both already built in WP-008) are ready to use for that validator.
+* **No MCQ/semantic-category/quality/textbook validation exists.** `MCQValidationResult`/`CategoryValidationResult`/`QualityValidationResult`/`TextbookCheckResult` still have no validator logic - they remain WP-002 contracts only, and the four remaining WP-008 validation prompts (`mcq.txt`, `category.txt`, `quality.txt`, `textbook.txt`) have never been sent to an LLM. That is WP-011 (MCQ/category/quality) and WP-012 (textbook).
+* **No retry/regeneration-on-grounding-failure exists.** A `passed=False` `GroundingValidationResult` is just returned - nothing automatically regenerates the candidate, tries `STYLE_SIMILAR` instead of `INDEPENDENT` (or vice versa), or retries with different retrieval. That, plus `QuestionGenerator`'s own lack of retry/diversity/duplicate-avoidance (unchanged from WP-009), is WP-013's explicit responsibility.
+* **No exam orchestration, multi-question generation loop, output-file writing, or CLI exists yet.** Both `QuestionGenerator` and `GroundingValidator` operate on one question at a time; nothing yet assembles multiple candidates into an `ExamOutput`/`ExamAudit` or writes `exam_<timestamp>.json`/`.audit.json`.
+* **A worked design question for whoever picks up WP-011/WP-012**: `GroundingValidator.validate_grounding(candidate)` independently retrieves its own student-summary evidence and does not expose it to the caller. If WP-011/WP-012's MCQ/category/quality/textbook validators need any evidence context (textbook checking in particular needs *course-book* evidence, which `GroundingValidator` deliberately never touches), they will need their own independent retrieval - following the exact same "never trust another stage's selection, retrieve your own" pattern WP-010 established, not by threading WP-010's internal evidence through. `QuestionAudit` (`src/exam_generator/models/audit.py`) already has a field for whichever evidence each stage ultimately decides is audit-worthy - assembling that audit record is deferred to a later output-focused WP (WP-015+), not WP-011/WP-012 themselves.
+* **Evidence-identifier fidelity fix is a precedent, not just a one-off**: the WP-010 live smoke test found (and fixed) a reproducible model behavior where `evidence_chunk_ids` values were reported without their `SourceType:` prefix, causing WP-009's/WP-010's provenance checks to correctly reject them as invented ids. Both `prompts/generation/question.txt` and `prompts/validation/grounding.txt` now instruct the model to copy that identifier character-for-character. Any future prompt that asks the model to echo back a `chunk_id` (this will very plausibly include WP-012's textbook prompt, which already receives course-book evidence formatted the same way) should use the same precise wording from the start, rather than rediscovering this issue live again.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and `openai>=2.0` (2.52.0) are the real runtime dependencies so far; WP-008 and WP-009 both added none. The next WP's author should account for the environment note when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and `openai>=2.0` (2.52.0) are the real runtime dependencies so far; WP-008, WP-009, and WP-010 all added none. The next WP's author should account for the environment note when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -661,7 +708,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-010** (per the roadmap: grounding validation). Claude must not invent or begin WP-010's specification; wait for it to be supplied.
+**WP-011** (per the roadmap: additional MCQ/category validation). Claude must not invent or begin WP-011's specification; wait for it to be supplied.
 
 ---
 

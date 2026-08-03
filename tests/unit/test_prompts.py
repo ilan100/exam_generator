@@ -852,7 +852,7 @@ def test_grounding_prompt_aligns_with_grounding_validation_result_fields(product
 
 def test_grounding_prompt_evidence_ids_must_come_from_supplied_evidence(production_repository):
     rendered = _rendered_grounding_prompt(production_repository)
-    assert "never an identifier that was not supplied" in rendered
+    assert "never invent one that was not supplied to you" in rendered
 
 
 def test_grounding_prompt_does_not_use_historical_reference_as_evidence(production_repository):
