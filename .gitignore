@@ -1,0 +1,27 @@
+# Virtual environment
+.venv/
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Editors
+.idea/
+.vscode/
+
+# Generated runtime artifacts
+output/*
+!output/.gitkeep
+index/*
+!index/.gitkeep
+
+# Source material must not be committed
+data/*
+!data/.gitkeep

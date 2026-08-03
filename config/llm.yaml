@@ -1,0 +1,15 @@
+# LLM provider/model configuration.
+# Provider and model are external configuration; application logic must not
+# hard-code them. The API key itself is NOT stored here - it comes from the
+# OPENAI_API_KEY environment variable at the point a provider is actually used.
+
+provider: openai
+model: gpt-4o-mini
+
+generation:
+  temperature: 0.7
+  max_tokens: 1024
+
+validation:
+  temperature: 0.0
+  max_tokens: 1024

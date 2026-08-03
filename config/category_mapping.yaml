@@ -1,0 +1,16 @@
+# Manual category alias/override configuration.
+#
+# Canonical categories originate from the historical workbook's `category`
+# column (established in a later Work Package) and must NOT be guessed or
+# duplicated here.
+#
+# This file only maps alternative/observed wording (e.g. from student-summary
+# chapter headings) onto an already-canonical category name. Do not populate
+# guessed mappings in this Work Package.
+#
+# Example (illustrative only - not a real mapping):
+# aliases:
+#   "עצבים קרניאליים":
+#     - "עצבי גולגולת"
+
+aliases: {}

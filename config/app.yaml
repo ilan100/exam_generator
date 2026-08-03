@@ -1,0 +1,18 @@
+# Application-level configuration.
+# Paths are project-relative; do not hard-code machine-specific absolute paths.
+
+paths:
+  data_dir: data
+  output_dir: output
+  index_dir: index
+  prompts_dir: prompts
+  schemas_dir: schemas
+
+# Generation behavior placeholders.
+# These values are architecturally defined but not yet used by any implemented
+# behavior (diversity/retry logic is a later Work Package).
+generation:
+  initial_diversity_target: 0.7
+  minimum_diversity_target: 0.3
+  diversity_relaxation_step: 0.1
+  max_generation_attempts: 3
