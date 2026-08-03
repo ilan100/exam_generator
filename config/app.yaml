@@ -16,3 +16,9 @@ generation:
   minimum_diversity_target: 0.3
   diversity_relaxation_step: 0.1
   max_generation_attempts: 3
+
+# Deterministic character-based chunking (WP-005). Values are measured in
+# Python Unicode characters, not model tokens.
+chunking:
+  chunk_size: 1800
+  chunk_overlap: 300

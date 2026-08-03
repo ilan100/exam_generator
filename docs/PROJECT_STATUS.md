@@ -4,16 +4,16 @@
 
 ## Current State
 
-* Last completed WP: **WP-004 — PDF text extraction and source document ingestion**
-* Current/next planned WP: **WP-005**
+* Last completed WP: **WP-005 — Factual source chunking and corpus construction**
+* Current/next planned WP: **WP-006**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-004 complete**
+* Repository implementation state: **WP-005 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
 The project architecture and product requirements have already been established and MUST NOT be redesigned merely because the implementation is starting again.
 
-Implementation will proceed sequentially from WP-005 using Work Packages supplied by GPT.
+Implementation will proceed sequentially from WP-006 using Work Packages supplied by GPT.
 
 ## Implemented
 
@@ -32,8 +32,10 @@ Implementation will proceed sequentially from WP-005 using Work Packages supplie
 * Unit tests for historical ingestion (`tests/unit/test_historical.py`), 59 tests, using synthetic in-memory `.xlsx` fixtures built with `openpyxl.Workbook()` (no dependency on the real workbook for correctness tests).
 * PDF text extraction (`src/exam_generator/ingestion/`): deterministic page-aware extraction of student-summary PDFs and `course_book.pdf` via PyMuPDF, into typed `ExtractedPage`/`ExtractedDocument` models; deterministic student-summary discovery and course-book resolution using the WP-001 configured data directory; domain-specific error hierarchy; fails closed when a document has no usable text anywhere.
 * Unit tests for PDF ingestion (`tests/unit/test_ingestion.py`), 47 tests, using synthetic in-memory PDFs built with `pymupdf` itself (no extra test-only dependency, no committed binary fixtures).
+* Factual-source chunking and corpora (`src/exam_generator/chunking/`): deterministic, character-based, boundary-aware chunking of `ExtractedDocument` pages into `SourceEvidenceChunk` objects (never spanning physical pages), stable deterministic chunk IDs, and read-only `FactualSourceCorpus` construction with per-source/per-page querying and statistics. `build_student_summary_corpus()`/`build_course_book_corpus()` provide the application-level entry points. New `chunking` section added to `config/app.yaml`/`ChunkingConfig`.
+* Unit tests for chunking (`tests/unit/test_chunking.py`), 80 tests, using synthetic `ExtractedDocument` objects (no dependency on the real PDFs for correctness tests).
 
-No retrieval, embeddings, chunking, indexing, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No retrieval, embeddings, indexing, LLM integration, prompts content, generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -72,6 +74,14 @@ PDF ingestion, importable from `exam_generator.ingestion`:
 * `default_course_book_path(data_dir=None)`, `DEFAULT_COURSE_BOOK_FILENAME`
 * `load_student_summaries(data_dir=None)` / `load_course_book(data_dir=None)` — discovery/resolution + extraction combined
 * Error hierarchy: `PdfIngestionError` → `PdfNotFoundError`, `PdfFormatError`, `PdfEncryptedError`, `PdfTextExtractionError`
+
+Chunking/corpora, importable from `exam_generator.chunking`:
+
+* `chunk_document(document, *, chunk_size, chunk_overlap) -> tuple[SourceEvidenceChunk, ...]`
+* `FactualSourceCorpus` — `.all_chunks`, `.total_chunks`, `.source_files`, `.source_types`, `.chunks_for_source(name)`, `.chunks_for_source_and_page(name, page)`, `.chunk_count_per_source`, `.min_chunk_length`, `.max_chunk_length`, `.average_chunk_length`
+* `build_student_summary_corpus(chunk_size=None, chunk_overlap=None, data_dir=None)` / `build_course_book_corpus(...)` — default chunk params come from `config/app.yaml`'s `chunking` section when not supplied
+* Error hierarchy: `ChunkingError`; `CorpusConstructionError` → `DuplicateChunkIdError`
+* Config: `exam_generator.config.models.ChunkingConfig` (`chunk_size`, `chunk_overlap`), new `AppConfig.chunking` field, `config/app.yaml`'s `chunking:` section (defaults `1800`/`300`)
 
 ## Established Requirements / Decisions
 
@@ -189,10 +199,20 @@ If implementation convenience conflicts with an established architectural decisi
 * Package structure deviates slightly from the WP's suggested `{__init__, pdf, models, errors}.py`: a `discovery.py` module was added to separate source-discovery/resolution policy (which PDFs count as "student summary", where the course book lives) from the generic, source-agnostic `extract_pdf()` API in `pdf.py` — mirroring the loader/repository separation already used in WP-003's `historical` package.
 * Zero-page-PDF handling (`PdfFormatError` on `page_count == 0`) is implemented defensively but **not exercised by a real test**: PyMuPDF itself refuses to save a zero-page document (`ValueError: cannot save with zero pages`), so no such fixture is constructible with the selected library, matching WP-004's own "if constructible with the selected library" qualifier on that test case.
 
+## Decisions Made (WP-005)
+
+* **Chunk-ID format**: `"{source_type}:{source_file}:{page:04d}:{ordinal:04d}"` — chosen for readability (matches the WP's own suggested example) and because it structurally guarantees uniqueness whenever source type, source file, page, or within-page ordinal differs, without any hashing/UUID component.
+* **Boundary search window**: `max(1, chunk_size // 4)` characters, a fixed fraction of the configured `chunk_size` rather than a separate config knob — kept as a private, documented constant per the WP's own preference ("a clearly named constant/private policy" over "a large configuration surface").
+* **Boundary preference order**: newline → Hebrew/English sentence-ending punctuation (`. ? !`) → any whitespace → hard split, implemented as a bounded backward search from the tentative chunk end (never earlier than `start + 1`, guaranteeing forward progress even in pathological configurations like `chunk_overlap = chunk_size - 1`).
+* Package structure: `chunking/{errors,chunker,corpus}.py` plus `__init__.py` — mirrors the `historical`/`ingestion` packages' loader/repository-style separation (generic algorithm vs. corpus abstraction vs. errors).
+* A single generic `FactualSourceCorpus` class backs both corpora (per the WP's explicit option to avoid over-engineering two near-identical wrapper classes); separation between student-summary and course-book material is enforced entirely by construction (`build_student_summary_corpus()`/`build_course_book_corpus()` never mix chunks from the two source types into one corpus instance), not by the class itself refusing mixed `source_type`s.
+* `ChunkingConfig`'s bool-rejection helper (`_reject_bool`) is defined locally in `config/models.py` rather than imported from `exam_generator.models._common`, to avoid introducing a `config → models` package dependency; this duplicates ~3 lines of logic already used by the domain-model layer, which was judged preferable to a cross-layer import for a foundational config module.
+* Chunk text is `.strip()`-ped only at emission time (leading/trailing whitespace); all boundary-offset arithmetic operates on the original untouched page text, so overlap/boundary calculations are unaffected by the trim.
+
 ## Tests
 
-* Total: **213** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004)
-* Passing: **213**
+* Total: **293** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005)
+* Passing: **293**
 * Failing: **0**
 
 Verification commands and results:
@@ -200,11 +220,12 @@ Verification commands and results:
 * `.venv/bin/python --version` → `Python 3.12.3`
 * `.venv/bin/python -c "import openpyxl; print(openpyxl.__version__)"` → `3.1.5`
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
-* `.venv/bin/python -m pytest -v` → 213 passed
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003/WP-004).
+* `.venv/bin/python -m pytest -v` → 293 passed
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected by WP-003/WP-004/WP-005 - `SourceEvidenceChunk` itself did not change).
 * Real-workbook smoke test against `data/questions_full_export.xlsx` via the public `HistoricalQuestionRepository` API (see Real-Workbook Verification below); confirmed no wording corruption on a Hebrew question with embedded English terminology (`Corona radiata`) and English-only answer options.
 * Real-source PDF verification against all four real PDFs via the public `exam_generator.ingestion` API (see Real-Source PDF Verification below); confirmed Hebrew and English/mixed content preserved without corruption.
-* `git status --short` / `git add -A --dry-run` → only WP-004 files (plus intentional `pyproject.toml` dependency addition) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
+* Real corpus verification against all four real PDFs via `build_student_summary_corpus()`/`build_course_book_corpus()` (see Real Corpus Verification below); confirmed chunk coverage invariants, ID uniqueness/determinism, and readable overlap with no corruption.
+* `git status --short` / `git add -A --dry-run` → only WP-005 files (plus intentional `config/app.yaml`/`pyproject.toml`-adjacent changes - no new runtime dependency this WP) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 
 ## Real-Workbook Verification (WP-003)
 
@@ -260,10 +281,36 @@ Against the actual PDFs in `data/` (none modified), via `exam_generator.ingestio
 * **English/mixed terminology verification**: 417/435 `course_book.pdf` pages contain English text runs (exactly matching its non-empty-page count); anatomical terms (e.g. "Medulla Oblongata", "spinal cord") appear intact and untranslated. A mixed Hebrew/English excerpt from a student summary (`... Corona radiata ...`) was also confirmed intact.
 * The empty pages found (18 in `course_book.pdf`: pages 1, 2, 4, 12, 44, 72, 98, 168, 210, 238, 270, 278, 294, 314, 330, 366, 380, 434; 4 in `student_summary_3.pdf`: pages 31, 137, 147, 176) were individually inspected and are consistent with legitimate blank/section-divider pages in a textbook/summary, not extraction failures — no document has zero non-empty pages.
 
+## Real Corpus Verification (WP-005)
+
+Built via `build_student_summary_corpus()` / `build_course_book_corpus()` (chunk_size=1800, chunk_overlap=300, from `config/app.yaml`):
+
+**Student summary corpus:**
+* source_files: 3
+* physical pages with chunks: 405 (matches the 405 non-blank student-summary pages from WP-004's verification: 77+156+172)
+* chunks: 506
+* min/max/avg chunk length (chars): 47 / 1799 / 1089.3
+* per-file: `student_summary_1.pdf`: 156, `student_summary_2.pdf`: 178, `student_summary_3.pdf`: 172
+* first_chunk_id: `STUDENT_SUMMARY:student_summary_1.pdf:0001:0001`
+* last_chunk_id: `STUDENT_SUMMARY:student_summary_3.pdf:0175:0001`
+* unique_chunk_ids: **true**
+
+**Course book corpus:**
+* physical pages with chunks: 417 (matches the 417 non-blank course-book pages from WP-004's verification)
+* chunks: 994
+* min/max/avg chunk length (chars): 42 / 1799 / 1464.0
+* first_chunk_id: `COURSE_BOOK:course_book.pdf:0003:0001`
+* last_chunk_id: `COURSE_BOOK:course_book.pdf:0435:0005`
+* unique_chunk_ids: **true**
+
+**Programmatic coverage verification** (all four real documents): every non-blank `ExtractedPage` produced ≥1 chunk; every blank page produced exactly 0 chunks; every emitted chunk's `page` exists in its source document and is ≥1; rebuilding both corpora from scratch produced byte-identical chunk IDs and ordering.
+
+**Manual quality inspection** (student_summary_1.pdf beginning/middle/end, a mixed Hebrew/English page, and course_book.pdf): chunks read as coherent Hebrew/English prose, not arbitrarily truncated mid-boundary; page-5 mixed content (`trabeculae`, `Pia`, `Ventral root`) preserved intact. Precisely verified overlap on page 5: chunk 2 begins at character offset 1454 within chunk 1 (length 1752) - a ~298-character overlap, matching the configured 300, with the shared Hebrew/English text identical in both chunks.
+
 ## Known Issues / Open Questions
 
-* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-004 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl` and `pymupdf` were both confirmed to install and work correctly under 3.12.3.
-* No other known issues from WP-004.
+* **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-005 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl` and `pymupdf` were both confirmed to install and work correctly under 3.12.3.
+* No new known issues from WP-005. No new runtime dependency was needed (pure standard library + existing Pydantic/config/WP-002/WP-004 infrastructure, as the WP required).
 
 ## Files Added
 
@@ -296,7 +343,7 @@ WP-003 (carried forward, unchanged this WP):
 * `src/exam_generator/historical/repository.py`
 * `tests/unit/test_historical.py`
 
-WP-004 (new):
+WP-004 (carried forward, unchanged this WP):
 * `src/exam_generator/ingestion/__init__.py`
 * `src/exam_generator/ingestion/errors.py`
 * `src/exam_generator/ingestion/models.py`
@@ -304,11 +351,22 @@ WP-004 (new):
 * `src/exam_generator/ingestion/discovery.py`
 * `tests/unit/test_ingestion.py`
 
+WP-005 (new):
+* `src/exam_generator/chunking/__init__.py`
+* `src/exam_generator/chunking/errors.py`
+* `src/exam_generator/chunking/chunker.py`
+* `src/exam_generator/chunking/corpus.py`
+* `tests/unit/test_chunking.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section recording the PyMuPDF selection/rationale, extraction-layer vs. evidence-chunk separation, page-numbering/blank-page policy, and source-discovery policy).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section recording the page-boundary rule, chunk-ID format, boundary-aware splitting/overlap policy, and corpus-separation policy).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency.).
+* `config/app.yaml` (added `chunking:` section: `chunk_size: 1800`, `chunk_overlap: 300`).
+* `src/exam_generator/config/models.py` (added `ChunkingConfig`, `StrictPositiveInt`/`StrictNonNegativeInt` helpers, `AppConfig.chunking` field).
+* `src/exam_generator/config/__init__.py` (exported `ChunkingConfig`).
+* `tests/unit/test_config.py` (added `chunking` field assertions to the existing default-app-config test).
 
 ## Deferred Work
 
@@ -339,16 +397,16 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-004 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction stopping at page-aware `ExtractedDocument`/`ExtractedPage` objects. None of the following exists yet:
+WP-001 through WP-005 are complete. `src/exam_generator/config` provides configuration loading (now including chunking parameters); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking into `SourceEvidenceChunk` and read-only `FactualSourceCorpus` construction (`build_student_summary_corpus()`, `build_course_book_corpus()`). None of the following exists yet:
 
 * `ExamRequest` still validates request *structure* only; it does **not** yet check requested category names against `HistoricalQuestionRepository.canonical_categories`. That cross-check is explicitly deferred to a later orchestration WP.
-* **No chunking exists.** `ExtractedDocument`/`ExtractedPage` (WP-004) are extraction-layer-only representations; nothing converts them into `SourceEvidenceChunk` (WP-002) yet. A future WP must split extracted page text into chunks, assign `chunk_id`s, and produce `SourceEvidenceChunk` objects carrying `source_file`/`page`/`text`/`source_type` provenance forward from the `ExtractedPage`s that produced them.
-* No embeddings, vector/keyword index, or retrieval exists yet (WP-005/WP-006 territory per the roadmap).
+* **No embeddings, vector/keyword index, or retrieval exists yet.** `FactualSourceCorpus` is an in-memory, unindexed collection of chunks queryable only by exact source-file/page - there is no similarity search, ranking, or category-aware retrieval. A future WP must build an index (embeddings or otherwise) over `build_student_summary_corpus()`'s and/or `build_course_book_corpus()`'s `.all_chunks`, and implement retrieval/context-selection on top of it. Corpus construction is deliberately independent of whatever indexing approach is chosen next.
+* No category assignment exists on chunks (`SourceEvidenceChunk` carries no category field) - a later WP must decide how requested exam categories interact with retrieval over the category-agnostic corpus.
 * All validation-result models (`GroundingValidationResult`, `MCQValidationResult`, `CategoryValidationResult`, `QualityValidationResult`, `TextbookCheckResult`) exist as contracts only; no validator logic exists yet.
 * No historical-question selection/similarity logic exists — `HistoricalQuestionRepository` only provides data access, per WP-003's explicit non-goals.
 * No LLM client/provider, prompts, generation, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) and `pymupdf>=1.24` (installed: 1.28.0) are now real runtime dependencies. The next WP's author should account for all of this when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (installed: 3.1.5) and `pymupdf>=1.24` (installed: 1.28.0) are the real runtime dependencies so far; WP-005 added no new dependency. The next WP's author should account for the environment note when specifying dependencies/tooling, and should be aware that corpus chunks are plain in-memory Python objects with no persistence yet (WP-005 explicitly did not add any persistence layer).
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -356,7 +414,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-005** (per the roadmap: Chunking + indexing). Claude must not invent or begin WP-005's specification; wait for it to be supplied.
+**WP-006** (per the roadmap: Retrieval/category mapping). Claude must not invent or begin WP-006's specification; wait for it to be supplied.
 
 ---
 

@@ -1,6 +1,7 @@
 from exam_generator.config.loader import ConfigError, load_app_config, load_llm_config
 from exam_generator.config.models import (
     AppConfig,
+    ChunkingConfig,
     GenerationBehaviorConfig,
     LLMConfig,
     LLMGenerationParams,
@@ -10,6 +11,7 @@ from exam_generator.config.models import (
 
 __all__ = [
     "AppConfig",
+    "ChunkingConfig",
     "ConfigError",
     "GenerationBehaviorConfig",
     "LLMConfig",

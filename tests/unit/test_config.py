@@ -17,6 +17,8 @@ def test_load_default_app_config_succeeds():
     assert config.paths.schemas_dir == "schemas"
     assert 0.0 <= config.generation.initial_diversity_target <= 1.0
     assert config.generation.max_generation_attempts > 0
+    assert config.chunking.chunk_size > 0
+    assert 0 <= config.chunking.chunk_overlap < config.chunking.chunk_size
 
 
 def test_load_default_llm_config_succeeds():

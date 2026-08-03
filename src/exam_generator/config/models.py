@@ -7,7 +7,20 @@ configuration). They do not implement any of the behavior they describe.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing import Annotated
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+
+
+def _reject_bool(value: object) -> object:
+    """Reject bool where an int is expected (bool is an int subtype in Python)."""
+    if isinstance(value, bool):
+        raise ValueError("boolean values are not accepted where an integer is expected")
+    return value
+
+
+StrictPositiveInt = Annotated[int, BeforeValidator(_reject_bool), Field(gt=0)]
+StrictNonNegativeInt = Annotated[int, BeforeValidator(_reject_bool), Field(ge=0)]
 
 
 class PathsConfig(BaseModel):
@@ -47,6 +60,24 @@ class GenerationBehaviorConfig(BaseModel):
         return self
 
 
+class ChunkingConfig(BaseModel):
+    """Deterministic character-based chunking parameters (WP-005)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    chunk_size: StrictPositiveInt
+    chunk_overlap: StrictNonNegativeInt
+
+    @model_validator(mode="after")
+    def _check_overlap_less_than_size(self) -> "ChunkingConfig":
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError(
+                f"chunk_overlap ({self.chunk_overlap}) must be strictly less than "
+                f"chunk_size ({self.chunk_size})"
+            )
+        return self
+
+
 class AppConfig(BaseModel):
     """Top-level application configuration (config/app.yaml)."""
 
@@ -54,6 +85,7 @@ class AppConfig(BaseModel):
 
     paths: PathsConfig
     generation: GenerationBehaviorConfig
+    chunking: ChunkingConfig
 
 
 class LLMGenerationParams(BaseModel):

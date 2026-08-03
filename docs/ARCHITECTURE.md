@@ -59,6 +59,17 @@ Canonical categories are derived from the historical workbook's `category` colum
 - **Source-discovery policy**: student-summary PDFs are every `*.pdf` file in the configured data directory except the fixed `course_book.pdf` filename, sorted lexically by filename for determinism; the course book is resolved via that same fixed filename. Source classification (`SourceType.STUDENT_SUMMARY` vs. `COURSE_BOOK`) happens only at this discovery boundary - the generic `extract_pdf()` API requires the caller to pass `source_type` explicitly and never infers it from a filename.
 - Extracted documents/pages are read-only after construction (frozen models, `tuple` page sequence).
 
+## Factual Source Chunking and Corpora (WP-005)
+`src/exam_generator/chunking/` converts WP-004 `ExtractedDocument`/`ExtractedPage` output into WP-002 `SourceEvidenceChunk` objects, and assembles them into read-only `FactualSourceCorpus` instances (`build_student_summary_corpus()`, `build_course_book_corpus()`). `SourceEvidenceChunk` remains the sole authoritative factual-chunk model - no competing chunk model was introduced.
+
+- **A chunk never spans more than one physical PDF page (frozen V1 decision).** Chunking runs independently within each non-blank `ExtractedPage`, so `chunk.page` always identifies the exact physical page containing all of that chunk's text.
+- **Chunking is deterministic and character-based**, not token-based - no tokenizer/NLP/embedding dependency was introduced. Configured via `config/app.yaml`'s `chunking.chunk_size`/`chunking.chunk_overlap` (defaults: `1800`/`300` characters), validated by `ChunkingConfig` (positive `chunk_size`, non-negative `chunk_overlap`, `chunk_overlap` strictly less than `chunk_size`, bool rejected for both).
+- **Boundary-aware splitting**: near the configured chunk end, a bounded backward search (a fixed fraction of `chunk_size`) prefers a newline, then Hebrew/English sentence-ending punctuation (`. ? !`), then any whitespace, before falling back to a hard character split. Adjacent chunks on the same page overlap by approximately `chunk_overlap` characters; overlap never crosses a page boundary, and the algorithm is guaranteed to make forward progress (no infinite loops) regardless of where a boundary is found.
+- **Chunk IDs** are stable and deterministic: `"{source_type}:{source_file}:{page:04d}:{ordinal:04d}"` (e.g. `STUDENT_SUMMARY:student_summary_1.pdf:0005:0001`) - no UUIDs, no `hash()`, no process-dependent identifiers. `FactualSourceCorpus` construction validates chunk-ID uniqueness and raises `DuplicateChunkIdError` otherwise.
+- **Blank pages produce zero chunks** but do not affect later pages' physical page numbers; a document that yields zero chunks overall fails closed (`ChunkingError`).
+- **Corpus separation**: the student-summary corpus and course-book corpus are always built and returned separately (`build_student_summary_corpus()` / `build_course_book_corpus()`); nothing merges them. Corpus ordering is deterministic: source-file order → physical page order → within-page chunk ordinal order.
+- Category assignment is explicitly out of scope for chunking; `SourceEvidenceChunk`/corpora carry no category field. Retrieval/indexing/ranking are downstream, later-WP responsibilities - this WP only produces the in-memory factual corpus.
+
 ## LLM Boundary
 Application logic uses an LLM abstraction/factory rather than provider SDK calls directly.
 
