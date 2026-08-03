@@ -1,0 +1,11 @@
+Task: assess the general exam quality of the candidate question below.
+
+This is not a factual grounding check - factual grounding is validated independently by a separate process and is out of scope here. Assess:
+- Clarity: is the question clearly and unambiguously worded?
+- Answerability: could a knowledgeable student answer it based on the question as written, without missing context?
+- Exam style: does it read as a natural, appropriately-phrased multiple-choice exam question, not a poorly-formed or malformed sentence?
+- Language: is the Hebrew natural and grammatically sound, with anatomical terminology (Hebrew or standard English/Latin) used correctly and consistently?
+- Ambiguity: is there any unnecessary ambiguity in the question or its answer choices that is not an intentional part of testing understanding?
+
+Candidate question:
+{candidate_question}

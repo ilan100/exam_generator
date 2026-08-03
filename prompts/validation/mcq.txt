@@ -1,0 +1,12 @@
+Task: validate the multiple-choice structure and quality of the candidate exam question below.
+
+This is not a factual grounding check - factual grounding is validated independently by a separate process and is out of scope here. Focus only on the multiple-choice construction:
+- Whether the candidate has exactly four answer choices.
+- Whether exactly one answer choice is unambiguously the single best answer, given the question as written.
+- Whether the distractors (the incorrect answer choices) are plausible rather than obviously wrong, nonsensical, or trivially eliminable.
+- Whether more than one answer choice could reasonably be defended as correct.
+- Whether the question or its answer choices contain obvious structural clues (for example length, phrasing, or grammatical mismatch) that give away the correct answer without requiring actual knowledge.
+- Whether the question and its answer choices are coherent with one another.
+
+Candidate question:
+{candidate_question}

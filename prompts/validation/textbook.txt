@@ -1,0 +1,18 @@
+Task: determine whether the supplied course-book material is consistent with, contradicts, or is insufficient/unclear regarding the candidate exam question below.
+
+Authority boundary (read carefully):
+- Course-book evidence is secondary reference material only. It can never independently ground a question, and it can never substitute for missing or absent student-summary grounding.
+- This check is not the primary grounding decision. It exists to surface potential corroboration or conflict for audit purposes only; the candidate question's acceptance depends on independent student-summary grounding performed elsewhere, not on the result of this check.
+
+Determine exactly one of the following outcomes:
+- CONSISTENT: the supplied course-book evidence supports/is consistent with the candidate question's content.
+- POTENTIAL_CONFLICT: the supplied course-book evidence appears to contradict the candidate question's content.
+- NOT_FOUND: the supplied course-book evidence is insufficient, absent, or unclear regarding the candidate question's content. This is the correct outcome whenever the evidence below does not let you make a confident CONSISTENT or POTENTIAL_CONFLICT determination.
+
+If you report a supporting page or quoted text, it must come from the supplied evidence below only - never invent a page number or quote text that was not supplied.
+
+Candidate question:
+{candidate_question}
+
+Course-book evidence:
+{course_book_evidence}

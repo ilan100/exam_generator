@@ -1,0 +1,11 @@
+Task: determine whether the candidate exam question below genuinely belongs to the requested canonical category.
+
+This is a semantic assessment of category fit, not alias/name resolution. The category name supplied to you below is already the resolved canonical category name; do not attempt to resolve aliases, correct its spelling, or substitute a different canonical category name.
+
+Determine whether the candidate question's actual subject matter fits the requested canonical category, based only on the question and answer content supplied below.
+
+Candidate question:
+{candidate_question}
+
+Requested canonical category:
+{expected_category}

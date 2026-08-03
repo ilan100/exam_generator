@@ -4,10 +4,10 @@
 
 ## Current State
 
-* Last completed WP: **WP-007 — LLM abstraction and OpenAI provider**
-* Current/next planned WP: **WP-008**
+* Last completed WP: **WP-008 — External prompt infrastructure**
+* Current/next planned WP: **WP-009**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-007 complete**
+* Repository implementation state: **WP-008 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
@@ -38,8 +38,10 @@ Implementation will proceed sequentially from WP-008 using Work Packages supplie
 * Unit tests for retrieval/categories (`tests/unit/test_retrieval.py`), 71 tests, using synthetic corpora/resolvers (no dependency on the real PDFs/workbook for correctness tests).
 * Provider-independent LLM abstraction + OpenAI provider (`src/exam_generator/llm/`): `LLMProvider` (abstract), `LLMMessage`/`MessageRole`/`LLMProfile` contracts, `build_llm_provider()` factory, `OpenAIProvider` using the OpenAI SDK's Responses API structured-output mechanism (`client.responses.parse(..., text_format=<any Pydantic model>)`). Focused LLM error hierarchy with OpenAI exception translation. `scripts/smoke_openai.py`: optional, non-pytest, one-request manual live smoke test.
 * Unit tests for the LLM layer (`tests/unit/test_llm.py`), 49 tests, all OpenAI calls mocked - zero network access, no API key required.
+* External prompt infrastructure (`src/exam_generator/prompts/`): `PromptId` (7 identities), immutable `PromptTemplate` (`prompt_id`, `text`, `required_variables`, `version`), `PromptRepository` (`.from_directory()`, `.from_default_location()`, `.get()`, `.prompt_ids`) that loads/validates/hashes every required prompt up front (fail-closed on missing/empty/whitespace-only/malformed files), strict `render_prompt()` (required-variable set must equal supplied set exactly), `build_prompt_messages()` (reuses WP-007 `LLMMessage`/`MessageRole`, never calls a provider), deterministic evidence/historical-reference/candidate-question/exam-question formatting helpers with explicit `--- BEGIN/END ... ---` source-role delimiting, and two prompt-context value objects (`GenerationPromptContext`, `GroundingPromptContext`) enforcing the `STYLE_SIMILAR`/`INDEPENDENT` × historical-reference invariant. Seven production prompt files added under `prompts/{system,generation,validation}/`.
+* Unit tests for the prompt infrastructure (`tests/unit/test_prompts.py`), 110 tests, zero LLM/provider calls, zero network access, no API key required.
 
-No embeddings, vector databases, semantic/neural retrieval, production prompts, question generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
+No embeddings, vector databases, semantic/neural retrieval, question generation, validation behavior, orchestration, output-file writing, or CLI functionality has been implemented yet.
 
 ## Important Interfaces
 
@@ -110,6 +112,18 @@ LLM abstraction, importable from `exam_generator.llm`:
 * `API_KEY_ENV_VAR = "OPENAI_API_KEY"`
 * Error hierarchy: `LLMError` → `LLMConfigurationError`, `LLMRequestError`, `LLMProviderError` (→ `LLMAuthenticationError`, `LLMRateLimitError`), `LLMResponseError` (→ `LLMRefusalError`)
 * `scripts/smoke_openai.py` — optional manual live smoke test (not part of pytest)
+
+External prompt infrastructure, importable from `exam_generator.prompts`:
+
+* `PromptId` (str enum) — `SYSTEM`, `QUESTION_GENERATION`, `GROUNDING_VALIDATION`, `MCQ_VALIDATION`, `CATEGORY_VALIDATION`, `QUALITY_VALIDATION`, `TEXTBOOK_VALIDATION`
+* `PromptTemplate` (frozen dataclass) — `prompt_id`, `text`, `required_variables` (`tuple[str, ...]`, derived from the template's actual placeholders), `version` (SHA-256 hex digest of the exact file bytes)
+* `PromptRepository.from_directory(path)` / `.from_default_location()` (uses `config/app.yaml`'s existing `paths.prompts_dir`) — `.get(prompt_id) -> PromptTemplate` (raises `PromptNotFoundError` for an unknown id), `.prompt_ids`; construction fails closed on any missing/empty/whitespace-only/malformed required prompt file
+* `render_prompt(template, **variables) -> str` — strict: supplied variables must equal `required_variables` exactly, or `PromptRenderError`; exactly one `str.format()` substitution pass, `{{`/`}}` is the literal-brace escape
+* `build_prompt_messages(*, system_template, task_template, variables) -> (LLMMessage, LLMMessage)` — always `(SYSTEM, USER)`, reuses WP-007's `LLMMessage`/`MessageRole` directly, never calls a provider
+* Formatting helpers (all pure/deterministic, no retrieval/selection, caller order preserved): `format_student_summary_evidence(chunks)` (≥1 chunk required), `format_course_book_evidence(chunks)` (empty allowed), `format_historical_reference(reference_or_None)`, `format_candidate_question(candidate)`, `format_exam_question(question)` — each evidence formatter labels its `--- BEGIN/END ... ---` section and rejects a chunk of the wrong `SourceType`
+* `GenerationPromptContext(category, generation_mode, source_evidence, historical_reference=None)` / `GroundingPromptContext(candidate, source_evidence)` (frozen dataclasses) — `.render_variables() -> dict[str, str]`; `GenerationPromptContext` enforces `STYLE_SIMILAR` requires and `INDEPENDENT` forbids a `historical_reference`
+* Error hierarchy: `PromptError` → `PromptRepositoryError` (→ `PromptNotFoundError`, `PromptTemplateError`), `PromptRenderError`, `PromptContextError`
+* Production prompt files: `prompts/system/exam_generator.txt`, `prompts/generation/question.txt`, `prompts/validation/{grounding,mcq,category,quality,textbook}.txt`
 
 ## Established Requirements / Decisions
 
@@ -262,6 +276,18 @@ If implementation convenience conflicts with an established architectural decisi
 * Refusal detection inspects `response.output` for any `content.type == "refusal"` item *before* falling back to `response.output_parsed is None`, so a refusal produces a specific, informative `LLMRefusalError` (with the model's stated refusal reason) rather than a generic "no parsed response" error.
 * Package structure: `llm/{errors,models,provider,factory,openai_provider}.py` (matches the WP's own suggested structure exactly). Only `openai_provider.py` imports the `openai` SDK.
 
+## Decisions Made (WP-008)
+
+* **`PromptTemplate` is a frozen `dataclass`, not a pydantic `BaseModel`.** Every other domain contract in this project is pydantic, but a prompt template is infrastructure metadata (a loaded file's text/derived variables/hash), not a validated data-exchange contract with JSON-schema needs - a plain immutable dataclass is simpler and avoids implying the template itself should be serialized/exchanged like a domain model.
+* **`required_variables` derivation rejects more than the WP's minimum example.** Beyond positional/numbered fields (`{0}`, `{}`), attribute/index access (`{x.y}`, `{x[0]}`) and format specs (`{x:>10}`) are also rejected as malformed, not merely "unsupported but ignored" - chosen because WP-008 section 6 explicitly says the template system supports only static text plus named placeholders ("no expressions"), and a format spec or attribute path is exactly the kind of mini-expression that section rules out.
+* **`PromptId.SYSTEM` was added** even though the WP's own conceptual `PromptId` example (section 8) lists only the six task-specific prompts. The system prompt is a real, separately-hashed, separately-loaded production prompt file (`prompts/system/exam_generator.txt`) that the repository must load and fail closed on exactly like the other six; giving it no identifier would have meant special-casing it outside the `PromptId` → path mapping that section 8 establishes as the single source of truth.
+* **`PromptRepository` construction takes no cross-file dependency**: all seven prompt files are loaded independently and construction fails on the first missing/empty/malformed one encountered in `PromptId` enum-definition order (not aggregated into a single "here is everything wrong" error) - matches WP-002/WP-003's existing fail-closed-on-first-problem convention rather than introducing new aggregate-error handling.
+* **Evidence/reference formatting owns its own delimiters, not the prompt text.** `format_student_summary_evidence()`/`format_course_book_evidence()`/`format_historical_reference()` each embed their own `--- BEGIN/END ... ---` markers around the content they produce, and the production prompt text simply references `{source_evidence}`/`{historical_reference}` without re-adding its own delimiter lines. This keeps the delimiter text defined in exactly one place (the formatter) rather than duplicated/risking drift between a prompt file's literal markers and a formatter's markers.
+* **`format_student_summary_evidence()`/`format_course_book_evidence()` reject a chunk whose `SourceType` does not match the formatter being called** (`PromptContextError`), even though the WP does not explicitly demand this check. Added because WP-008's own objective explicitly asks for "tests ensuring prompt/source-role boundaries remain explicit" - a mismatched `SourceType` reaching the wrong formatter is exactly the kind of source-role confusion that boundary is meant to prevent, and the check is a few lines against a field that already exists on `SourceEvidenceChunk`.
+* **`GenerationPromptContext` enforces the mode/historical-reference invariant in both directions**: `STYLE_SIMILAR` requires a `historical_reference` (explicit in WP-008 section 44), and `INDEPENDENT` must not be supplied one at all (stricter than the WP's literal wording, which only says `INDEPENDENT` must not *fabricate* one). Chosen to give test 69 ("invalid mode/context combination fails") an unambiguous, symmetric rule to test in both directions, and because a caller that already has a resolved historical reference but requests `INDEPENDENT` generation almost certainly has a caller-side bug worth failing loudly on rather than silently discarding the reference.
+* **No context object was introduced for MCQ/category/quality/textbook validation** - only `GenerationPromptContext`/`GroundingPromptContext` exist, matching WP-008 section 45's explicit example list. Those four prompts' inputs (a formatted candidate question, plus a plain string or already-formatted course-book evidence) have no invalid-combination invariant analogous to the generation-mode/historical-reference rule, so a dedicated value object would only wrap `render_prompt()` without preventing any additional invalid state.
+* Package structure: `prompts/{errors,models,repository,renderer,formatting,context}.py` (`renderer.py`/`formatting.py`/`context.py` split beyond the WP's minimum suggested `{errors,models,repository,renderer}.py` to keep source-role formatting and mode-invariant context construction each in their own focused module, mirroring the loader/repository-style separation already used by `historical`/`ingestion`/`chunking`). Only `renderer.py` imports from `exam_generator.llm` (for `LLMMessage`/`MessageRole`); nothing in the package imports the `openai` SDK.
+
 ## Live Smoke Test (WP-007)
 
 **Executed successfully** by the user with a real `OPENAI_API_KEY`, once against the live OpenAI API:
@@ -277,8 +303,8 @@ This confirms the configured `gpt-4o-mini` model, the Responses API structured-o
 
 ## Tests
 
-* Total: **414** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007)
-* Passing: **414**
+* Total: **524** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007 + 110 from WP-008)
+* Passing: **524**
 * Failing: **0**
 
 Verification commands and results:
@@ -288,13 +314,15 @@ Verification commands and results:
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
 * `.venv/bin/python -c "import sklearn; print(sklearn.__version__)"` → `1.9.0`
 * `.venv/bin/python -c "import openai; print(openai.__version__)"` → `2.52.0`
-* `.venv/bin/python -m pytest -v` → 414 passed, in ~3s with zero network access and no `OPENAI_API_KEY` set (confirmed absent from the environment) - satisfies the WP's mandatory offline-test requirement.
+* `.venv/bin/python -m pytest -v` → 524 passed, in ~5s with zero network access and no `OPENAI_API_KEY` set (confirmed absent from the environment) - satisfies the WP's mandatory offline-test requirement.
 * `.venv/bin/python -m pytest tests/unit/test_llm.py -v` → 49 passed.
-* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - no WP-002 model changed in WP-007).
+* `.venv/bin/python -m pytest tests/unit/test_prompts.py -v` → 110 passed, zero network access, no API key required, no `LLMProvider.generate_structured()` call anywhere in the WP-008 test suite.
+* `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - no WP-002 model changed in WP-007/WP-008).
 * Real-workbook smoke test against `data/questions_full_export.xlsx`; confirmed no wording corruption.
 * Real-source PDF verification against all four real PDFs; confirmed Hebrew/English/mixed content preserved.
 * Real corpus + real retrieval-index verification against all four real PDFs; confirmed coverage invariants, ID uniqueness/determinism, and 20/20 canonical categories returning positive retrieval results.
-* Live OpenAI smoke test: **not executed** (see Live Smoke Test section below) - explicitly permitted by the WP when no key is available.
+* Real production-prompt-repository verification and real-data prompt-formatting smoke test (WP-008) - see "Real Prompt Verification (WP-008)" below.
+* Live OpenAI smoke test: **not executed this WP** (see Live Smoke Test section above) - WP-008 makes no LLM/provider call at all, live or mocked, per its own explicit non-goals.
 * `git status --short` / `git add -A --dry-run` → only WP-007 files (plus intentional `pyproject.toml` change) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 
 ## Real-Workbook Verification (WP-003)
@@ -417,11 +445,38 @@ Total query time for all 20 categories: ~0.17s (~8.4ms/query average).
 * English term `Medulla Oblongata` → top chunk `COURSE_BOOK:course_book.pdf:0091:0001`, score 0.3097, contains the exact phrase.
 * Mixed-content term `trabeculae` (confirmed present in exactly 1 real chunk, from WP-005's precise overlap verification) → that exact chunk (`STUDENT_SUMMARY:student_summary_1.pdf:0005:0001`) appears at rank 3, score 0.0777; no Unicode corruption in any result.
 
+## Real Prompt Verification (WP-008)
+
+Loaded every production prompt through the real `PromptRepository.from_default_location()` (no LLM call):
+
+| prompt_id | file | required_variables | version prefix |
+|---|---|---|---|
+| SYSTEM | system/exam_generator.txt | (none) | f40c13486d0701aa |
+| QUESTION_GENERATION | generation/question.txt | category, generation_mode, source_evidence, historical_reference | fddc0c1a31190b4d |
+| GROUNDING_VALIDATION | validation/grounding.txt | candidate_question, source_evidence | bb53657ee4749edc |
+| MCQ_VALIDATION | validation/mcq.txt | candidate_question | 67db50ecbe0d1aa7 |
+| CATEGORY_VALIDATION | validation/category.txt | candidate_question, expected_category | 7ae0b7235c0b358d |
+| QUALITY_VALIDATION | validation/quality.txt | candidate_question | 1199c691ec0b3a6e |
+| TEXTBOOK_VALIDATION | validation/textbook.txt | candidate_question, course_book_evidence | a169fcd5c4179c25 |
+
+**Real-data formatting smoke test** (formatting/rendering only - zero LLM calls), using real project data via the existing WP-003/WP-005/WP-006 subsystems:
+
+* Real canonical category used: `התעלה השדרתית ותכולתה` (first canonical category from the real workbook).
+* Real student-summary evidence: top-3 `retrieve_for_category()` results against the real student-summary retrieval index (3 chunks).
+* Real historical reference: `historical_question_id=1`, the first real historical question in that category.
+* Real course-book chunk: `COURSE_BOOK:course_book.pdf:0003:0001` (page 3), taken directly from the real course-book corpus.
+* `QUESTION_GENERATION` rendered successfully for both `STYLE_SIMILAR` (5,779 chars, with the real historical reference; confirmed `NOT FACTUAL EVIDENCE` and `AUTHORITATIVE` markers both present and distinct) and `INDEPENDENT` (5,543 chars; confirmed the "No historical style reference is supplied" sentinel present, no fabricated reference).
+* `GROUNDING_VALIDATION`, `MCQ_VALIDATION`, `CATEGORY_VALIDATION`, `QUALITY_VALIDATION` all rendered successfully against a real candidate built from the real historical reference's text.
+* `TEXTBOOK_VALIDATION` rendered successfully against the real course-book chunk; confirmed the real chunk ID appears in the rendered text and the `SECONDARY` label is present.
+* Hebrew characters confirmed present and intact in the rendered `STYLE_SIMILAR` generation prompt (spot-checked via Hebrew Unicode block membership).
+* No corruption, truncation, or mis-delimiting observed in any of the above.
+
 ## Known Issues / Open Questions
 
 * **Python version deviation from WP-001 spec (carried forward).** WP-001.md specified Python 3.14 and assumed a pre-existing project-local `.venv` built with it. Neither a Python 3.14 interpreter nor a pre-existing `.venv` was actually present on this machine (only system `python3` / `python3.12` = 3.12.3, confirmed via `apt list --installed` and filesystem search). Per explicit user instruction, WP-001 through WP-007 were implemented and verified against **Python 3.12.3** instead, with `pyproject.toml` declaring `requires-python = ">=3.12"`. This is a factual correction of the WP's environment assumption, not an architectural change. `openpyxl`, `pymupdf`, `scikit-learn`, and now `openai` were all confirmed to install and work correctly under 3.12.3.
 * See "Known Retrieval-Quality Observations" above for WP-006-specific findings (all explicitly non-blocking per the WP's own acceptance criteria - honest reporting was required, not resolution).
 * No open issues from WP-007. Live OpenAI compatibility (`gpt-4o-mini` + Responses API + `temperature` + structured output) was verified end-to-end against the real API by the user after this WP's initial completion report - see Live Smoke Test above.
+* No open issues from WP-008. The real course-book retrieval index returned zero results for the specific canonical-category text queried during the real-data smoke test (a known, previously-documented WP-006 short-query ranking characteristic, not a WP-008 defect); the smoke test used a real course-book chunk taken directly from the real corpus instead so `TEXTBOOK_VALIDATION` was still exercised against genuine course-book content.
 
 ## Files Added
 
@@ -477,7 +532,7 @@ WP-006 (carried forward, unchanged this WP):
 * `src/exam_generator/retrieval/categories.py`
 * `tests/unit/test_retrieval.py`
 
-WP-007 (new):
+WP-007 (carried forward, unchanged this WP):
 * `src/exam_generator/llm/__init__.py`
 * `src/exam_generator/llm/errors.py`
 * `src/exam_generator/llm/models.py`
@@ -487,11 +542,28 @@ WP-007 (new):
 * `scripts/smoke_openai.py`
 * `tests/unit/test_llm.py`
 
+WP-008 (new):
+* `src/exam_generator/prompts/__init__.py`
+* `src/exam_generator/prompts/errors.py`
+* `src/exam_generator/prompts/models.py`
+* `src/exam_generator/prompts/repository.py`
+* `src/exam_generator/prompts/renderer.py`
+* `src/exam_generator/prompts/formatting.py`
+* `src/exam_generator/prompts/context.py`
+* `prompts/system/exam_generator.txt`
+* `prompts/generation/question.txt`
+* `prompts/validation/grounding.txt`
+* `prompts/validation/mcq.txt`
+* `prompts/validation/category.txt`
+* `prompts/validation/quality.txt`
+* `prompts/validation/textbook.txt`
+* `tests/unit/test_prompts.py`
+
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection. WP-008: expanded the existing "Prompt Boundary" section with a new "External Prompt Infrastructure" subsection).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`. WP-008: no new dependency).
 * `config/app.yaml` (WP-006: added `retrieval:` section: `top_k: 8`, `ngram_min: 3`, `ngram_max: 5`).
 * `config/category_mapping.yaml` (WP-006: schema changed from placeholder `aliases: {}` to activated `mapping: {}` - see Decisions Made).
 * `src/exam_generator/config/models.py` (WP-006: added `RetrievalConfig`, `CategoryMappingConfig`, `NonBlankConfigStr`/`_reject_blank` helpers, `AppConfig.retrieval` field).
@@ -528,16 +600,16 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-007 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution; `src/exam_generator/llm` provides the provider-independent LLM abstraction + a working OpenAI provider (`build_llm_provider()`, `LLMMessage`, `LLMProfile`, `generate_structured()`). None of the following exists yet:
+WP-001 through WP-008 are complete. `src/exam_generator/config` provides configuration loading (paths, generation placeholders, chunking, retrieval, category mapping); `src/exam_generator/models` provides every domain contract; `src/exam_generator/historical` provides read-only access to the canonical category list and historical style/structure references; `src/exam_generator/ingestion` provides deterministic PDF text extraction; `src/exam_generator/chunking` provides deterministic chunking + read-only corpora; `src/exam_generator/retrieval` provides local TF-IDF retrieval indexes and canonical-category resolution/`ExamRequest` resolution; `src/exam_generator/llm` provides the provider-independent LLM abstraction + a working OpenAI provider (`build_llm_provider()`, `LLMMessage`, `LLMProfile`, `generate_structured()`); `src/exam_generator/prompts` provides the external prompt repository/rendering/formatting infrastructure and all seven production prompt files under `prompts/`. None of the following exists yet:
 
-* **No production prompts or prompt-loading infrastructure exists.** `src/exam_generator/llm` can send arbitrary messages and get back an arbitrary Pydantic response model, but nothing populates `prompts/system/`, `prompts/generation/`, `prompts/validation/` with real content, and no code loads/renders prompt templates yet. That is WP-008's explicit responsibility.
-* **No question generation or validation behavior exists.** `CandidateQuestion` has never been produced by an LLM call; `GroundingValidationResult`/`MCQValidationResult`/`CategoryValidationResult`/`QualityValidationResult`/`TextbookCheckResult` still have no validator logic - they remain WP-002 contracts only. WP-007 only makes it *possible* for later code to request these as structured outputs; it does not call the LLM with any of them yet.
-* **No retrieval-to-generation wiring exists.** `retrieve_for_category()` (WP-006) and `generate_structured()` (WP-007) have not been connected - no code retrieves evidence and passes it to an LLM prompt. That connection requires prompt infrastructure (WP-008) and generation logic (WP-009) first.
+* **No question generation or validation behavior exists.** `CandidateQuestion` has never been produced by an LLM call; `GroundingValidationResult`/`MCQValidationResult`/`CategoryValidationResult`/`QualityValidationResult`/`TextbookCheckResult` still have no validator logic - they remain WP-002 contracts only. WP-008 only makes it possible to render the exact prompt text/messages a real call would need; nothing has actually called `LLMProvider.generate_structured()` with them yet.
+* **No retrieval-to-generation wiring exists as an orchestrated pipeline.** `retrieve_for_category()` (WP-006), the WP-008 prompt-context/rendering helpers, and `generate_structured()` (WP-007) have each been exercised independently (including together, in the WP-008 real-data formatting smoke test) but nothing yet chains them into one generation call/loop. That is WP-009's responsibility.
+* **No response schema for the actual generation LLM call has been decided.** WP-008's generation prompt describes (in prose only, per its own explicit "do not duplicate a JSON schema" instruction) that the model should report which supplied evidence IDs support its answer and which historical reference (if any) it used - consistent with `QuestionAudit.evidence`/`historical_reference_id` (`src/exam_generator/models/audit.py`) - but `CandidateQuestion` itself (WP-002) has no such fields. WP-009 must decide the actual Pydantic response model passed to `generate_structured(response_model=...)` for the real generation call (likely a richer intermediate model that then maps down to `CandidateQuestion` plus audit fields) - this was intentionally left undecided by WP-008.
 * No historical-question selection/similarity logic, diversity/retry logic, exam orchestration, output-file writing, or CLI exists yet.
-* **Live OpenAI compatibility is confirmed** - `gpt-4o-mini` + Responses API + `temperature` + structured output all work correctly together against the real API (see Live Smoke Test above). WP-008/WP-009 can rely on the provider for real generation work.
-* Integration point for WP-008/WP-009: `build_llm_provider(load_llm_config())` gives a ready `LLMProvider`; `provider.generate_structured(messages=[LLMMessage(...)], response_model=<any Pydantic model>, profile=LLMProfile.GENERATION|VALIDATION)` is the call shape prompt/generation code should target. No hidden system prompt is inserted automatically (by design - WP-008 owns that).
+* **Live OpenAI compatibility is confirmed** - `gpt-4o-mini` + Responses API + `temperature` + structured output all work correctly together against the real API (see Live Smoke Test above). WP-009 can rely on the provider for real generation work.
+* Integration point for WP-009: `build_llm_provider(load_llm_config())` gives a ready `LLMProvider`; `PromptRepository.from_default_location()` gives every loaded production prompt; `GenerationPromptContext(category=..., generation_mode=..., source_evidence=..., historical_reference=...).render_variables()` + `render_prompt(repo.get(PromptId.QUESTION_GENERATION), **variables)`, or `build_prompt_messages(system_template=repo.get(PromptId.SYSTEM), task_template=repo.get(PromptId.QUESTION_GENERATION), variables=...)` for the full `(SYSTEM, USER)` message pair, is the call shape WP-009's generation code should target before calling `provider.generate_structured(messages=..., response_model=..., profile=LLMProfile.GENERATION)`. The same pattern (without a `GenerationPromptContext`) applies to the five validation prompts for later WPs.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and now `openai>=2.0` (2.52.0) are the real runtime dependencies so far. The next WP's author should account for the environment note when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and `openai>=2.0` (2.52.0) are the real runtime dependencies so far; WP-008 added none. The next WP's author should account for the environment note when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -545,7 +617,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-008** (per the roadmap: external prompt infrastructure). Claude must not invent or begin WP-008's specification; wait for it to be supplied.
+**WP-009** (per the roadmap: question generation). Claude must not invent or begin WP-009's specification; wait for it to be supplied.
 
 ---
 
