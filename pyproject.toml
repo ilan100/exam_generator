@@ -21,6 +21,9 @@ dev = [
     "pytest>=8.0",
 ]
 
+[project.scripts]
+exam-generator = "exam_generator.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
