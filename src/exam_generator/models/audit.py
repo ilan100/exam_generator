@@ -10,7 +10,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from exam_generator.models._common import NonBlankStr, PositiveIntStrict, UnitInterval
+from exam_generator.models._common import NonBlankStr, PositiveIntStrict, StrictBool, UnitInterval
 from exam_generator.models.question import GenerationMode
 from exam_generator.models.source import SourceEvidenceChunk
 from exam_generator.models.validation import (
@@ -20,6 +20,28 @@ from exam_generator.models.validation import (
     QualityValidationResult,
     TextbookCheckResult,
 )
+
+
+class QuestionAttemptAudit(BaseModel):
+    """Traceability for one complete generate-then-validate attempt
+    (WP-013) toward a single exam question, whether or not it was
+    ultimately accepted.
+
+    Added in WP-015 to preserve full per-attempt history in the audit -
+    ``QuestionAudit``'s own ``grounding``/``mcq_validation``/etc. fields
+    (unchanged since WP-002) continue to represent only the final,
+    accepted attempt's results.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    attempt_number: PositiveIntStrict
+    accepted: StrictBool
+    grounding: GroundingValidationResult
+    mcq_validation: MCQValidationResult
+    category_validation: CategoryValidationResult
+    quality_validation: QualityValidationResult
+    textbook_check: TextbookCheckResult | None = None
 
 
 class QuestionAudit(BaseModel):
@@ -39,6 +61,7 @@ class QuestionAudit(BaseModel):
     textbook_check: TextbookCheckResult | None = None
     generation_attempts: PositiveIntStrict
     diversity_target: UnitInterval
+    attempts: list[QuestionAttemptAudit] = Field(min_length=1)
 
 
 class ExamAudit(BaseModel):

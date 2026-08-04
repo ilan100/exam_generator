@@ -16,6 +16,7 @@ from exam_generator.models import (
     HistoricalStyleReference,
     MCQValidationResult,
     QualityValidationResult,
+    QuestionAttemptAudit,
     QuestionAudit,
     SourceEvidenceChunk,
     SourceType,
@@ -40,6 +41,24 @@ def make_grounding(**overrides) -> GroundingValidationResult:
     )
     base.update(overrides)
     return GroundingValidationResult(**base)
+
+
+def make_question_attempt_audit(**overrides) -> QuestionAttemptAudit:
+    base = dict(
+        attempt_number=1,
+        accepted=True,
+        grounding=make_grounding(),
+        mcq_validation=MCQValidationResult(
+            valid=True, exactly_four_answers=True, single_best_answer=True, reason="ok"
+        ),
+        category_validation=CategoryValidationResult(
+            valid=True, requested_category="גזע המוח", assessed_category="גזע המוח", reason="ok"
+        ),
+        quality_validation=QualityValidationResult(valid=True, reason="ok"),
+        textbook_check=None,
+    )
+    base.update(overrides)
+    return QuestionAttemptAudit(**base)
 
 
 def make_question_audit(**overrides) -> QuestionAudit:
@@ -68,6 +87,7 @@ def make_question_audit(**overrides) -> QuestionAudit:
         textbook_check=None,
         generation_attempts=1,
         diversity_target=0.7,
+        attempts=[make_question_attempt_audit()],
     )
     base.update(overrides)
     return QuestionAudit(**base)
@@ -549,6 +569,50 @@ def test_question_audit_multiple_evidence_chunks_supported():
     ]
     audit = make_question_audit(evidence=chunks)
     assert len(audit.evidence) == 3
+
+
+def test_question_audit_requires_at_least_one_attempt():
+    with pytest.raises(ValidationError):
+        make_question_audit(attempts=[])
+
+
+def test_question_audit_preserves_multiple_attempts():
+    attempts = [
+        make_question_attempt_audit(attempt_number=1, accepted=False),
+        make_question_attempt_audit(attempt_number=2, accepted=True),
+    ]
+    audit = make_question_audit(attempts=attempts)
+    assert len(audit.attempts) == 2
+    assert audit.attempts[0].accepted is False
+    assert audit.attempts[1].accepted is True
+
+
+def test_question_attempt_audit_valid_accepted():
+    attempt = make_question_attempt_audit()
+    assert attempt.attempt_number == 1
+    assert attempt.accepted is True
+
+
+def test_question_attempt_audit_extra_field_rejected():
+    with pytest.raises(ValidationError):
+        make_question_attempt_audit(unexpected_field="nope")
+
+
+def test_question_attempt_audit_zero_attempt_number_rejected():
+    with pytest.raises(ValidationError):
+        make_question_attempt_audit(attempt_number=0)
+
+
+def test_question_attempt_audit_boolean_accepted_coercion_rejected_for_non_bool():
+    with pytest.raises(ValidationError):
+        make_question_attempt_audit(accepted="yes")
+
+
+def test_question_attempt_audit_optional_textbook_check_works():
+    attempt = make_question_attempt_audit(
+        textbook_check=TextbookCheckResult(status=TextbookCheckStatus.NOT_FOUND, reason="no evidence")
+    )
+    assert attempt.textbook_check.status == TextbookCheckStatus.NOT_FOUND
 
 
 # ---------------------------------------------------------------------------

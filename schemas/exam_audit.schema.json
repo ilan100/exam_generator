@@ -152,6 +152,54 @@
       "title": "QualityValidationResult",
       "type": "object"
     },
+    "QuestionAttemptAudit": {
+      "additionalProperties": false,
+      "description": "Traceability for one complete generate-then-validate attempt\n(WP-013) toward a single exam question, whether or not it was\nultimately accepted.\n\nAdded in WP-015 to preserve full per-attempt history in the audit -\n``QuestionAudit``'s own ``grounding``/``mcq_validation``/etc. fields\n(unchanged since WP-002) continue to represent only the final,\naccepted attempt's results.",
+      "properties": {
+        "attempt_number": {
+          "gt": 0,
+          "title": "Attempt Number",
+          "type": "integer"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "grounding": {
+          "$ref": "#/$defs/GroundingValidationResult"
+        },
+        "mcq_validation": {
+          "$ref": "#/$defs/MCQValidationResult"
+        },
+        "category_validation": {
+          "$ref": "#/$defs/CategoryValidationResult"
+        },
+        "quality_validation": {
+          "$ref": "#/$defs/QualityValidationResult"
+        },
+        "textbook_check": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextbookCheckResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "attempt_number",
+        "accepted",
+        "grounding",
+        "mcq_validation",
+        "category_validation",
+        "quality_validation"
+      ],
+      "title": "QuestionAttemptAudit",
+      "type": "object"
+    },
     "QuestionAudit": {
       "additionalProperties": false,
       "description": "Traceability/diagnostics for a single generated question.",
@@ -221,6 +269,14 @@
           "minimum": 0.0,
           "title": "Diversity Target",
           "type": "number"
+        },
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/QuestionAttemptAudit"
+          },
+          "minItems": 1,
+          "title": "Attempts",
+          "type": "array"
         }
       },
       "required": [
@@ -232,7 +288,8 @@
         "category_validation",
         "quality_validation",
         "generation_attempts",
-        "diversity_target"
+        "diversity_target",
+        "attempts"
       ],
       "title": "QuestionAudit",
       "type": "object"

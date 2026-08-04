@@ -1,4 +1,4 @@
-from exam_generator.models.audit import ExamAudit, QuestionAudit
+from exam_generator.models.audit import ExamAudit, QuestionAttemptAudit, QuestionAudit
 from exam_generator.models.exam import ExamOutput, ExamRequest
 from exam_generator.models.question import (
     CandidateQuestion,
@@ -30,6 +30,7 @@ __all__ = [
     "HistoricalStyleReference",
     "MCQValidationResult",
     "QualityValidationResult",
+    "QuestionAttemptAudit",
     "QuestionAudit",
     "SourceEvidenceChunk",
     "SourceType",
