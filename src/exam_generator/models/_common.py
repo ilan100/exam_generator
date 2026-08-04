@@ -37,6 +37,9 @@ NonBlankStr = Annotated[str, BeforeValidator(_reject_blank)]
 # A strictly positive integer; bool is rejected even though bool is an int subtype.
 PositiveIntStrict = Annotated[int, BeforeValidator(_reject_bool), Field(gt=0)]
 
+# A non-negative integer (zero allowed); bool is rejected even though bool is an int subtype.
+NonNegativeIntStrict = Annotated[int, BeforeValidator(_reject_bool), Field(ge=0)]
+
 # A 1-based answer identifier: exactly one of 1, 2, 3, 4.
 CorrectAnswerId = Annotated[int, BeforeValidator(_reject_bool), Field(ge=1, le=4)]
 

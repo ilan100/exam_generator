@@ -56,6 +56,7 @@ class GenerationBehaviorConfig(BaseModel):
     minimum_diversity_target: float = Field(ge=0.0, le=1.0)
     diversity_relaxation_step: float = Field(gt=0.0)
     max_generation_attempts: int = Field(gt=0)
+    max_duplicate_replacement_attempts: int = Field(gt=0)
 
     @model_validator(mode="after")
     def _check_diversity_ordering(self) -> "GenerationBehaviorConfig":

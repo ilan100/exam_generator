@@ -11,7 +11,7 @@ Determine exactly one of the following outcomes:
 
 If you report source_page, it must exactly match the "Page:" value of one of the evidence items below - never invent or guess a page number.
 
-If you report reference_text, it must be copied exactly, character for character, as a contiguous excerpt from that same evidence item's "Text:" content - never paraphrase, summarize, translate, or reconstruct it from memory, and never combine wording from more than one evidence item. If you cannot find a contiguous exact quote that supports your determination, leave reference_text empty rather than approximating one.
+If you report reference_text, it must be copied exactly, character for character, as a contiguous excerpt from that same evidence item's "Text:" content - never paraphrase, summarize, translate, or reconstruct it from memory, and never combine wording from more than one evidence item. If you cannot find a contiguous exact quote that supports your determination, omit reference_text entirely (return null, not an empty string) rather than approximating one.
 
 Candidate question:
 {candidate_question}

@@ -8,14 +8,19 @@ paths:
   prompts_dir: prompts
   schemas_dir: schemas
 
-# Generation behavior placeholders.
-# These values are architecturally defined but not yet used by any implemented
-# behavior (diversity/retry logic is a later Work Package).
+# Generation/production behavior. max_generation_attempts (WP-013) and
+# max_duplicate_replacement_attempts (WP-014) are active. The three
+# diversity_* fields remain architecturally defined placeholders, not yet
+# used by any implemented behavior (semantic/embedding diversity scoring is
+# out of scope through at least WP-014 - see docs/ARCHITECTURE.md).
 generation:
   initial_diversity_target: 0.7
   minimum_diversity_target: 0.3
   diversity_relaxation_step: 0.1
   max_generation_attempts: 3
+  # WP-014: bounded exam-level duplicate-replacement attempts - distinct from
+  # max_generation_attempts (WP-013's per-question quality-regeneration bound).
+  max_duplicate_replacement_attempts: 2
 
 # Deterministic character-based chunking (WP-005). Values are measured in
 # Python Unicode characters, not model tokens.

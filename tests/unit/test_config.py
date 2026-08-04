@@ -22,6 +22,7 @@ def test_load_default_app_config_succeeds():
     assert config.paths.schemas_dir == "schemas"
     assert 0.0 <= config.generation.initial_diversity_target <= 1.0
     assert config.generation.max_generation_attempts > 0
+    assert config.generation.max_duplicate_replacement_attempts > 0
     assert config.chunking.chunk_size > 0
     assert 0 <= config.chunking.chunk_overlap < config.chunking.chunk_size
     assert config.retrieval.top_k > 0
@@ -62,6 +63,7 @@ def _valid_generation_kwargs(**overrides):
         minimum_diversity_target=0.3,
         diversity_relaxation_step=0.1,
         max_generation_attempts=3,
+        max_duplicate_replacement_attempts=2,
     )
     base.update(overrides)
     return base
@@ -90,6 +92,11 @@ def test_non_positive_relaxation_step_rejected():
 def test_non_positive_max_attempts_rejected():
     with pytest.raises(ValidationError):
         GenerationBehaviorConfig(**_valid_generation_kwargs(max_generation_attempts=0))
+
+
+def test_non_positive_max_duplicate_replacement_attempts_rejected():
+    with pytest.raises(ValidationError):
+        GenerationBehaviorConfig(**_valid_generation_kwargs(max_duplicate_replacement_attempts=0))
 
 
 def _valid_llm_kwargs(**overrides):
