@@ -4,10 +4,10 @@
 
 ## Current State
 
-* Last completed WP: **WP-012 — Secondary textbook consistency validation**
-* Current/next planned WP: **WP-013**
+* Last completed WP: **WP-013 — Candidate acceptance and bounded regeneration**
+* Current/next planned WP: **WP-014**
 * Overall phase: **Fresh implementation from approved project architecture**
-* Repository implementation state: **WP-012 complete**
+* Repository implementation state: **WP-013 complete**
 
 This repository is a clean reimplementation of the Exam Generator project on a new machine.
 
@@ -49,8 +49,11 @@ Implementation will proceed sequentially from WP-008 using Work Packages supplie
 * Unit tests for the three new validators plus cross-validator independence checks (`tests/unit/test_mcq_validation.py`, `tests/unit/test_category_validation.py`, `tests/unit/test_quality_validation.py`, `tests/unit/test_validation_independence.py`), 43 tests, LLM fully mocked, zero network access, no API key required.
 * Secondary textbook consistency validation (`src/exam_generator/validation/textbook.py`): `TextbookValidator` (`validate(candidate) -> TextbookCheckResult`, `.from_default_configuration()`), independent deterministic course-book-only retrieval (never the student-summary index), and provenance verification of `source_page`/`reference_text` against the actual independently-retrieved course-book chunks. Empty course-book retrieval returns `TextbookCheckStatus.NOT_FOUND` directly without an LLM call (secondary evidence is optional, unlike primary grounding); a negative/inconclusive textbook verdict is a normal return value, never an exception, and never modifies or overrides `GroundingValidationResult`.
 * Unit tests for textbook validation (`tests/unit/test_textbook_validation.py`), 25 tests, LLM fully mocked, zero network access, no API key required.
+* Single-question production control layer (`src/exam_generator/production/`): `QuestionProducer.produce_question(*, category, generation_mode) -> QuestionProductionResult`, coordinating `QuestionGenerator` and all five validators into bounded, deterministic-acceptance regeneration. `CandidateValidationResults.accepted` (centralized derived property, mirroring `GroundingValidationResult.passed`) implements the V1 acceptance policy in plain Python - no LLM ever decides acceptance. Reuses the existing WP-001 `generation.max_generation_attempts` config value (no new configuration). `QuestionAttempt`/`QuestionProductionResult` preserve full attempt history; `QuestionAttemptsExhaustedError` (carrying every completed attempt) is raised if all attempts are rejected.
+* Unit tests for the production control layer (`tests/unit/test_production.py`), 30 tests, LLM fully mocked, zero network access, no API key required.
+* **Live-test-driven prompt fix (WP-013, applies retroactively to WP-008/WP-012's `prompts/validation/textbook.txt`)**: updated to require `source_page`/`reference_text` to correspond exactly to supplied evidence (character-for-character verbatim quoting, or left empty) - the live smoke test found the model otherwise sometimes paraphrases cited course-book text, which WP-012's existing provenance check then correctly rejects as unverifiable. See "Decisions Made (WP-013)" below.
 
-No embeddings, vector databases, semantic/neural retrieval, orchestration, output-file writing, or CLI functionality has been implemented yet. All five candidate-quality validators (grounding, MCQ, category, quality, textbook) now exist as independent single-purpose checks; combining them into an acceptance policy is explicitly deferred.
+No embeddings, vector databases, semantic/neural retrieval, exam orchestration, output-file writing, or CLI functionality has been implemented yet. All five candidate-quality validators (grounding, MCQ, category, quality, textbook) now exist as independent single-purpose checks, and WP-013 combines them into a working single-question production cycle with deterministic acceptance and bounded regeneration; multi-question exam orchestration remains deferred.
 
 ## Important Interfaces
 
@@ -161,6 +164,15 @@ Secondary textbook consistency validation, also importable from `exam_generator.
 * Error hierarchy: `TextbookValidationError` → `InvalidTextbookOutputError` (raised when a returned `source_page`/`reference_text` does not correspond to a course-book chunk actually supplied to the validator)
 * Deterministic V1 textbook-retrieval query: `f"{candidate.category} {candidate.question} {<intended correct answer text>}"` (identical in shape to `GroundingValidator`'s, applied to the course-book index instead)
 * Never mutates the candidate, never invokes `GroundingValidator`/`MCQValidator`/`CategoryValidator`/`QualityValidator`, never modifies a `GroundingValidationResult`; a `NOT_FOUND`/`POTENTIAL_CONFLICT` verdict is a normal successful return value — never an exception
+
+Single-question production control layer, importable from `exam_generator.production`:
+
+* `QuestionProducer(*, generator, grounding_validator, mcq_validator, category_validator, quality_validator, textbook_validator, max_attempts)` — every dependency injected explicitly; `.produce_question(*, category: str, generation_mode: GenerationMode) -> QuestionProductionResult`; `.from_default_configuration()` (real generator/all five real validators/`config/app.yaml`'s `generation.max_generation_attempts`; requires `OPENAI_API_KEY`)
+* `CandidateValidationResults(grounding, mcq, category, quality, textbook)` — bundles the five existing, unmodified validator result models; `.accepted` (derived property, centralized V1 acceptance policy): `grounding.passed AND mcq.valid AND category.valid AND quality.valid AND textbook.status != POTENTIAL_CONFLICT`
+* `QuestionAttempt(attempt_number, candidate, validations)` — one completed generate-then-validate attempt (1-based `attempt_number`); `.accepted` delegates to `validations.accepted`
+* `QuestionProductionResult(candidate, attempts: tuple[QuestionAttempt, ...])` — the accepted candidate plus every attempt (including earlier rejections) that led to it
+* Error hierarchy: `ProductionError` → `InvalidProductionConfigurationError` (`max_attempts < 1`), `QuestionAttemptsExhaustedError` (carries `.attempts`, every completed `QuestionAttempt`, when all attempts are rejected)
+* `category`/`generation_mode` held fixed across every attempt; validators always run in the fixed order grounding → MCQ → category → quality → textbook, to completion, for every generated candidate; no LLM ever decides acceptance; operational failures (from generation or any validator) propagate immediately and consume no attempts; never mutates a candidate or validator result
 
 ## Established Requirements / Decisions
 
@@ -364,6 +376,21 @@ If implementation convenience conflicts with an established architectural decisi
 * No overall candidate-acceptance rule combining all five validators (grounding/MCQ/category/quality/textbook) was implemented or even sketched, per the WP's explicit section 16 prohibition - `TextbookValidator.validate()` returns its own `TextbookCheckResult` and nothing else observes or combines it with any other validator's result.
 * Package structure: `validation/{errors,grounding,mcq,category,quality,textbook}.py` - one new sibling module, continuing the established pattern.
 
+## Decisions Made (WP-013)
+
+* **`CandidateValidationResults.accepted` is a derived property, not a caller-suppliable field**, even though the WP's own section 12 pseudocode shows `QuestionAttempt(..., accepted=False)` as a constructor argument. Deriving it (and `QuestionAttempt.accepted` delegating to it) instead follows this project's own established "centralize derived logic" convention (`GroundingValidationResult.passed` is the precedent this directly mirrors) - it makes an inconsistent-with-its-inputs `accepted` value structurally impossible, which a plain stored field would not guarantee.
+* **No new configuration was added.** WP-013 section 9 explicitly said to inspect existing configuration first; `config/app.yaml`'s `generation.max_generation_attempts` (already present since WP-001, validated `Field(gt=0)` via `GenerationBehaviorConfig`) is exactly the "bounded generation attempts" setting the WP asked for, and was reused as-is via `load_app_config().generation.max_generation_attempts` in `QuestionProducer.from_default_configuration()`. `QuestionProducer.__init__` additionally validates any directly-injected `max_attempts` (`InvalidProductionConfigurationError` if not an int `>= 1`), since constructor-DI test/caller paths bypass `AppConfig`'s own pydantic validation.
+* **New top-level `exam_generator.production` package, not folded into `exam_generator.generation` or `exam_generator.validation`.** The WP explicitly says "do not place this logic inside `QuestionGenerator`" and that generation/control remain separate responsibilities; a new package (mirroring the project's existing one-package-per-responsibility convention: `historical`, `ingestion`, `chunking`, `retrieval`, `llm`, `prompts`, `generation`, `validation`) keeps the control layer a peer of, not a subordinate of, the six components it coordinates.
+* **`QuestionProducer.produce_question()` has no `try`/`except` at all around generation or validation.** This is the simplest possible way to guarantee WP-013's operational-failure-vs-quality-rejection distinction: an operational exception from any component structurally cannot be caught, silently retried, or reinterpreted as a rejection, because there is no exception-handling code path present to do so - the same "prove the boundary structurally, not by convention" pattern used throughout WP-009/WP-010/WP-012 (e.g. "no course-book retrieval parameter exists at all").
+* **Validator invocation order (grounding, MCQ, category, quality, textbook) is a fixed sequence of five plain method calls in `_validate_candidate()`**, exactly the WP's own recommended order - not a configurable or data-driven list, since WP-013 explicitly asked for a deterministic order and gave no reason for it to vary.
+* Package structure: `production/{errors,models,producer}.py` - `models.py` holds the three new result contracts (`CandidateValidationResults`, `QuestionAttempt`, `QuestionProductionResult`) as pydantic `BaseModel`s (`extra="forbid", frozen=True`), matching this project's existing convention for structured result contracts (e.g. `RetrievalResult`) rather than plain dataclasses; `producer.py` holds only `QuestionProducer`.
+
+### Live-Test-Driven Textbook Prompt Fix (WP-013)
+
+The WP-013 live smoke test's first production-cycle run raised `InvalidTextbookOutputError` from an already-passing WP-012 component (`TextbookValidator`), not from any new WP-013 code. Investigation (several manual, non-pytest debug calls against a fixed real candidate + fixed real course-book evidence, outside the bounded production cycle itself) reproduced the cause directly: the model, when populating `reference_text`, sometimes paraphrased/summarized course-book content instead of quoting it verbatim - one reproduced case cited a real supplied page (`source_page=354`) with a `reference_text` that did not appear anywhere in that page's actual supplied chunk text. `TextbookValidator`'s existing WP-012 provenance check was working exactly as designed by correctly rejecting this as unverifiable; the defect was in the prompt's instruction clarity, not in WP-012's or WP-013's logic.
+
+This is the same category of issue WP-010 found and fixed for `evidence_chunk_ids` (an implicit "don't invent evidence" instruction that the model does not reliably follow without an explicit "copy character-for-character" directive). Per that same established precedent, the user was asked before modifying an already-shipped prompt file, and explicitly chose to have it fixed. `prompts/validation/textbook.txt`'s closing instruction was replaced: `source_page` must exactly match a supplied evidence item's `Page:` value; `reference_text` must be a contiguous, character-for-character excerpt of that item's `Text:` content, or left empty if no exact quote is available - never paraphrased, translated, or reconstructed from memory, and never combining wording from more than one evidence item. New version hash prefix: `de8e3f35c8b6fd2c` (supersedes the hash recorded in "Real Prompt Verification (WP-008)" below, which remains an accurate snapshot of that file's content *at that time*, not its current content). No other prompt content, requirement, or policy was changed; the fix was verified not to break any existing offline test (full 672-test suite re-run clean), and the subsequent full live production-cycle smoke test (see below) completed with no operational textbook-provenance error.
+
 ## Live Smoke Test (WP-007)
 
 **Executed successfully** by the user with a real `OPENAI_API_KEY`, once against the live OpenAI API:
@@ -449,10 +476,27 @@ This confirms the configured `gpt-4o-mini` model, the Responses API structured-o
 * This is a legitimate, informative result per WP-012 sections 8/15 explicitly, not an implementation defect: three course-book chunks were retrieved and genuinely considered (the LLM call *was* made - retrieval was not empty), but the model judged them insufficient to confidently support or contradict the specific candidate. No prompt was tuned in response, and no repeated generation/retrieval was attempted to find a "better" result.
 * Only one live generate-then-validate call was made, per this project's established cost/frequency constraint for live smoke tests.
 
+## Live Production Cycle Smoke Test (WP-013)
+
+**Executed successfully**, once, using `QuestionProducer.from_default_configuration().produce_question(category=<first real canonical category>, generation_mode=GenerationMode.INDEPENDENT)` with the configured `max_attempts=3` (`config/app.yaml`'s existing `generation.max_generation_attempts`). Ran after the live-test-driven textbook prompt fix described above (the *first* run of this smoke test surfaced that defect via `InvalidTextbookOutputError`, before any candidate reached an acceptance decision; this is the subsequent, complete run).
+
+* Category used: `התעלה השדרתית ותכולתה` (same first canonical category as every prior live test).
+* Outcome: **exhausted** - all 3 attempts completed operationally successfully (no exceptions), all 3 rejected by the deterministic acceptance policy. `QuestionAttemptsExhaustedError` was raised carrying all 3 completed `QuestionAttempt` records, exactly as designed.
+
+  | Attempt | Grounding | MCQ | Category | Quality | Textbook | Accepted |
+  |---|---|---|---|---|---|---|
+  | 1 | PASS | PASS | PASS | **FAIL** | NOT_FOUND | NO |
+  | 2 | PASS | **FAIL** | PASS | **FAIL** | NOT_FOUND | NO |
+  | 3 | PASS | **FAIL** | PASS | **FAIL** | NOT_FOUND | NO |
+
+* Representative reasons: Attempt 1 Quality FAIL - "The question lacks clarity and specificity regarding the role of the התעלה השדרתית. The answer choices are ambiguous and do not clearly differentiate the functions of the spinal canal..."; Attempt 2/3 MCQ FAIL - "More than one answer choice could reasonably be defended as correct..."; all three Textbook results were `NOT_FOUND` because independent course-book retrieval returned zero chunks for each of the three generated question phrasings (the empty-retrieval short-circuit path from "Decisions Made (WP-012)" - no LLM call was made for textbook validation on any of the three attempts).
+* This is a legitimate, informative "exhausted" result per WP-013 section 20 explicitly ("An exhausted live test is useful baseline data and does not mean WP-013 failed") - not an implementation defect. Grounding passed in all three attempts (generation is reliably producing factually-grounded questions), but MCQ/Quality repeatedly failed on genuine construction weaknesses (ambiguous best-answer, unclear question phrasing) - consistent with, and reinforcing, the same generation-quality weaknesses WP-011's own live smoke test already observed independently. No prompt was tuned in response to this outcome, and the smoke test was not rerun to try to force an accepted result.
+* Only one production-cycle invocation was made, per WP-013 section 20's explicit "keep the smoke test to one production cycle" instruction - it nonetheless made 15 real LLM calls under the hood (3 attempts × [1 generation + 4 always-called validators], with the 5th validator, textbook, making zero calls on all three attempts since its own independent retrieval found nothing each time).
+
 ## Tests
 
-* Total: **642** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007 + 110 from WP-008 + 28 from WP-009 + 22 from WP-010 + 43 from WP-011 + 25 from WP-012)
-* Passing: **642**
+* Total: **672** (10 from WP-001 + 97 from WP-002 + 59 from WP-003 + 47 from WP-004 + 80 from WP-005 + 71 from WP-006 + 1 category-mapping config test + 49 from WP-007 + 110 from WP-008 + 28 from WP-009 + 22 from WP-010 + 43 from WP-011 + 25 from WP-012 + 30 from WP-013)
+* Passing: **672**
 * Failing: **0**
 
 Verification commands and results:
@@ -462,13 +506,14 @@ Verification commands and results:
 * `.venv/bin/python -c "import pymupdf; print(pymupdf.__version__)"` → `1.28.0`
 * `.venv/bin/python -c "import sklearn; print(sklearn.__version__)"` → `1.9.0`
 * `.venv/bin/python -c "import openai; print(openai.__version__)"` → `2.52.0`
-* `.venv/bin/python -m pytest -v` → 642 passed, in ~4s with zero network access and no `OPENAI_API_KEY` set in the shell used for the offline run - satisfies the WP's mandatory offline-test requirement.
+* `.venv/bin/python -m pytest -v` → 672 passed, in ~4s with zero network access and no `OPENAI_API_KEY` set in the shell used for the offline run - satisfies the WP's mandatory offline-test requirement.
 * `.venv/bin/python -m pytest tests/unit/test_llm.py -v` → 49 passed.
 * `.venv/bin/python -m pytest tests/unit/test_prompts.py -v` → 110 passed, zero network access, no API key required, no `LLMProvider.generate_structured()` call anywhere in the WP-008 test suite (includes one WP-010 wording update - see Decisions Made).
 * `.venv/bin/python -m pytest tests/unit/test_generation.py -v` → 28 passed, LLM provider fully mocked (`MagicMock(spec=LLMProvider)`), zero network access, no API key required.
 * `.venv/bin/python -m pytest tests/unit/test_grounding_validation.py -v` → 22 passed, LLM provider fully mocked, zero network access, no API key required.
 * `.venv/bin/python -m pytest tests/unit/test_mcq_validation.py tests/unit/test_category_validation.py tests/unit/test_quality_validation.py tests/unit/test_validation_independence.py -v` → 43 passed (13 MCQ + 13 category + 12 quality + 5 cross-validator independence), LLM provider fully mocked, zero network access, no API key required.
 * `.venv/bin/python -m pytest tests/unit/test_textbook_validation.py -v` → 25 passed, LLM provider fully mocked, zero network access, no API key required.
+* `.venv/bin/python -m pytest tests/unit/test_production.py -v` → 30 passed, generator and all five validators fully mocked, zero network access, no API key required.
 * `.venv/bin/python scripts/generate_schemas.py` run twice in a row → byte-identical output (deterministic; unaffected - `GeneratedQuestionResponse`/`GroundingValidationResult` are not newly schema-exported).
 * Real-workbook smoke test against `data/questions_full_export.xlsx`; confirmed no wording corruption.
 * Real-source PDF verification against all four real PDFs; confirmed Hebrew/English/mixed content preserved.
@@ -478,6 +523,7 @@ Verification commands and results:
 * `git status --short` / `git add -A --dry-run` → only WP-007 files (plus intentional `pyproject.toml` change) staged; no PDFs, Excel, `data/question_format.json`, `.venv/`, secrets, or generated output/index artifacts.
 * Live candidate-quality validation smoke test (WP-011): one real generate-then-validate-four-ways sequence against the real OpenAI API - see "Live Candidate-Quality Validation Smoke Test (WP-011)" above.
 * Live textbook validation smoke test (WP-012): one real generate-then-textbook-validate sequence against the real OpenAI API, including genuine (non-empty) course-book retrieval - see "Live Textbook Validation Smoke Test (WP-012)" above.
+* Live production-cycle smoke test (WP-013): one real `QuestionProducer.produce_question()` call (3 bounded attempts, 15 real LLM calls) against the real OpenAI API - see "Live Production Cycle Smoke Test (WP-013)" above.
 
 ## Real-Workbook Verification (WP-003)
 
@@ -635,6 +681,7 @@ Loaded every production prompt through the real `PromptRepository.from_default_l
 * No open issues from WP-010. The live smoke test initially exposed a real, reproducible provenance-check failure caused by prompt wording (see "Decisions Made (WP-010)"); it was fixed (with explicit user approval, since it meant editing already-shipped WP-008 prompt files) and confirmed resolved by a subsequent successful live call. Only one real grounding verdict has been observed so far (`passed=True`, high confidence) - this is not a quality/accuracy measurement across multiple questions or categories, just a confirmation that the pipeline works end-to-end. WP-013 (diversity/retry) and broader manual review will be where real grounding-quality patterns get surfaced.
 * No open issues from WP-011. The live smoke test's candidate happened to fail all four independent validators at once (Grounding/MCQ/Category/Quality) - this is an honest, self-consistent negative result about that one generated candidate (all four reasons independently converge on the same underlying weakness: the correct answer isn't the only defensible one, and the question is really about general vertebral function, not the requested category), not a validator defect, and per WP-011 section 15 is an explicitly acceptable, informative smoke-test outcome. No prompt was tuned in response. Only one real four-way verdict combination has been observed so far - not a systematic quality measurement across multiple candidates/categories.
 * No open issues from WP-012. The live smoke test's textbook verdict was `NOT_FOUND` despite genuine (non-empty, 3-chunk) course-book retrieval - the LLM judged the retrieved material insufficient to confidently support or contradict the specific candidate, which is a legitimate `NOT_FOUND` use case distinct from the empty-retrieval short-circuit path (both were exercised: the empty-retrieval path in unit tests, the LLM-judged-insufficient path live). This contrasts with WP-008's own real-data smoke test, which saw zero course-book retrieval results for a bare category-name query (a documented WP-006 short-query ranking characteristic); WP-012's query additionally includes the full question and answer text, which was sufficient to retrieve real candidates in the live test. Only one real textbook verdict has been observed so far - not a systematic quality measurement across multiple candidates/categories.
+* No open implementation issues from WP-013, but the live smoke test surfaced two real, worth-recording observations. First, a genuine prompt-contract defect in `prompts/validation/textbook.txt` (see "Decisions Made (WP-013)" - fixed with explicit user approval). Second, an honest quality-baseline data point: the one live production cycle exhausted all 3 attempts without an accepted candidate - Grounding passed all three times, but MCQ and/or Quality failed on all three, reinforcing (not merely repeating) the same generation-construction weaknesses WP-011's independent live smoke test already observed. This is not a WP-013 defect - it is exactly the honest baseline measurement WP-013 section 15 explicitly asks for ("This also gives us an honest baseline for how often repeated independent model generations pass"). Only one real production-cycle outcome has been observed so far - not a systematic acceptance-rate measurement across multiple categories/runs; sophisticated validator-feedback regeneration (which might improve this rate) is explicitly deferred, per the WP's own scope.
 
 ## Files Added
 
@@ -738,17 +785,25 @@ WP-011 (carried forward, unchanged this WP):
 * `tests/unit/test_quality_validation.py`
 * `tests/unit/test_validation_independence.py`
 
-WP-012 (new):
+WP-012 (carried forward, unchanged this WP):
 * `src/exam_generator/validation/textbook.py`
 * `tests/unit/test_textbook_validation.py`
+
+WP-013 (new):
+* `src/exam_generator/production/__init__.py`
+* `src/exam_generator/production/errors.py`
+* `src/exam_generator/production/models.py`
+* `src/exam_generator/production/producer.py`
+* `tests/unit/test_production.py`
 
 ## Files Significantly Modified
 
 * `docs/PROJECT_STATUS.md` (this file).
-* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection. WP-008: expanded the existing "Prompt Boundary" section with a new "External Prompt Infrastructure" subsection. WP-009: new "Question Generation" section. WP-010: new "Independent Grounding Validation" section, plus an evidence-identifier-fidelity note appended to the WP-009 section. WP-011: new "MCQ, Category, and Quality Validation" section. WP-012: new "Secondary Textbook Consistency Validation" section).
-* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`. WP-008: no new dependency. WP-009: no new dependency. WP-010: no new dependency. WP-011: no new dependency. WP-012: no new dependency).
+* `docs/ARCHITECTURE.md` (WP-002: `SourceType` enum values spelled out under Retrieval. WP-003: new "Historical Question Ingestion" section. WP-004: new "PDF Text Extraction" section. WP-005: new "Factual Source Chunking and Corpora" section. WP-006: new "Local Retrieval and Category Integration" section. WP-007: expanded the existing "LLM Boundary" section with a new "LLM Abstraction and OpenAI Provider" subsection. WP-008: expanded the existing "Prompt Boundary" section with a new "External Prompt Infrastructure" subsection. WP-009: new "Question Generation" section. WP-010: new "Independent Grounding Validation" section, plus an evidence-identifier-fidelity note appended to the WP-009 section. WP-011: new "MCQ, Category, and Quality Validation" section. WP-012: new "Secondary Textbook Consistency Validation" section. WP-013: new "Single-Question Production Control Layer" section plus a "Live-Test-Driven Textbook Prompt Fix" subsection).
+* `pyproject.toml` (WP-003: added `openpyxl>=3.1`. WP-004: added `pymupdf>=1.24`. WP-005: no new dependency. WP-006: added `scikit-learn>=1.4`. WP-007: added `openai>=2.0`. WP-008: no new dependency. WP-009: no new dependency. WP-010: no new dependency. WP-011: no new dependency. WP-012: no new dependency. WP-013: no new dependency).
 * `src/exam_generator/validation/__init__.py` (WP-011: exported `MCQValidator`, `CategoryValidator`, `QualityValidator` alongside the existing WP-010 `GroundingValidator`/error exports. WP-012: further exported `TextbookValidator`, `TextbookValidationError`, `InvalidTextbookOutputError`).
 * `src/exam_generator/validation/errors.py` (WP-012: added `TextbookValidationError` → `InvalidTextbookOutputError`; module docstring broadened from "grounding validation" to "candidate-quality validation" generally, now that it hosts two independent error hierarchies).
+* `prompts/validation/textbook.txt` (WP-008/WP-012, content changed in WP-013: `source_page`/`reference_text` guidance now requires exact, character-for-character correspondence to supplied evidence (or left empty) rather than the previous looser "must come from the supplied evidence" wording - see "Decisions Made (WP-013)". New version hash prefix: `de8e3f35c8b6fd2c`).
 * `config/app.yaml` (WP-006: added `retrieval:` section: `top_k: 8`, `ngram_min: 3`, `ngram_max: 5`).
 * `config/category_mapping.yaml` (WP-006: schema changed from placeholder `aliases: {}` to activated `mapping: {}` - see Decisions Made).
 * `src/exam_generator/config/models.py` (WP-006: added `RetrievalConfig`, `CategoryMappingConfig`, `NonBlankConfigStr`/`_reject_blank` helpers, `AppConfig.retrieval` field).
@@ -790,15 +845,15 @@ Claude must implement only the Work Package currently supplied by GPT.
 
 ## Next WP Context
 
-WP-001 through WP-012 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract including `GeneratedQuestionResponse`; `src/exam_generator/historical`, `src/exam_generator/ingestion`, `src/exam_generator/chunking`, `src/exam_generator/retrieval` provide historical data, PDF extraction, chunking/corpora, and local retrieval respectively; `src/exam_generator/llm` provides the provider-independent LLM abstraction + OpenAI provider; `src/exam_generator/prompts` provides the external prompt repository/rendering/formatting infrastructure and all seven production prompt files; `src/exam_generator/generation` provides `QuestionGenerator` (category -> `CandidateQuestion`); `src/exam_generator/validation` now provides `GroundingValidator`, `MCQValidator`, `CategoryValidator`, `QualityValidator`, and `TextbookValidator` - five independent `CandidateQuestion` -> validation-result checks (four primary/structural, one secondary/non-authoritative). All five validation paths plus generation have been confirmed working end-to-end against the real OpenAI API, not just in mocked tests. None of the following exists yet:
+WP-001 through WP-013 are complete. `src/exam_generator/config` provides configuration loading; `src/exam_generator/models` provides every domain contract including `GeneratedQuestionResponse`; `src/exam_generator/historical`, `src/exam_generator/ingestion`, `src/exam_generator/chunking`, `src/exam_generator/retrieval` provide historical data, PDF extraction, chunking/corpora, and local retrieval respectively; `src/exam_generator/llm` provides the provider-independent LLM abstraction + OpenAI provider; `src/exam_generator/prompts` provides the external prompt repository/rendering/formatting infrastructure and all seven production prompt files; `src/exam_generator/generation` provides `QuestionGenerator` (category -> `CandidateQuestion`); `src/exam_generator/validation` provides `GroundingValidator`, `MCQValidator`, `CategoryValidator`, `QualityValidator`, and `TextbookValidator` - five independent `CandidateQuestion` -> validation-result checks; `src/exam_generator/production` now provides `QuestionProducer` (category/generation_mode -> accepted `CandidateQuestion` + full attempt history, or a clear exhaustion error), combining all six of the above into a working, deterministic-acceptance, bounded-regeneration single-question production cycle. The full production cycle has been confirmed working end-to-end against the real OpenAI API (including one genuine live-exposed prompt defect, found and fixed). None of the following exists yet:
 
-* **No candidate-acceptance policy exists.** Nothing combines the five independent validator results (`GroundingValidationResult.passed`, `MCQValidationResult.valid`, `CategoryValidationResult.valid`, `QualityValidationResult.valid`, `TextbookCheckResult.status`) into an accept/reject decision for a candidate. This is explicitly deferred to a later control-layer WP, per both WP-011's and WP-012's own explicit scope exclusions.
-* **No retry/regeneration-on-validation-failure exists.** A negative/inconclusive verdict from any of the five validators is just returned - nothing automatically regenerates the candidate, tries `STYLE_SIMILAR` instead of `INDEPENDENT` (or vice versa), or retries with different retrieval. That, plus `QuestionGenerator`'s own lack of retry/diversity/duplicate-avoidance (unchanged from WP-009), is WP-013's explicit responsibility.
-* **No exam orchestration, multi-question generation loop, output-file writing, or CLI exists yet.** `QuestionGenerator` and all five validators operate on one question at a time; nothing yet assembles multiple candidates into an `ExamOutput`/`ExamAudit` or writes `exam_<timestamp>.json`/`.audit.json`.
-* **A worked design note, now resolved for WP-012 and still relevant to any future validator**: `GroundingValidator`/`TextbookValidator` each independently retrieve their own evidence (student-summary vs. course-book respectively) and do not expose it to the caller; the three WP-011 validators perform no retrieval at all. `QuestionAudit` (`src/exam_generator/models/audit.py`) already has a field for whichever evidence each stage ultimately decides is audit-worthy - assembling that audit record remains deferred to a later output-focused WP (WP-015+).
-* **Evidence-identifier fidelity fix is a precedent that turned out not to apply to WP-011/WP-012**: the WP-010 live smoke test found (and fixed) a reproducible model behavior where `evidence_chunk_ids` values were reported without their `SourceType:` prefix, causing WP-009's/WP-010's provenance checks to correctly reject them as invented ids. Neither WP-011's three prompts nor WP-012's textbook prompt echo back a `chunk_id` string at all (`TextbookCheckResult` uses a page number + quoted text instead), so this specific fidelity issue never resurfaced and no prompt needed the fix. Any *future* prompt that does ask the model to echo back a `chunk_id` should still use the same precise character-for-character wording from the start.
+* **No exam orchestration, multi-question generation loop, output-file writing, or CLI exists yet.** `QuestionProducer` operates on exactly one question per `produce_question()` call; nothing yet calls it repeatedly across an `ExamRequest`'s requested categories/counts, assembles multiple accepted candidates into an `ExamOutput`/`ExamAudit`, or writes `exam_<timestamp>.json`/`.audit.json`. This is WP-014's job.
+* **No exam-level diversity/duplicate-avoidance/historical-reference-rotation exists.** `QuestionProducer` alternates neither generation mode nor category on its own (both are caller-supplied and held fixed across attempts, by design); nothing tracks semantic similarity or historical-reference reuse *across* multiple accepted questions, since WP-013 only has visibility into one question at a time. WP-013 section 18 explicitly defers this to WP-014 or a focused follow-up.
+* **No validator-feedback regeneration exists.** Regeneration on WP-013 rejection is a plain repeat of the same `QuestionGenerator.generate_candidate_question(category, generation_mode)` call - no "your previous answer failed because..." prompt rewriting, and no attempt-aware generation context. The live smoke test's exhausted-3-attempts outcome is a first honest baseline measurement for how often this simple regeneration strategy alone succeeds; whether smarter feedback is worth adding is an open question for later.
+* **`QuestionAudit`/`ExamAudit` (`src/exam_generator/models/audit.py`) still have no assembly logic** - `QuestionAttempt`/`QuestionProductionResult` (WP-013) carry everything `QuestionAudit` would need (candidate, all five validation results, attempt count), but nothing yet converts one into the other. That conversion is expected to land with WP-014/WP-015 output-focused work.
+* **Evidence/quote fidelity is now a two-time precedent, not a one-off.** WP-010 fixed `evidence_chunk_ids` prefix-dropping; WP-013 fixed `TextbookCheckResult.reference_text` paraphrasing. Both were the same underlying pattern: an implicit "don't invent evidence" instruction that the model does not reliably follow without an explicit "copy character-for-character, or leave empty" directive. Any future prompt asking the model to echo back or quote existing text verbatim should use this exact wording from the start rather than rediscovering the issue live a third time.
 
-The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and `openai>=2.0` (2.52.0) are the real runtime dependencies so far; WP-008 through WP-012 all added none. The next WP's author should account for the environment note when specifying dependencies/tooling.
+The environment's Python interpreter is 3.12.3, not 3.14 as WP-001.md assumed; see Known Issues above. `openpyxl>=3.1` (3.1.5), `pymupdf>=1.24` (1.28.0), `scikit-learn>=1.4` (1.9.0), and `openai>=2.0` (2.52.0) are the real runtime dependencies so far; WP-008 through WP-013 all added none. The next WP's author should account for the environment note when specifying dependencies/tooling.
 
 Do not reconstruct implementation from memory or from another repository.
 
@@ -806,7 +861,7 @@ Do not copy implementation decisions that are not recorded in the approved archi
 
 The next implementation task is:
 
-**WP-013** (per the roadmap: diversity/retry controller). Claude must not invent or begin WP-013's specification; wait for it to be supplied.
+**WP-014** (per the roadmap: exam orchestration). Claude must not invent or begin WP-014's specification; wait for it to be supplied.
 
 ---
 

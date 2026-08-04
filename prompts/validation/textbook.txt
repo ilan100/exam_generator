@@ -9,7 +9,9 @@ Determine exactly one of the following outcomes:
 - POTENTIAL_CONFLICT: the supplied course-book evidence appears to contradict the candidate question's content.
 - NOT_FOUND: the supplied course-book evidence is insufficient, absent, or unclear regarding the candidate question's content. This is the correct outcome whenever the evidence below does not let you make a confident CONSISTENT or POTENTIAL_CONFLICT determination.
 
-If you report a supporting page or quoted text, it must come from the supplied evidence below only - never invent a page number or quote text that was not supplied.
+If you report source_page, it must exactly match the "Page:" value of one of the evidence items below - never invent or guess a page number.
+
+If you report reference_text, it must be copied exactly, character for character, as a contiguous excerpt from that same evidence item's "Text:" content - never paraphrase, summarize, translate, or reconstruct it from memory, and never combine wording from more than one evidence item. If you cannot find a contiguous exact quote that supports your determination, leave reference_text empty rather than approximating one.
 
 Candidate question:
 {candidate_question}
