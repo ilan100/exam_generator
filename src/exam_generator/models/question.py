@@ -68,12 +68,17 @@ class GeneratedQuestionResponse(BaseModel):
     model, and are assigned directly onto ``CandidateQuestion`` by
     application code rather than trusted from LLM output.
 
-    ``evidence_chunk_ids``/``historical_reference_id`` are the model's
-    *claimed* provenance only; they are not authoritative and must be
-    validated against the actual supplied generation context (the chunks
-    actually retrieved, and the historical reference actually supplied, if
-    any) before a caller may rely on them. See
-    ``exam_generator.generation.generator``.
+    ``evidence_refs``/``historical_reference_id`` are the model's *claimed*
+    provenance only; they are not authoritative and must be validated
+    against the actual supplied generation context (the chunks actually
+    retrieved, and the historical reference actually supplied, if any)
+    before a caller may rely on them. Since WP-024, ``evidence_refs`` are
+    small, 1-based, call-local integers matching the "[Evidence N]" labels
+    already shown in the prompt's factual-evidence section - not canonical
+    ``SourceEvidenceChunk.chunk_id`` strings - deterministically resolved
+    into genuine canonical identifiers by
+    ``exam_generator.generation.generator``, mirroring the pattern WP-022
+    already established for grounding/textbook validation.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -85,12 +90,18 @@ class GeneratedQuestionResponse(BaseModel):
     correct_answer: CorrectAnswerId = Field(
         description="The 1-based position (1-4) of the single correct answer choice."
     )
-    evidence_chunk_ids: list[NonBlankStr] = Field(
+    evidence_refs: list[int] = Field(
         default_factory=list,
         description=(
-            "Identifiers of the supplied factual-evidence chunks that support this "
-            "question, using only identifiers that were actually supplied to you. "
-            "Never invent an identifier that was not supplied."
+            "1-based local references to the supplied factual-evidence items that "
+            "support this question, matching the '[Evidence N]' labels shown in the "
+            "factual evidence below - e.g. 1 refers to [Evidence 1]. Cite only "
+            "evidence numbers that were actually supplied to you. Never invent a "
+            "number outside the supplied range, and never report a chunk identifier, "
+            "source file name, or any other text - only the plain number. If you are "
+            "not confident which evidence number supports your question, leave this "
+            "list empty rather than guessing - an empty list is always acceptable and "
+            "preferred over an invented or approximate reference."
         ),
     )
     historical_reference_id: PositiveIntStrict | None = Field(

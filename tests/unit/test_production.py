@@ -12,6 +12,7 @@ from exam_generator.models import (
     GroundingValidationResult,
     MCQValidationResult,
     QualityValidationResult,
+    QuestionTarget,
     TextbookCheckResult,
     TextbookCheckStatus,
 )
@@ -44,6 +45,17 @@ def _candidate(**kwargs) -> CandidateQuestion:
     )
     defaults.update(kwargs)
     return CandidateQuestion(**defaults)
+
+
+def _target(**kwargs) -> QuestionTarget:
+    defaults = dict(
+        target_id=1,
+        category=CATEGORY,
+        topic="topic",
+        factual_focus="factual focus",
+    )
+    defaults.update(kwargs)
+    return QuestionTarget(**defaults)
 
 
 def _grounding_result(passed: bool = True, **kwargs) -> GroundingValidationResult:
@@ -231,7 +243,7 @@ def test_question_attempt_failure_type_without_message_rejected():
 def test_first_candidate_accepted_makes_exactly_one_generation_attempt():
     generator = _passing_generator()
     producer = _make_producer(generator=generator, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 1
     assert len(result.attempts) == 1
     assert result.attempts[0].accepted is True
@@ -244,7 +256,7 @@ def test_first_rejected_second_accepted_makes_exactly_two_attempts():
         GroundingValidator, "validate_grounding", None, side_effect=[_grounding_result(False), _grounding_result(True)]
     )
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 2
     assert len(result.attempts) == 2
     assert result.attempts[0].accepted is False
@@ -256,7 +268,7 @@ def test_acceptance_stops_further_generation():
     candidate1, candidate2 = _candidate(question="שאלה ראשונה"), _candidate(question="שאלה שנייה")
     generator = _passing_generator(side_effect=[candidate1, candidate2])
     producer = _make_producer(generator=generator, max_attempts=5)
-    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 1
 
 
@@ -267,7 +279,7 @@ def test_attempt_numbering_is_one_based():
         GroundingValidator, "validate_grounding", None, side_effect=[_grounding_result(False), _grounding_result(True)]
     )
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert [attempt.attempt_number for attempt in result.attempts] == [1, 2]
 
 
@@ -278,7 +290,7 @@ def test_failed_candidate_records_are_preserved():
         GroundingValidator, "validate_grounding", None, side_effect=[_grounding_result(False), _grounding_result(True)]
     )
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert result.attempts[0].candidate == candidate1
     assert result.attempts[0].accepted is False
 
@@ -292,7 +304,7 @@ def test_validation_results_are_preserved_for_every_completed_attempt():
         GroundingValidator, "validate_grounding", None, side_effect=[failing_grounding, passing_grounding]
     )
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert result.attempts[0].validations.grounding == failing_grounding
     assert result.attempts[1].validations.grounding == passing_grounding
 
@@ -302,7 +314,7 @@ def test_maximum_attempts_is_never_exceeded():
     grounding = _passing_validator(GroundingValidator, "validate_grounding", _grounding_result(False))
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
     with pytest.raises(QuestionAttemptsExhaustedError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 3
 
 
@@ -311,7 +323,7 @@ def test_all_rejected_raises_exhausted_attempts_error():
     grounding = _passing_validator(GroundingValidator, "validate_grounding", _grounding_result(False))
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
     with pytest.raises(QuestionAttemptsExhaustedError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
 
 def test_exhaustion_preserves_diagnostic_attempt_history():
@@ -319,7 +331,7 @@ def test_exhaustion_preserves_diagnostic_attempt_history():
     grounding = _passing_validator(GroundingValidator, "validate_grounding", _grounding_result(False))
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
     with pytest.raises(QuestionAttemptsExhaustedError) as excinfo:
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert len(excinfo.value.attempts) == 3
     assert all(attempt.accepted is False for attempt in excinfo.value.attempts)
     assert [attempt.attempt_number for attempt in excinfo.value.attempts] == [1, 2, 3]
@@ -330,7 +342,7 @@ def test_exhaustion_never_returns_a_rejected_candidate_as_accepted():
     grounding = _passing_validator(GroundingValidator, "validate_grounding", _grounding_result(False))
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=1)
     with pytest.raises(QuestionAttemptsExhaustedError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +358,7 @@ def test_recoverable_generation_contract_failure_is_retried_and_succeeds():
     mcq = _passing_validator(MCQValidator, "validate", _mcq_result(True))
     producer = _make_producer(generator=generator, mcq=mcq, max_attempts=3)
 
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
     assert generator.generate_candidate_question.call_count == 2
     assert len(result.attempts) == 2
@@ -365,7 +377,7 @@ def test_generation_contract_failure_records_type_and_message():
         side_effect=[InvalidGeneratedOutputError("invented evidence id: foo"), _candidate()]
     )
     producer = _make_producer(generator=generator, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     failed_attempt = result.attempts[0]
     assert failed_attempt.generation_failure_type == "InvalidGeneratedOutputError"
     assert failed_attempt.generation_failure_message == "invented evidence id: foo"
@@ -380,7 +392,7 @@ def test_multiple_generation_contract_failures_then_success():
         ]
     )
     producer = _make_producer(generator=generator, max_attempts=3)
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 3
     assert len(result.attempts) == 3
     assert result.attempts[0].is_generation_contract_failure is True
@@ -398,7 +410,7 @@ def test_mixed_contract_failure_and_quality_rejection_share_one_budget():
     mcq = _passing_validator(MCQValidator, "validate", None, side_effect=[_mcq_result(False), _mcq_result(True)])
     producer = _make_producer(generator=generator, mcq=mcq, max_attempts=3)
 
-    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
     assert generator.generate_candidate_question.call_count == 3
     assert len(result.attempts) == 3
@@ -415,7 +427,7 @@ def test_generation_contract_failures_exhaust_the_shared_attempt_budget():
     )
     producer = _make_producer(generator=generator, max_attempts=3)
     with pytest.raises(QuestionAttemptsExhaustedError) as excinfo:
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 3
     assert len(excinfo.value.attempts) == 3
     assert all(attempt.is_generation_contract_failure for attempt in excinfo.value.attempts)
@@ -435,7 +447,7 @@ def test_no_validator_is_called_for_a_generation_contract_failure_attempt():
         generator=generator, grounding=grounding, mcq=mcq, category=category, quality=quality, textbook=textbook,
         max_attempts=3,
     )
-    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     # Exactly one validation cycle occurred - the discarded attempt never
     # reached any validator.
     assert grounding.validate_grounding.call_count == 1
@@ -457,7 +469,7 @@ def test_non_recoverable_generator_errors_are_never_retried(exc):
     generator = _passing_generator(side_effect=exc)
     producer = _make_producer(generator=generator, max_attempts=3)
     with pytest.raises(type(exc)):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 1
 
 
@@ -476,7 +488,7 @@ def test_all_five_validators_run_even_after_an_early_negative_verdict():
         grounding=grounding, mcq=mcq, category=category, quality=quality, textbook=textbook, max_attempts=1
     )
     with pytest.raises(QuestionAttemptsExhaustedError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert grounding.validate_grounding.call_count == 1
     assert mcq.validate.call_count == 1
     assert category.validate.call_count == 1
@@ -511,7 +523,7 @@ def test_validator_order_is_deterministic_grounding_mcq_category_quality_textboo
         side_effect=_tracker("textbook", _textbook_result(TextbookCheckStatus.CONSISTENT)),
     )
     producer = _make_producer(grounding=grounding, mcq=mcq, category=category, quality=quality, textbook=textbook)
-    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert call_log == ["grounding", "mcq", "category", "quality", "textbook"]
 
 
@@ -519,7 +531,7 @@ def test_operational_generator_failure_propagates():
     generator = _passing_generator(side_effect=LLMProviderError("connection failed"))
     producer = _make_producer(generator=generator, max_attempts=3)
     with pytest.raises(LLMProviderError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
 
 def test_operational_validator_failure_propagates():
@@ -528,14 +540,14 @@ def test_operational_validator_failure_propagates():
     )
     producer = _make_producer(grounding=grounding, max_attempts=3)
     with pytest.raises(LLMProviderError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
 
 
 def test_operational_generator_failure_does_not_trigger_regeneration():
     generator = _passing_generator(side_effect=LLMProviderError("connection failed"))
     producer = _make_producer(generator=generator, max_attempts=3)
     with pytest.raises(LLMProviderError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert generator.generate_candidate_question.call_count == 1
 
 
@@ -547,7 +559,7 @@ def test_operational_validator_failure_stops_remaining_validators_for_that_attem
     textbook = _passing_validator(TextbookValidator, "validate", _textbook_result(TextbookCheckStatus.CONSISTENT))
     producer = _make_producer(grounding=grounding, mcq=mcq, textbook=textbook, max_attempts=3)
     with pytest.raises(LLMProviderError):
-        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert grounding.validate_grounding.call_count == 1
     assert textbook.validate.call_count == 0
 
@@ -558,10 +570,28 @@ def test_category_and_generation_mode_remain_stable_across_attempts():
         GroundingValidator, "validate_grounding", None, side_effect=[_grounding_result(False), _grounding_result(True)]
     )
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
-    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.STYLE_SIMILAR)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.STYLE_SIMILAR, target=_target())
     for call in generator.generate_candidate_question.call_args_list:
         assert call.kwargs["category"] == CATEGORY
         assert call.kwargs["generation_mode"] == GenerationMode.STYLE_SIMILAR
+
+
+def test_target_remains_identical_object_across_wp013_bounded_retry_attempts():
+    # WP-026 section 18: a rejected candidate may be reframed differently on
+    # the next attempt, but it must still test the exact same assigned
+    # QuestionTarget - never a re-planned or substituted one.
+    target = _target()
+    candidate1, candidate2 = _candidate(question="שאלה ראשונה"), _candidate(question="שאלה שנייה")
+    generator = _passing_generator(side_effect=[candidate1, candidate2])
+    grounding = _passing_validator(
+        GroundingValidator, "validate_grounding", None, side_effect=[_grounding_result(False), _grounding_result(True)]
+    )
+    producer = _make_producer(generator=generator, grounding=grounding, max_attempts=3)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    calls = generator.generate_candidate_question.call_args_list
+    assert len(calls) == 2
+    assert calls[0].kwargs["target"] is target
+    assert calls[1].kwargs["target"] is target
 
 
 def test_candidate_not_mutated_by_production_cycle():
@@ -569,7 +599,7 @@ def test_candidate_not_mutated_by_production_cycle():
     before = candidate.model_dump()
     generator = _passing_generator(candidate=candidate)
     producer = _make_producer(generator=generator, max_attempts=1)
-    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
     assert candidate.model_dump() == before
 
 
@@ -594,4 +624,4 @@ def test_no_llm_provider_referenced_directly_in_producer_module():
 
 def test_produce_question_signature_has_no_feedback_or_llm_parameter():
     parameters = inspect.signature(QuestionProducer.produce_question).parameters
-    assert set(parameters) == {"self", "category", "generation_mode"}
+    assert set(parameters) == {"self", "category", "generation_mode", "target"}

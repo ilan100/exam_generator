@@ -1,0 +1,62 @@
+[
+  {
+    "planned_position": 5,
+    "category": "חומר לבן",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה סוג של חומר לבן מחבר בין אזורים קורטיקליים באותה המיספרה?",
+    "answers": [
+      "סיבי השלכה",
+      "סיבים קומיסורליים",
+      "סיבי אסוסיאציה",
+      "סיבי פרוג׳קשן"
+    ],
+    "correct_answer": 3
+  },
+  {
+    "planned_position": 11,
+    "category": "היסטולוגיה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזו שכבת נאוקורטקס נחשבת לשכבה המגורה ביותר, בעלת תפקיד מרכזי בהעברת מידע בין אזורים שונים של המוח?",
+    "answers": [
+      "שכבה 1",
+      "שכבה 2",
+      "שכבה 4",
+      "שכבה 5"
+    ],
+    "correct_answer": 4
+  },
+  {
+    "planned_position": 26,
+    "category": "המוח הקטן",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה גרעין במוח הקטן הוא המרכזי והגדול ביותר?",
+    "answers": [
+      "Fastigial Nucleus",
+      "Interposed Nucleus",
+      "Dentate Nucleus",
+      "Globose Nucleus"
+    ],
+    "correct_answer": 3
+  },
+  {
+    "planned_position": 27,
+    "category": "מערכת העצבים ההיקפית",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 2,
+    "question": "אילו מהמערכות הבאות מהוות את החלוקה הבסיסית של מערכת העצבים ההיקפית?",
+    "answers": [
+      "מערכת העצבים האוטונומית ומערכת העצבים הסומטית",
+      "מערכת העצבים המרכזית ומערכת העצבים ההיקפית",
+      "מערכת העצבים הסימפתטית ומערכת העצבים הפרא-סימפתטית",
+      "מערכת העצבים הסומטית ומערכת העצבים המודעת"
+    ],
+    "correct_answer": 1
+  }
+]

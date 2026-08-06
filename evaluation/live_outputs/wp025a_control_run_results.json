@@ -1,0 +1,99 @@
+[
+  {
+    "planned_position": 5,
+    "category": "חומר לבן",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה סוג של חומר לבן במוח מחבר בין אזורים קורטיקליים באותה ההמיספרה?",
+    "answers": [
+      "סיבי השלכה",
+      "סיבים קומיסורליים",
+      "סיבי אסוסיאציה",
+      "סיבים מוטוריים"
+    ],
+    "correct_answer": 3
+  },
+  {
+    "planned_position": 11,
+    "category": "היסטולוגיה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "באיזה אופן מאופיינות השכבות השונות בנאוקורטקס?",
+    "answers": [
+      "לפי סוג התאים שמכילות",
+      "לפי פעילות הנוירונים",
+      "לפי גובה השכבות",
+      "לפי מקור התפתחותי"
+    ],
+    "correct_answer": 1
+  },
+  {
+    "planned_position": 26,
+    "category": "המוח הקטן",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 3,
+    "question": "איזה גרעין נמצא במבנה המוח הקטן (צרבלום) ומוכר גם בשמות Globose ו-Emboliform?",
+    "answers": [
+      "Fastigial Nucleus",
+      "Interposed Nucleus",
+      "Dentate Nucleus",
+      "Nucleus Cuneatus"
+    ],
+    "correct_answer": 2
+  },
+  {
+    "planned_position": 27,
+    "category": "מערכת העצבים ההיקפית",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "exhausted",
+    "attempts_made": 3,
+    "attempt_reasons": [
+      {
+        "question": "מהן שתי המערכות העיקריות אליהן מחולקת מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת העצבים האוטונומית ומערכת העצבים הסומטית",
+          "מערכת העצבים המרכזית ומערכת העצבים ההיקפית",
+          "מערכת העצבים הסימפתטית ומערכת העצבים הפרא-סימפתטית",
+          "מערכת העצבים היקפית ומערכת העצבים המוחית"
+        ],
+        "correct_answer": 1,
+        "reasons": [
+          "mcq:While the candidate has exactly four answer choices, there is more than one answer choice that could reasonably be defended as correct. Specifically, Answer 1 is correct, but Answer 3 also describes components of the peripheral nervous system. This ambiguity means that there is not a single best answer, violating the requirement for clarity in the correct response.",
+          "quality:The question is clear and unambiguous, but the answer choices include incorrect options that do not align with the factual structure of the peripheral nervous system. Specifically, Answer 2 and Answer 4 incorrectly reference the central nervous system, which is not part of the peripheral nervous system. This misalignment affects the overall quality of the question, as it could confuse knowledgeable students."
+        ]
+      },
+      {
+        "question": "מהן שתי החלוקות העיקריות של מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת העצבים האוטונומית ומערכת העצבים הסומטית",
+          "מערכת העצבים המרכזית ומערכת העצבים ההיקפית",
+          "מערכת העצבים הסימפתטית ומערכת העצבים הפאראסימפתטית",
+          "מערכת העצבים הפריפריאלית ומערכת העצבים המרכזית"
+        ],
+        "correct_answer": 1,
+        "reasons": [
+          "mcq:The question asks for two main divisions of the peripheral nervous system, but the provided answers include incorrect combinations and do not clearly identify a single best answer. For example, Answer 2 and Answer 4 both include 'מערכת העצבים המרכזית', which is not part of the peripheral nervous system, making them incorrect. Additionally, more than one answer could be defended as correct based on the context, leading to ambiguity.",
+          "category:The question asks for the main divisions of the peripheral nervous system, but the provided answers include categories that pertain to both the central and peripheral nervous systems, which does not align strictly with the requested category.",
+          "quality:The question is clear and unambiguous, but the answer choices include incorrect options that do not align with the question's focus on the peripheral nervous system. Specifically, Answer 2 and Answer 4 incorrectly reference the central nervous system, which does not fit the question's requirement. This misalignment affects the overall quality and appropriateness of the question as a multiple-choice exam item."
+        ]
+      },
+      {
+        "question": "מהן שתי המערכות העיקריות של מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת העצבים הסומטית ומערכת העצבים המרכזית",
+          "מערכת העצבים האוטונומית ומערכת העצבים הסומטית",
+          "מערכת העצבים הסימפתטית ומערכת העצבים הפאראסימפתטית",
+          "מערכת העצבים התודעתית ומערכת העצבים הלא תודעתית"
+        ],
+        "correct_answer": 2,
+        "reasons": [
+          "mcq:While the candidate has exactly four answer choices, there is no single best answer. Both Answer 2 and Answer 3 could be defended as correct, as they both represent major components of the peripheral nervous system. This ambiguity undermines the validity of the multiple-choice structure.",
+          "quality:The question asks for the two main systems of the peripheral nervous system, but the provided answer choices include options that reference the central nervous system and other unrelated systems. This creates confusion and ambiguity, as the correct answer (מערכת העצבים האוטונומית ומערכת העצבים הסומטית) is not clearly distinguished from incorrect options. Additionally, the phrasing of the question could be clearer in specifying that it is looking for systems specifically within the peripheral nervous system."
+        ]
+      }
+    ]
+  }
+]

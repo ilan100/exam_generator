@@ -36,6 +36,7 @@ from exam_generator.models import (
     GeneratedQuestionResponse,
     GenerationMode,
     HistoricalStyleReference,
+    QuestionTarget,
     SourceEvidenceChunk,
 )
 from exam_generator.prompts import GenerationPromptContext, PromptId, PromptRepository, build_prompt_messages
@@ -65,6 +66,32 @@ def _select_historical_reference(
     return candidates[0]
 
 
+def _resolve_generated_evidence_refs(
+    evidence_refs: list[int], *, source_evidence: tuple[SourceEvidenceChunk, ...]
+) -> list[str]:
+    """Strictly validate the LLM's call-local ``evidence_refs`` (WP-024)
+    against the evidence actually supplied to this generation call, then
+    deterministically resolve them to genuine canonical
+    ``SourceEvidenceChunk.chunk_id`` values - never trusting a
+    caller-supplied string, mirroring WP-022's grounding/textbook pattern.
+
+    Fails closed (raises, rather than drops/repairs/clamps/fuzzy-matches)
+    on any reference outside ``1..len(source_evidence)`` - including zero,
+    negative, and out-of-range values, all treated identically. A repeated
+    reference (e.g. ``[1, 1, 3]``) resolves to its canonical id only once,
+    preserving first-occurrence order - it is not evidence of anything
+    beyond what a single citation already establishes.
+    """
+    invalid_refs = [ref for ref in evidence_refs if not (1 <= ref <= len(source_evidence))]
+    if invalid_refs:
+        raise InvalidGeneratedOutputError(
+            f"Generated response claims evidence reference(s) outside the supplied range "
+            f"1..{len(source_evidence)}: {invalid_refs}"
+        )
+    deduplicated_refs = list(dict.fromkeys(evidence_refs))
+    return [source_evidence[ref - 1].chunk_id for ref in deduplicated_refs]
+
+
 def _validate_generated_provenance(
     response: GeneratedQuestionResponse,
     *,
@@ -74,15 +101,12 @@ def _validate_generated_provenance(
 ) -> None:
     """Reject any provenance claim the LLM makes that does not correspond to
     what was actually supplied - a generated response is never trusted
-    merely because it parsed as structured output."""
-    supplied_chunk_ids = {chunk.chunk_id for chunk in source_evidence}
-    invented_ids = [
-        chunk_id for chunk_id in response.evidence_chunk_ids if chunk_id not in supplied_chunk_ids
-    ]
-    if invented_ids:
-        raise InvalidGeneratedOutputError(
-            f"Generated response claims evidence chunk id(s) that were not supplied: {invented_ids}"
-        )
+    merely because it parsed as structured output. ``evidence_refs``
+    resolution (WP-024) already fails closed on any reference the model
+    was not actually shown; nothing further is required of it here beyond
+    triggering that resolution - ``CandidateQuestion`` itself carries no
+    evidence field to populate (unchanged since WP-009/WP-015)."""
+    _resolve_generated_evidence_refs(response.evidence_refs, source_evidence=source_evidence)
 
     if generation_mode == GenerationMode.INDEPENDENT:
         if response.historical_reference_id is not None:
@@ -148,10 +172,13 @@ class QuestionGenerator:
         )
 
     def generate_candidate_question(
-        self, *, category: str, generation_mode: GenerationMode
+        self, *, category: str, generation_mode: GenerationMode, target: QuestionTarget
     ) -> CandidateQuestion:
         """Generate exactly one candidate question for ``category`` using
-        ``generation_mode``.
+        ``generation_mode``, testing the assigned ``target`` (WP-025 -
+        planned before generation begins, so multiple questions requested
+        from the same category are diverse by construction rather than by
+        after-the-fact rejection).
 
         Makes exactly one LLM call (``LLMProfile.GENERATION``) - no semantic
         retry loop. Performs no grounding/MCQ/category/quality/textbook
@@ -181,6 +208,7 @@ class QuestionGenerator:
             category=canonical_category,
             generation_mode=generation_mode,
             source_evidence=source_evidence,
+            target=target,
             historical_reference=historical_reference,
         )
 

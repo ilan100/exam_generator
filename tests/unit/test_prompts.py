@@ -9,6 +9,7 @@ from exam_generator.models import (
     ExamQuestion,
     GenerationMode,
     HistoricalStyleReference,
+    QuestionTarget,
     SourceEvidenceChunk,
     SourceType,
 )
@@ -23,11 +24,13 @@ from exam_generator.prompts import (
     PromptRepositoryError,
     PromptTemplate,
     PromptTemplateError,
+    QuestionTargetPlanningPromptContext,
     build_prompt_messages,
     format_candidate_question,
     format_course_book_evidence,
     format_exam_question,
     format_historical_reference,
+    format_question_target,
     format_student_summary_evidence,
     render_prompt,
 )
@@ -48,9 +51,12 @@ HEBREW_MIXED = "קליפת המוח (cerebral cortex) אחראית לתפקוד�
 
 _MINIMAL_PROMPT_CONTENTS = {
     ("system", "exam_generator.txt"): "You are a careful assistant. Follow instructions exactly.",
+    ("generation", "question_target_planning.txt"): (
+        "Category: {category}\nCount: {count}\nEvidence:\n{source_evidence}"
+    ),
     ("generation", "question.txt"): (
         "Category: {category}\nMode: {generation_mode}\n"
-        "Evidence:\n{source_evidence}\nHistorical:\n{historical_reference}"
+        "Target:\n{question_target}\nEvidence:\n{source_evidence}\nHistorical:\n{historical_reference}"
     ),
     ("validation", "grounding.txt"): "Candidate:\n{candidate_question}\nEvidence:\n{source_evidence}",
     ("validation", "mcq.txt"): "Candidate:\n{candidate_question}",
@@ -127,6 +133,17 @@ def _candidate(**kwargs) -> CandidateQuestion:
     )
     defaults.update(kwargs)
     return CandidateQuestion(**defaults)
+
+
+def _target(**kwargs) -> QuestionTarget:
+    defaults = dict(
+        target_id=1,
+        category="גזע המוח",
+        topic="תפקוד גזע המוח",
+        factual_focus="גזע המוח מווסת תפקודים חיוניים כגון נשימה ודופק לב",
+    )
+    defaults.update(kwargs)
+    return QuestionTarget(**defaults)
 
 
 def _exam_question(**kwargs) -> ExamQuestion:
@@ -235,6 +252,7 @@ def test_required_variables_derived_deterministically(tmp_path):
         "generation_mode",
         "source_evidence",
         "historical_reference",
+        "question_target",
     }
 
 
@@ -390,6 +408,7 @@ def test_blank_category_rejected_by_generation_context_even_though_generic_rende
             category="   ",
             generation_mode=GenerationMode.INDEPENDENT,
             source_evidence=(_chunk(),),
+            target=_target(),
         )
 
 
@@ -624,6 +643,97 @@ def test_candidate_and_exam_question_share_answer_formatting_style():
 
 
 # ---------------------------------------------------------------------------
+# Target planning prompt policy (WP-025, production prompt)
+# ---------------------------------------------------------------------------
+
+
+def _rendered_target_planning_prompt(production_repository: PromptRepository, *, count: int = 2, evidence=None) -> str:
+    context = QuestionTargetPlanningPromptContext(
+        category="גזע המוח", count=count, source_evidence=evidence or (_chunk(),)
+    )
+    template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
+    return render_prompt(template, **context.render_variables())
+
+
+def test_planning_template_requires_category(production_repository):
+    template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
+    assert "category" in template.required_variables
+
+
+def test_planning_template_requires_count(production_repository):
+    template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
+    assert "count" in template.required_variables
+
+
+def test_planning_template_requires_source_evidence(production_repository):
+    template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
+    assert "source_evidence" in template.required_variables
+
+
+def test_planning_prompt_renders_requested_count(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository, count=4)
+    assert "4" in rendered
+
+
+def test_planning_prompt_rejects_rewording_as_diversity(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "differ only in wording" in rendered
+
+
+def test_planning_prompt_rejects_question_answer_inversion(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "reversed" in rendered
+
+
+def test_planning_prompt_rejects_same_structure_same_property(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "same structure and the same property" in rendered
+
+
+def test_planning_prompt_rejects_same_relationship_different_directions(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "different directions" in rendered
+
+
+def test_planning_prompt_asks_for_local_evidence_refs_not_canonical_ids(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "evidence_refs" in rendered
+    assert "evidence_chunk_ids" not in rendered
+    assert "[Evidence N]" in rendered or "[Evidence 1]" in rendered
+
+
+def test_planning_prompt_allows_honest_shortfall(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "return fewer" in rendered
+    assert "fabricat" in rendered
+
+
+def test_planning_prompt_forbids_course_book_material(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "Course-book material is not supplied" in rendered
+
+
+def test_planning_context_rejects_blank_category():
+    with pytest.raises(PromptContextError):
+        QuestionTargetPlanningPromptContext(category="   ", count=2, source_evidence=(_chunk(),))
+
+
+def test_planning_context_rejects_empty_evidence():
+    with pytest.raises(PromptContextError):
+        QuestionTargetPlanningPromptContext(category="c", count=2, source_evidence=())
+
+
+def test_planning_context_rejects_non_positive_count():
+    with pytest.raises(PromptContextError):
+        QuestionTargetPlanningPromptContext(category="c", count=0, source_evidence=(_chunk(),))
+
+
+def test_planning_context_rejects_negative_count():
+    with pytest.raises(PromptContextError):
+        QuestionTargetPlanningPromptContext(category="c", count=-1, source_evidence=(_chunk(),))
+
+
+# ---------------------------------------------------------------------------
 # Generation prompt policy (production prompt)
 # ---------------------------------------------------------------------------
 
@@ -639,11 +749,13 @@ def _rendered_generation_prompt(
     mode: GenerationMode,
     historical_reference=None,
     evidence=None,
+    target=None,
 ) -> str:
     context = GenerationPromptContext(
         category="גזע המוח",
         generation_mode=mode,
         source_evidence=evidence or (_chunk(),),
+        target=target or _target(),
         historical_reference=historical_reference,
     )
     template = production_repository.get(PromptId.QUESTION_GENERATION)
@@ -696,12 +808,110 @@ def test_generation_prompt_identifies_student_summary_as_authority(production_re
     assert "sole authoritative factual basis" in rendered
 
 
+def test_generation_prompt_asks_for_local_evidence_refs_not_canonical_ids(production_repository):
+    # WP-024: mirrors WP-022's grounding/textbook contract - the model
+    # cites the local "[Evidence N]" label, never the canonical chunk id.
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "evidence_refs" in rendered
+    assert "evidence_chunk_ids" not in rendered
+    assert "[Evidence N]" in rendered or "[Evidence 1]" in rendered
+    assert "Do not report the" in rendered
+
+
 def test_generation_prompt_marks_historical_reference_non_factual(production_repository):
     reference = _historical_reference()
     rendered = _rendered_generation_prompt(
         production_repository, mode=GenerationMode.STYLE_SIMILAR, historical_reference=reference
     )
     assert "never factual evidence" in rendered
+
+
+# ---------------------------------------------------------------------------
+# WP-026: target-aware MCQ framing
+# ---------------------------------------------------------------------------
+
+
+def test_generation_prompt_distinguishes_target_from_literal_form(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "not a literal sentence you must reproduce" in rendered
+
+
+def test_generation_prompt_allows_narrowing_within_target(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "narrowing WITHIN the target" in rendered
+
+
+def test_generation_prompt_still_forbids_switching_away_from_target(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Do not silently switch to a different" in rendered
+    assert "Narrowing within the target is not the same as switching away from it" in rendered
+
+
+def test_generation_prompt_addresses_enumeration_classification_targets(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Testing enumeration or classification targets" in rendered
+
+
+def test_generation_prompt_prefers_one_distinguishing_property(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "ONE evidence-supported member through ONE distinguishing property" in rendered
+
+
+def test_generation_prompt_avoids_full_list_recall(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "do NOT ask the student to recall the complete list or enumeration" in rendered
+
+
+def test_generation_prompt_includes_worked_enumeration_example(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "white matter consists of projection fibers" in rendered
+    assert "Weak framing (avoid)" in rendered
+    assert "Strong framing (prefer)" in rendered
+
+
+def test_generation_prompt_avoids_recombination_distractors(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "rearranging or partially recombining the target's own listed members" in rendered
+
+
+def test_generation_prompt_addresses_hierarchical_classification_levels(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Nested or hierarchical classifications" in rendered
+    assert "hierarchy level" in rendered
+
+
+def test_generation_prompt_hierarchical_distractor_rule_is_general_not_category_specific(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    # WP-026 section 7: the hierarchy rule must be general - no category name
+    # (e.g. the diagnostic's own PNS example) may appear in the production prompt.
+    assert "מערכת העצבים ההיקפית" not in rendered
+    assert "PNS" not in rendered
+
+
+def test_generation_prompt_reinforces_clearly_incorrect_distractors(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "clearly, unambiguously incorrect" in rendered
+
+
+def test_generation_prompt_style_similar_form_subordinate_to_mcq_correctness(production_repository):
+    reference = _historical_reference()
+    rendered = _rendered_generation_prompt(
+        production_repository, mode=GenerationMode.STYLE_SIMILAR, historical_reference=reference
+    )
+    assert "producing a valid one-best-answer question always takes priority" in rendered
+
+
+def test_multi_item_target_topic_and_focus_render_completely_unmodified():
+    # Python never pre-narrows a target's rendered text - narrowing is a
+    # generation-time (model) decision guided by prompt instructions, not
+    # something the formatting layer does on the model's behalf.
+    target = _target(
+        topic="topic naming A, B, and C",
+        factual_focus="X is divided into A, B, and C, each with distinct properties",
+    )
+    formatted = format_question_target(target)
+    assert "topic naming A, B, and C" in formatted
+    assert "X is divided into A, B, and C, each with distinct properties" in formatted
 
 
 def test_generation_prompt_prohibits_unsupported_invention(production_repository):
@@ -732,6 +942,7 @@ def test_style_similar_context_requires_historical_reference():
             category="c",
             generation_mode=GenerationMode.STYLE_SIMILAR,
             source_evidence=(_chunk(),),
+            target=_target(category="c"),
             historical_reference=None,
         )
 
@@ -749,6 +960,7 @@ def test_style_similar_keeps_historical_material_separate_from_factual_evidence(
         category="c",
         generation_mode=GenerationMode.STYLE_SIMILAR,
         source_evidence=(_chunk(text="factual passage"),),
+        target=_target(category="c"),
         historical_reference=_historical_reference(question="historical passage"),
     )
     variables = context.render_variables()
@@ -761,6 +973,7 @@ def test_independent_accepts_no_historical_reference():
         category="c",
         generation_mode=GenerationMode.INDEPENDENT,
         source_evidence=(_chunk(),),
+        target=_target(category="c"),
         historical_reference=None,
     )
     assert context.historical_reference is None
@@ -778,6 +991,7 @@ def test_invalid_mode_reference_combination_fails_independent_with_reference():
             category="c",
             generation_mode=GenerationMode.INDEPENDENT,
             source_evidence=(_chunk(),),
+            target=_target(category="c"),
             historical_reference=_historical_reference(),
         )
 
@@ -787,6 +1001,7 @@ def test_existing_generation_mode_enum_is_reused():
         category="c",
         generation_mode=GenerationMode.INDEPENDENT,
         source_evidence=(_chunk(),),
+        target=_target(category="c"),
     )
     assert isinstance(context.generation_mode, GenerationMode)
 

@@ -1,0 +1,68 @@
+[
+  {
+    "category": "מסילות עצביות",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "Spinothalamic Tract",
+        "factual_focus": "The Spinothalamic Tract transmits pain and temperature sensations from the periphery to the thalamus.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0151:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "Medial Lemniscus Tract",
+        "factual_focus": "The Medial Lemniscus Tract transmits advanced sensory modalities such as fine touch and proprioception to the thalamus.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0151:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "גזע המוח",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "מבנה גזע המוח",
+        "factual_focus": "גזע המוח מחולק לשלושה חלקים: Midbrain, Pons, Medulla Oblongata.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0108:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "תפקודים של גזע המוח",
+        "factual_focus": "גזע המוח אחראי על תפקודים בסיסיים כמו נשימה, לב, ושינה.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0108:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "המערכת הלימבית",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "ההיפוקמפוס",
+        "factual_focus": "תפקיד ההיפוקמפוס בזיכרון ובלמידה",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0139:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0154:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מערכת ההרחה",
+        "factual_focus": "הקשרים האבולוציוניים של המערכת הלימבית עם מערכת ההרחה",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0069:0002",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0137:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0044:0001"
+        ]
+      }
+    ]
+  }
+]

@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 from exam_generator.config.models import LLMConfig, LLMGenerationParams, LLMValidationParams
 from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
 from exam_generator.historical import HistoricalQuestionRepository
-from exam_generator.llm import LLMMessage, LLMProfile, LLMProvider, LLMProviderError
+from exam_generator.llm import LLMMessage, LLMProfile, LLMProvider, LLMProviderError, MessageRole
 from exam_generator.models import (
     CategoryValidationResult,
     ExamGenerationStatus,
@@ -33,7 +33,9 @@ from exam_generator.models import (
     GroundingValidationResponse,
     HistoricalStyleReference,
     MCQValidationResult,
+    PlannedQuestionTargetResponse,
     QualityValidationResult,
+    QuestionTargetPlanningResponse,
     SourceEvidenceChunk,
     SourceType,
     TextbookValidationResponse,
@@ -41,6 +43,7 @@ from exam_generator.models import (
 )
 from exam_generator.orchestration import ExamOrchestrator, QuestionProductionFailedError
 from exam_generator.output import build_exam_output_bundle, serialize_audit_json
+from exam_generator.planning import QuestionTargetPlanner
 from exam_generator.production import QuestionAttemptsExhaustedError, QuestionProducer
 from exam_generator.prompts import PromptRepository
 from exam_generator.retrieval import CategoryResolver, FactualRetrievalIndex
@@ -72,6 +75,10 @@ class FakeLLMProvider(LLMProvider):
     def __init__(self) -> None:
         self._queues: dict[type, list[object]] = {}
         self.call_log: list[tuple[type, LLMProfile]] = []
+        #: Every call's messages, in call order, parallel to ``call_log`` -
+        #: purely additive observability for tests that need to inspect
+        #: actual prompt content, never used to change fake behavior.
+        self.messages_log: list[Sequence[LLMMessage]] = []
 
     def queue(self, response_model: type, *responses: object) -> None:
         self._queues.setdefault(response_model, []).extend(responses)
@@ -86,6 +93,7 @@ class FakeLLMProvider(LLMProvider):
 
     def generate_structured(self, *, messages: Sequence[LLMMessage], response_model: type, profile: LLMProfile):
         self.call_log.append((response_model, profile))
+        self.messages_log.append(messages)
         queue = self._queues.get(response_model)
         if not queue:
             raise AssertionError(
@@ -161,7 +169,7 @@ def _generated_response(question: str = "שאלה לדוגמה?", correct_answer
         question=question,
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=correct_answer,
-        evidence_chunk_ids=[],
+        evidence_refs=[],
         historical_reference_id=None,
     )
 
@@ -235,12 +243,37 @@ def _build_pipeline(
         textbook_validator=textbook_validator,
         max_attempts=max_generation_attempts,
     )
+    target_planner = QuestionTargetPlanner(
+        category_resolver=category_resolver,
+        student_summary_index=student_summary_index,
+        prompt_repository=prompt_repository,
+        llm_provider=fake_provider,
+    )
     orchestrator = ExamOrchestrator(
         category_resolver=category_resolver,
+        target_planner=target_planner,
         producer=producer,
         max_duplicate_replacement_attempts=max_duplicate_replacement_attempts,
     )
     return orchestrator, fake_provider
+
+
+def _queue_target_plans(fake_provider: FakeLLMProvider, categories: dict) -> None:
+    """Queue one WP-025 target-planning response per category - as many
+    targets as questions requested for that category, each citing no
+    evidence (``evidence_refs=[]``) since these integration tests exercise
+    generation/validation/orchestration behavior, not planning-provenance
+    resolution itself (see ``test_planning.py`` for that)."""
+    for category, count in categories.items():
+        fake_provider.queue(
+            QuestionTargetPlanningResponse,
+            QuestionTargetPlanningResponse(
+                targets=[
+                    PlannedQuestionTargetResponse(topic=f"topic {i}", factual_focus=f"focus {i}", evidence_refs=[])
+                    for i in range(1, count + 1)
+                ]
+            ),
+        )
 
 
 def _queue_passing_attempt(
@@ -279,6 +312,7 @@ def test_all_accepted_first_attempt_produces_complete_exam_and_audit():
     )
     _queue_passing_attempt(fake_provider, category=CATEGORY_A)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1
@@ -321,6 +355,7 @@ def test_candidate_rejected_then_accepted():
     # Attempt 2: accepted.
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שנייה")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     attempts = result.productions[0].production.attempts
@@ -353,6 +388,7 @@ def test_attempts_exhausted_is_question_local_and_yields_partial_result():
         fake_provider.queue(QualityValidationResult, _quality(True))
         fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -383,11 +419,12 @@ def test_partial_exam_end_to_end_through_output_boundary():
         question="שאלה שנייה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        evidence_refs=[99],  # WP-024: out-of-range local reference, the new "invented" analog
         historical_reference_id=None,
     )
     fake_provider.queue(GeneratedQuestionResponse, invented_response)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 2})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -440,6 +477,7 @@ def test_textbook_not_found_does_not_block_acceptance():
     # invariant under test here: NOT_FOUND never blocks acceptance.
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, textbook_status=TextbookCheckStatus.NOT_FOUND)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     validations = result.productions[0].production.attempts[0].validations
@@ -467,6 +505,7 @@ def test_textbook_potential_conflict_blocks_acceptance_and_exhausts():
     fake_provider.queue(QualityValidationResult, _quality(True))
     fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.POTENTIAL_CONFLICT))
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -495,6 +534,7 @@ def test_duplicate_candidate_is_replaced():
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה ייחודית")
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שונה")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 2})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
 
     questions = [q.question for q in result.exam.questions]
@@ -522,6 +562,7 @@ def test_operational_failure_propagates_immediately():
     fake_provider.queue(GeneratedQuestionResponse, LLMProviderError("connection failed"))
 
     with pytest.raises(QuestionProductionFailedError) as excinfo:
+        _queue_target_plans(fake_provider, {CATEGORY_A: 1})
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert isinstance(excinfo.value.operational_cause, LLMProviderError)
@@ -547,6 +588,7 @@ def test_multi_category_request_produces_exact_requested_distribution():
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה קטגוריה א")
     _queue_passing_attempt(fake_provider, category=CATEGORY_B, question="שאלה קטגוריה ב")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1, CATEGORY_B: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
 
     categories = [q.category for q in result.exam.questions]
@@ -568,6 +610,7 @@ def test_style_similar_and_independent_modes_both_produce_accepted_questions():
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה 1")
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה 2")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 2})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
 
     modes = [record.planned.generation_mode for record in result.productions]
@@ -589,6 +632,7 @@ def test_final_clean_and_audit_outputs_are_consistent():
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה קטגוריה א")
     _queue_passing_attempt(fake_provider, category=CATEGORY_B, question="שאלה קטגוריה ב")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1, CATEGORY_B: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
     bundle = build_exam_output_bundle(
         result,
@@ -641,6 +685,7 @@ def test_invalid_structured_validator_output_is_an_operational_failure():
     fake_provider.queue(QualityValidationResult, raw_validation_error)
 
     with pytest.raises(QuestionProductionFailedError) as excinfo:
+        _queue_target_plans(fake_provider, {CATEGORY_A: 1})
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert isinstance(excinfo.value.operational_cause, ValidationError)
@@ -648,10 +693,11 @@ def test_invalid_structured_validator_output_is_an_operational_failure():
 
 
 def test_generation_provenance_violation_is_recovered_within_the_attempt_budget():
-    # WP-019: a single recoverable generation-contract failure (invented
-    # evidence_chunk_ids) is discarded and retried - not an operational
-    # failure at all anymore. No validator is ever called for the
-    # discarded attempt (nothing queued for it would be consumed).
+    # WP-019: a single recoverable generation-contract failure (WP-024: an
+    # out-of-range local evidence_refs value) is discarded and retried -
+    # not an operational failure at all anymore. No validator is ever
+    # called for the discarded attempt (nothing queued for it would be
+    # consumed).
     orchestrator, fake_provider = _build_pipeline(
         student_summary_corpus=_student_summary_corpus(),
         course_book_corpus=_course_book_corpus_no_overlap(),
@@ -663,12 +709,13 @@ def test_generation_provenance_violation_is_recovered_within_the_attempt_budget(
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        evidence_refs=[99],  # WP-024: out-of-range local reference, the new "invented" analog
         historical_reference_id=None,
     )
     fake_provider.queue(GeneratedQuestionResponse, invented_response)
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה תקינה")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     attempts = result.productions[0].production.attempts
@@ -699,12 +746,13 @@ def test_generation_provenance_violation_exhausts_when_every_attempt_is_invalid(
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        evidence_refs=[99],  # WP-024: out-of-range local reference, the new "invented" analog
         historical_reference_id=None,
     )
     for _ in range(3):
         fake_provider.queue(GeneratedQuestionResponse, invented_response)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -733,7 +781,7 @@ def test_generation_provenance_violation_then_quality_rejection_then_accepted():
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        evidence_refs=[99],  # WP-024: out-of-range local reference, the new "invented" analog
         historical_reference_id=None,
     )
     fake_provider.queue(GeneratedQuestionResponse, invented_response)
@@ -747,6 +795,7 @@ def test_generation_provenance_violation_then_quality_rejection_then_accepted():
     # Attempt 3: accepted.
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שלישית")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     attempts = result.productions[0].production.attempts
@@ -776,6 +825,7 @@ def test_grounding_provenance_violation_is_question_local_after_wp021_retry_exha
     )
     fake_provider.queue(GroundingValidationResponse, invented_grounding, invented_grounding)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -804,6 +854,7 @@ def test_textbook_provenance_violation_is_question_local_after_wp021_retry_exhau
     )
     fake_provider.queue(TextbookValidationResponse, invented_textbook, invented_textbook)
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.status == ExamGenerationStatus.PARTIAL
@@ -827,12 +878,13 @@ def test_multi_question_exam_recovers_a_later_planned_questions_contract_failure
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        evidence_refs=[99],  # WP-024: out-of-range local reference, the new "invented" analog
         historical_reference_id=None,
     )
     fake_provider.queue(GeneratedQuestionResponse, invented_response)
     _queue_passing_attempt(fake_provider, category=CATEGORY_B, question="שאלה שנייה")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1, CATEGORY_B: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
 
     assert [q.question for q in result.exam.questions] == ["שאלה ראשונה", "שאלה שנייה"]
@@ -862,7 +914,7 @@ def test_duplicated_answer_numbering_is_a_normal_quality_rejection_not_a_failure
             "תשובה ד",
         ],
         correct_answer=1,
-        evidence_chunk_ids=[],
+        evidence_refs=[],
         historical_reference_id=None,
     )
     fake_provider.queue(GeneratedQuestionResponse, defective_response)
@@ -876,6 +928,7 @@ def test_duplicated_answer_numbering_is_a_normal_quality_rejection_not_a_failure
     fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה תקינה")
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     attempts = result.productions[0].production.attempts
@@ -909,6 +962,7 @@ def test_grounding_provenance_retry_recovers_within_one_question_attempt():
     fake_provider.queue(QualityValidationResult, _quality(True))
     fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1
@@ -943,6 +997,7 @@ def test_grounding_local_reference_never_leaks_into_serialized_audit():
     fake_provider.queue(QualityValidationResult, _quality(True))
     fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
 
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     bundle = build_exam_output_bundle(
         result,
@@ -963,3 +1018,97 @@ def test_grounding_local_reference_never_leaks_into_serialized_audit():
     assert "Evidence 1" not in audit_json
     assert "[Evidence" not in audit_json
     assert "evidence_refs" not in audit_json
+
+
+def test_generation_local_reference_never_leaks_downstream():
+    # WP-024: generation cites a local evidence_refs value (never a
+    # canonical chunk id); nothing downstream (CandidateQuestion, the
+    # clean exam, or the serialized audit) may ever surface that raw
+    # local reference or the field name it travels in.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(
+        GeneratedQuestionResponse,
+        GeneratedQuestionResponse(
+            question="שאלה לדוגמה עם הפניה מקומית",
+            answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+            correct_answer=1,
+            evidence_refs=[1],
+            historical_reference_id=None,
+        ),
+    )
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, _quality(True))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
+
+    _queue_target_plans(fake_provider, {CATEGORY_A: 1})
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    bundle = build_exam_output_bundle(
+        result,
+        exam_id="wp024-leak-test",
+        generated_at=datetime.now(timezone.utc),
+        llm_config=LLMConfig(
+            provider="fake", model="fake-model",
+            generation=LLMGenerationParams(temperature=0.7, max_tokens=800),
+            validation=LLMValidationParams(temperature=0.2, max_tokens=500),
+        ),
+        diversity_target=0.7,
+    )
+
+    assert "evidence_refs" not in type(result.productions[0].production.candidate).model_fields
+    audit_json = serialize_audit_json(bundle.audit)
+    assert "evidence_refs" not in audit_json
+
+
+def test_two_distinct_planned_targets_reach_two_distinct_generation_prompts():
+    # WP-025 end-to-end: real ExamOrchestrator, real QuestionTargetPlanner,
+    # real QuestionGenerator - two targets planned once for the category
+    # must be the ones actually assigned to the two generation calls, in
+    # plan order, each producing genuinely different prompt content.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(
+        QuestionTargetPlanningResponse,
+        QuestionTargetPlanningResponse(
+            targets=[
+                PlannedQuestionTargetResponse(
+                    topic="target one distinct topic", factual_focus="target one distinct focus", evidence_refs=[]
+                ),
+                PlannedQuestionTargetResponse(
+                    topic="target two distinct topic", factual_focus="target two distinct focus", evidence_refs=[]
+                ),
+            ]
+        ),
+    )
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה ראשונה")
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שנייה")
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
+
+    assert result.status == ExamGenerationStatus.COMPLETE
+    assert len(result.exam.questions) == 2
+
+    generation_call_indices = [
+        i for i, (response_model, _) in enumerate(fake_provider.call_log) if response_model is GeneratedQuestionResponse
+    ]
+    assert len(generation_call_indices) == 2
+    first_user_content = next(
+        m for m in fake_provider.messages_log[generation_call_indices[0]] if m.role == MessageRole.USER
+    ).content
+    second_user_content = next(
+        m for m in fake_provider.messages_log[generation_call_indices[1]] if m.role == MessageRole.USER
+    ).content
+    assert "target one distinct topic" in first_user_content
+    assert "target two distinct topic" not in first_user_content
+    assert "target two distinct topic" in second_user_content
+    assert "target one distinct topic" not in second_user_content

@@ -1,0 +1,64 @@
+{
+  "questions": [
+    {
+      "number": 1,
+      "question": "איזו מהמסילות העצביות הבאות אחראית על העברת תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+      "answer1": "Medial Lemniscus Tract",
+      "answer2": "Corticobulbar Tract",
+      "answer3": "Spinothalamic Tract",
+      "answer4": "Corticospinal Tract",
+      "correct_answer": 3,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 2,
+      "question": "מהי המסילה העצבית שמעבירה תחושות מתקדמות כמו מגע עדין ופרופריוצפציה לתלמוס?",
+      "answer1": "מסילה ספינותלמית",
+      "answer2": "Medial Lemniscus Tract",
+      "answer3": "Corticobulbar Tract",
+      "answer4": "Corticospinal Tract",
+      "correct_answer": 2,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 3,
+      "question": "איזה מהחלקים הבאים מהווה חלק מגזע המוח?",
+      "answer1": "Pons",
+      "answer2": "Cerebellum",
+      "answer3": "Cerebrum",
+      "answer4": "Thalamus",
+      "correct_answer": 1,
+      "category": "גזע המוח"
+    },
+    {
+      "number": 4,
+      "question": "מהו תפקידו העיקרי של גזע המוח?",
+      "answer1": "הפעלת אברי החישה",
+      "answer2": "בקרת תפקודים בסיסיים כמו נשימה ולב",
+      "answer3": "הפקת הורמונים",
+      "answer4": "העברת מידע בין חוט השדרה למוח הגדול",
+      "correct_answer": 2,
+      "category": "גזע המוח"
+    },
+    {
+      "number": 5,
+      "question": "מהו תפקיד ההיפוקמפוס בזיכרון ובלמידה?",
+      "answer1": "שמירה על זיכרונות לטווח קצר",
+      "answer2": "הפיכת זיכרונות לטווח קצר לזיכרונות לטווח ארוך",
+      "answer3": "העברת מידע בין המיספרות",
+      "answer4": "הגברת יכולת הלמידה של מערכת העצבים המרכזית",
+      "correct_answer": 2,
+      "category": "המערכת הלימבית"
+    },
+    {
+      "number": 6,
+      "question": "מהו הקשר האבולוציוני בין המערכת הלימבית למערכת ההרחה?",
+      "answer1": "המערכת הלימבית מתפתחת מתוך ה-Rhinencephalon, אשר נחשב לחוש הקדום ביותר.",
+      "answer2": "המערכת הלימבית אינה קשורה למערכת ההרחה.",
+      "answer3": "המערכת הלימבית נחשבת לחלק מהניאוקורטקס, אשר התפתח מאוחר יותר.",
+      "answer4": "המערכת הלימבית אינה כוללת את האולפקטורי בול.",
+      "correct_answer": 1,
+      "category": "המערכת הלימבית"
+    }
+  ]
+}

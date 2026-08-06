@@ -24,12 +24,15 @@ from exam_generator.models import (
     GeneratedQuestionResponse,
     GroundingValidationResponse,
     MCQValidationResult,
+    PlannedQuestionTargetResponse,
     QualityValidationResult,
+    QuestionTargetPlanningResponse,
     SourceType,
     TextbookValidationResponse,
     TextbookCheckStatus,
 )
 from exam_generator.orchestration import ExamOrchestrator, QuestionProductionFailedError
+from exam_generator.planning import QuestionTargetPlanner
 from exam_generator.production import QuestionProducer
 from exam_generator.prompts import PromptRepository
 from exam_generator.retrieval import CategoryResolver, FactualRetrievalIndex
@@ -122,7 +125,7 @@ def _generated_response(**kwargs) -> GeneratedQuestionResponse:
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
-        evidence_chunk_ids=[],
+        evidence_refs=[],
         historical_reference_id=None,
     )
     defaults.update(kwargs)
@@ -192,10 +195,34 @@ def _build_real_pipeline(*, sdk_client: _QueuedSdkClient, structured_output_retr
         ),
         max_attempts=max_generation_attempts,
     )
+    target_planner = QuestionTargetPlanner(
+        category_resolver=category_resolver,
+        student_summary_index=student_summary_index,
+        prompt_repository=prompt_repository,
+        llm_provider=provider,
+    )
     orchestrator = ExamOrchestrator(
-        category_resolver=category_resolver, producer=producer, max_duplicate_replacement_attempts=2
+        category_resolver=category_resolver,
+        target_planner=target_planner,
+        producer=producer,
+        max_duplicate_replacement_attempts=2,
     )
     return orchestrator
+
+
+def _queue_target_plan(client: "_QueuedSdkClient", *, category: str, count: int = 1) -> None:
+    """Queue one WP-025 target-planning response for ``category`` - every
+    test in this module requests exactly one question per category, so
+    one target is always sufficient."""
+    client.queue(
+        QuestionTargetPlanningResponse,
+        QuestionTargetPlanningResponse(
+            targets=[
+                PlannedQuestionTargetResponse(topic=f"topic {i}", factual_focus=f"focus {i}", evidence_refs=[])
+                for i in range(1, count + 1)
+            ]
+        ),
+    )
 
 
 def _queue_passing_validators(client: _QueuedSdkClient, *, category: str) -> None:
@@ -225,6 +252,7 @@ def test_validator_structured_output_recovers_and_question_is_accepted():
     client.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
 
     orchestrator = _build_real_pipeline(sdk_client=client)
+    _queue_target_plan(client, category=CATEGORY_A)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1
@@ -245,6 +273,7 @@ def test_generation_structured_output_recovers_without_consuming_a_production_at
     _queue_passing_validators(client, category=CATEGORY_A)
 
     orchestrator = _build_real_pipeline(sdk_client=client)
+    _queue_target_plan(client, category=CATEGORY_A)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1
@@ -269,6 +298,7 @@ def test_structured_output_retry_exhaustion_is_a_contextualized_exam_failure():
 
     orchestrator = _build_real_pipeline(sdk_client=client, structured_output_retries=1)
     with pytest.raises(QuestionProductionFailedError) as excinfo:
+        _queue_target_plan(client, category=CATEGORY_A)
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert isinstance(excinfo.value.operational_cause, LLMStructuredOutputError)
@@ -288,13 +318,14 @@ def test_generation_structured_retry_then_wp019_provenance_recovery_then_accepte
     client = _QueuedSdkClient()
     # Attempt 1's generation: physical call #1 malformed, physical call #2
     # parses successfully but claims invented provenance.
-    invented = _generated_response(evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"])
+    invented = _generated_response(evidence_refs=[99])  # WP-024: out-of-range local reference
     client.queue(GeneratedQuestionResponse, _malformed_json_error(GeneratedQuestionResponse), invented)
     # Attempt 2's generation: succeeds cleanly.
     client.queue(GeneratedQuestionResponse, _generated_response(question="שאלה תקינה"))
     _queue_passing_validators(client, category=CATEGORY_A)
 
     orchestrator = _build_real_pipeline(sdk_client=client)
+    _queue_target_plan(client, category=CATEGORY_A)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert result.exam.questions[0].question == "שאלה תקינה"
@@ -320,6 +351,7 @@ def test_structured_output_recovery_then_valid_provenance_succeeds():
     _queue_passing_validators_without_grounding(client, category=CATEGORY_A)
 
     orchestrator = _build_real_pipeline(sdk_client=client)
+    _queue_target_plan(client, category=CATEGORY_A)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1
@@ -348,6 +380,7 @@ def test_structured_output_recovery_then_invalid_provenance_then_wp021_recovery_
     _queue_passing_validators_without_grounding(client, category=CATEGORY_A)
 
     orchestrator = _build_real_pipeline(sdk_client=client)
+    _queue_target_plan(client, category=CATEGORY_A)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
     assert len(result.exam.questions) == 1

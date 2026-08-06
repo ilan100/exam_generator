@@ -1,0 +1,394 @@
+{
+  "questions": [
+    {
+      "number": 1,
+      "question": "מהו המבנה הממוקם בחלק התחתון של מוח השדרה ואחראי על חיבור השורשים למערכת העצבים ההיקפית?",
+      "answer1": "Conus Medullaris",
+      "answer2": "Filum Terminale",
+      "answer3": "Cauda Equina",
+      "answer4": "Cervical Enlargement",
+      "correct_answer": 1,
+      "category": "התעלה השדרתית ותכולתה"
+    },
+    {
+      "number": 2,
+      "question": "באיזה אזור ממוקם הקורטקס המוטורי הראשוני (BA 4)?",
+      "answer1": "precentral gyrus",
+      "answer2": "postcentral gyrus",
+      "answer3": "anterior cingulate cortex",
+      "answer4": "supramarginal gyrus",
+      "correct_answer": 1,
+      "category": "לוקליזציה פונקציונלית"
+    },
+    {
+      "number": 3,
+      "question": "מהו האזור האחראי על תכנון וציפייה לתנועה בקורטקס המוטורי?",
+      "answer1": "הקורטקס הראשוני (BA4)",
+      "answer2": "הקורטקס השניוני (BA6)",
+      "answer3": "הקורטקס הסומטוסנסורי הראשוני (BA3)",
+      "answer4": "אזור ברודמן 8 (FEF)",
+      "correct_answer": 2,
+      "category": "לוקליזציה פונקציונלית"
+    },
+    {
+      "number": 4,
+      "question": "מהו החומר הלבן שמקיף את התלמוס?",
+      "answer1": "Stratum Zonal",
+      "answer2": "External Medullary Lamina",
+      "answer3": "Internal Medullary Lamina",
+      "answer4": "Centrum Semiovale",
+      "correct_answer": 2,
+      "category": "חומר לבן"
+    },
+    {
+      "number": 5,
+      "question": "מהו החומר הלבן במוח?",
+      "answer1": "אלומות סיבים הממוקמות בתוך החומר האפור",
+      "answer2": "אקסונים עטופים במיאלין המחברים בין אזורים שונים במוח",
+      "answer3": "החומר האפור שנמצא במרכז המוח",
+      "answer4": "רקמות חיבור בין עצבים",
+      "correct_answer": 2,
+      "category": "חומר לבן"
+    },
+    {
+      "number": 6,
+      "question": "מהו העצב הקרניאלי הראשון שאינו נכנס או יוצא מגזע המוח?",
+      "answer1": "Oculomotor Nerve",
+      "answer2": "Optic Nerve",
+      "answer3": "Olfactory Nerve",
+      "answer4": "Trigeminal Nerve",
+      "correct_answer": 3,
+      "category": "עצבים קרניאליים"
+    },
+    {
+      "number": 7,
+      "question": "מהו תפקידו של העצב הקרניאלי הראשון, עצב ההרחה?",
+      "answer1": "אחראי על חוש הריח",
+      "answer2": "אחראי על תנועת העיניים",
+      "answer3": "אחראי על שמיעה",
+      "answer4": "אחראי על תפקודי הלב",
+      "correct_answer": 1,
+      "category": "עצבים קרניאליים"
+    },
+    {
+      "number": 8,
+      "question": "מהי השיטה הנפוצה ביותר לדימות מוחי המבוססת על קרני רנטגן?",
+      "answer1": "אולטרסאונד",
+      "answer2": "MRI",
+      "answer3": "CT",
+      "answer4": "דימות תפקודי",
+      "correct_answer": 3,
+      "category": "מיפוי ודימות מוחי"
+    },
+    {
+      "number": 9,
+      "question": "איזה מהשיטות הבאות היא השיטה הנגישה ביותר לדימות מוחי?",
+      "answer1": "אולטרסאונד",
+      "answer2": "CT",
+      "answer3": "MRI",
+      "answer4": "דימות פונקציונלי",
+      "correct_answer": 1,
+      "category": "מיפוי ודימות מוחי"
+    },
+    {
+      "number": 10,
+      "question": "על פי מה חילק ברודמן את הקורטקס לאזורים שונים?",
+      "answer1": "פעילות הנוירונים בעת ביצוע מטלות שונות",
+      "answer2": "בליטות ושקעים על גבי הגולגולת",
+      "answer3": "המקור העוברי",
+      "answer4": "העובי היחסי של שכבות הקורטקס",
+      "correct_answer": 4,
+      "category": "היסטולוגיה"
+    },
+    {
+      "number": 11,
+      "question": "מה המאפיין הייחודי של רקמת עצב?",
+      "answer1": "יכולה להתכווץ עם גירוי מתאים",
+      "answer2": "כלולה בתפקוד של איברים פנימיים",
+      "answer3": "אקסיטבילית, יכולה לשנות את מתח הממברנה",
+      "answer4": "מכילה תאי אפיתל שמצפים איברים",
+      "correct_answer": 3,
+      "category": "היסטולוגיה"
+    },
+    {
+      "number": 12,
+      "question": "מהו המבנה המרכזי במערכת הלימבית שמקושר בעיקר לחוש הריח?",
+      "answer1": "ההיפוקמפוס",
+      "answer2": "אמיגדלה",
+      "answer3": "Mammillary body",
+      "answer4": "Olfactory bulb",
+      "correct_answer": 4,
+      "category": "המערכת הלימבית"
+    },
+    {
+      "number": 13,
+      "question": "מהו המבנה המרכזי במערכת הלימבית הקשור לחוש הריח?",
+      "answer1": "ההיפוקמפוס",
+      "answer2": "האמיגדלה",
+      "answer3": "גזע המוח",
+      "answer4": "הבלוטה האולפתורית",
+      "correct_answer": 4,
+      "category": "המערכת הלימבית"
+    },
+    {
+      "number": 14,
+      "question": "מהו העורק שמספק דם לחלקים התחתונים והקדמיים של הצרבלום?",
+      "answer1": "Superior Cerebellar Artery",
+      "answer2": "Anterior Inferior Cerebellar Artery (AICA)",
+      "answer3": "Inferior Cerebellar Artery (PICA)",
+      "answer4": "Basilar Artery",
+      "correct_answer": 2,
+      "category": "אספקת דם"
+    },
+    {
+      "number": 15,
+      "question": "איזה עורק מספק דם לחלקים העליונים והקדמיים של הצרבלום?",
+      "answer1": "Posterior Inferior Cerebellar Artery (PICA)",
+      "answer2": "Anterior Inferior Cerebellar Artery (AICA)",
+      "answer3": "Superior Cerebellar Artery",
+      "answer4": "Basilar Artery",
+      "correct_answer": 3,
+      "category": "אספקת דם"
+    },
+    {
+      "number": 16,
+      "question": "מהו תפקידו של הסינוס הסגיטלי העליון במערכת הוורידית של המוח?",
+      "answer1": "הוא מספק דם לאזורים חיצוניים של הגולגולת",
+      "answer2": "הוא מתנקז לחלל בשם Confluence of Sinuses",
+      "answer3": "הוא מצטבר על מנת למנוע דימום",
+      "answer4": "הוא אחראי למעבר של CSF בין קרומי המוח",
+      "correct_answer": 2,
+      "category": "קרומים וסינוסים דוראליים"
+    },
+    {
+      "number": 17,
+      "question": "מהו הסינוס הדוראלי העליון?",
+      "answer1": "חלל בין השכבות החיצונית והפנימית של הדורה המלא בדם וורידי",
+      "answer2": "שכבת דם וורידי הנמצאת מתחת לארכנואיד",
+      "answer3": "חלל במערכת העצבים הפראסימפתטית",
+      "answer4": "חלק מהחומר האפור במוח",
+      "correct_answer": 1,
+      "category": "קרומים וסינוסים דוראליים"
+    },
+    {
+      "number": 18,
+      "question": "מהו התפקיד המרכזי של גזע המוח?",
+      "answer1": "א. עיבוד מידע תחושתי",
+      "answer2": "ב. תפקודים בסיסיים כמו נשימה ושינה",
+      "answer3": "ג. התפתחות המוח הגדול",
+      "answer4": "ד. שליטה על תנועות רצוניות",
+      "correct_answer": 2,
+      "category": "גזע המוח"
+    },
+    {
+      "number": 19,
+      "question": "מהו תפקידו העיקרי של גזע המוח?",
+      "answer1": "אחראי על תפקודים בסיסיים כגון נשימה ושינה",
+      "answer2": "מעבד מידע סנסורי מהעיניים",
+      "answer3": "שולט על כישורי למידה וזיכרון",
+      "answer4": "מייצר הורמונים חשובים",
+      "correct_answer": 1,
+      "category": "גזע המוח"
+    },
+    {
+      "number": 20,
+      "question": "איזו מהמסילות העצביות הבאות אחראית להעברת תחושות כאב וטמפרטורה?",
+      "answer1": "Medial Lemniscus Tract",
+      "answer2": "Spinothalamic Tract",
+      "answer3": "Corticobulbar Tract",
+      "answer4": "Corticospinal Tract",
+      "correct_answer": 2,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 21,
+      "question": "מהו תפקיד המסילה הספינותלמית (Spinothalamic Tract)?",
+      "answer1": "מעבירה תחושות פרימיטיביות כמו כאב וטמפרטורה",
+      "answer2": "מעבירה תחושות מתקדמות",
+      "answer3": "עצבוב שרירי הפנים",
+      "answer4": "עצבוב שרירי הגפיים",
+      "correct_answer": 1,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 22,
+      "question": "מה תפקידם המרכזי של גרעיני הבסיס במערכת העצבים?",
+      "answer1": "הם אחראים על קבלת מידע תחושתי בלבד",
+      "answer2": "הם מבצעים וויסות ורגולציה של פעילות מוטורית",
+      "answer3": "הם פועלים בעיקר במערכת הלימבית",
+      "answer4": "הם מפעילים את מערכת התגמול בלבד",
+      "correct_answer": 2,
+      "category": "גרעיני הבסיס"
+    },
+    {
+      "number": 23,
+      "question": "מהו התפקיד המרכזי של גרעיני הבסיס במערכת העצבים?",
+      "answer1": "וויסות תנועות מוטוריות",
+      "answer2": "העברת מידע תחושתי",
+      "answer3": "שליטה על התנהגות חברתית",
+      "answer4": "הפקת דופמין",
+      "correct_answer": 1,
+      "category": "גרעיני הבסיס"
+    },
+    {
+      "number": 24,
+      "question": "מה מהבאים נכון לגבי מבנה המוח הקטן (צרבלום)?",
+      "answer1": "המוח הקטן ממוקם בחלק האחורי התחתון של המוח.",
+      "answer2": "המוח הקטן הוא בעל תפקיד בבלימת כאבים.",
+      "answer3": "המוח הקטן מכיל רק חומר אפור.",
+      "answer4": "המוח הקטן לא קשור למערכות למידה.",
+      "correct_answer": 1,
+      "category": "המוח הקטן"
+    },
+    {
+      "number": 25,
+      "question": "מהו התפקיד המרכזי של המוח הקטן (צרבלום)?",
+      "answer1": "שמירה על שיווי משקל",
+      "answer2": "עיבוד מידע סנסורי",
+      "answer3": "תיאום תנועות מוטוריות",
+      "answer4": "הפקת דיבור",
+      "correct_answer": 3,
+      "category": "המוח הקטן"
+    },
+    {
+      "number": 26,
+      "question": "מהי מערכת העצבים ההיקפית?",
+      "answer1": "מערכת עצבים מרכזית בלבד",
+      "answer2": "מערכת עצבים הממוקמת בגולגולת",
+      "answer3": "מערכת עצבים הממוקמת מחוץ לעמוד השדרה ולגולגולת",
+      "answer4": "מערכת עצבים שמתחלקת רק לשרירים חלקים",
+      "correct_answer": 3,
+      "category": "מערכת העצבים ההיקפית"
+    },
+    {
+      "number": 27,
+      "question": "מה היא מערכת העצבים ההיקפית?",
+      "answer1": "מערכת עצבים מרכזית בלבד",
+      "answer2": "מערכת עצבים אוטונומית וסומטית",
+      "answer3": "רק מערכת עצבים סימפתטית",
+      "answer4": "מערכת עצבים היקפית בלבד",
+      "correct_answer": 2,
+      "category": "מערכת העצבים ההיקפית"
+    },
+    {
+      "number": 28,
+      "question": "מהו המבנה המרכזי שמתפתח מהדיאנצפלון?",
+      "answer1": "ההיפותלמוס",
+      "answer2": "התלמוס",
+      "answer3": "הסאב-תלמוס",
+      "answer4": "האפיתלמוס",
+      "correct_answer": 2,
+      "category": "דיאנצפלון"
+    },
+    {
+      "number": 29,
+      "question": "מהו המבנה המרכזי ביותר שמתפתח מהדיאנצפלון?",
+      "answer1": "תלמוס",
+      "answer2": "היפותלמוס",
+      "answer3": "אפיתלמוס",
+      "answer4": "סאב-תלמוס",
+      "correct_answer": 1,
+      "category": "דיאנצפלון"
+    },
+    {
+      "number": 30,
+      "question": "מהו תהליך הגסטרולציה במערכת העצבים במהלך ההתפתחות העוברית?",
+      "answer1": "מעבר מדיסק דו שכבתי לדיסק תלת שכבתי",
+      "answer2": "היווצרות חללים באפיבלסט",
+      "answer3": "התפתחות ההמיספרות של המוח",
+      "answer4": "חלוקת התאים לרקמות שונות",
+      "correct_answer": 1,
+      "category": "אמבריולוגיה"
+    },
+    {
+      "number": 31,
+      "question": "מהו התהליך שבו התאים עוברים ממצב של דיסק דו שכבתי למצב של דיסק תלת שכבתי במהלך ההתפתחות העוברית?",
+      "answer1": "גסטרולציה",
+      "answer2": "גיריפיקציה",
+      "answer3": "אינווגינציה",
+      "answer4": "קיפולי צינור העצבים",
+      "correct_answer": 1,
+      "category": "אמבריולוגיה"
+    },
+    {
+      "number": 32,
+      "question": "באיזה חלק של המוח הגדול ממוקמת האונה הפריאטלית?",
+      "answer1": "בצד הלטרלי של ההמיספרה",
+      "answer2": "בצד המדיאלי של ההמיספרה",
+      "answer3": "בצד התחתון של ההמיספרה",
+      "answer4": "בצד העליון של ההמיספרה",
+      "correct_answer": 1,
+      "category": "טופוגרפיה של ההמיספרות"
+    },
+    {
+      "number": 33,
+      "question": "מהו הגבול העליון של האונה האוקסיפיטלית?",
+      "answer1": "Parieto-Occipital Sulcus",
+      "answer2": "Central Sulcus",
+      "answer3": "Lateral Fissure",
+      "answer4": "Preoccipital Notch",
+      "correct_answer": 1,
+      "category": "טופוגרפיה של ההמיספרות"
+    },
+    {
+      "number": 34,
+      "question": "מהו המבנה הממוקם בחדר השלישי של המוח ומייצר את ה-CSF?",
+      "answer1": "Corpus Callosum",
+      "answer2": "Choroid Plexus",
+      "answer3": "Septum Pellucidum",
+      "answer4": "Cerebral Aqueduct",
+      "correct_answer": 2,
+      "category": "חדרי המוח"
+    },
+    {
+      "number": 35,
+      "question": "מהו המבנה המפריד בין שני החדרים הלטרליים במוח?",
+      "answer1": "קורפוס קלוזום",
+      "answer2": "ספטום פלוסידום",
+      "answer3": "חדר שלישי",
+      "answer4": "חדר רביעי",
+      "correct_answer": 2,
+      "category": "חדרי המוח"
+    },
+    {
+      "number": 36,
+      "question": "איזה סוג של תאי גליה מהווה את הרכיב החיסוני של מערכת העצבים המרכזית?",
+      "answer1": "אוליגודנדרוציטים",
+      "answer2": "תאי אפנדימה",
+      "answer3": "מיקרוגליה",
+      "answer4": "תאי שוואן",
+      "correct_answer": 3,
+      "category": "תאי מערכת העצבים"
+    },
+    {
+      "number": 37,
+      "question": "מהו תפקיד המיקרוגליה במערכת העצבים המרכזית?",
+      "answer1": "תמיכה פיזית לנוירונים",
+      "answer2": "העברת סיגנלים בין תאי העצב",
+      "answer3": "פאגוציטוזה של מרכיבים מזיקים",
+      "answer4": "ייצור מיאלין סביב האקסונים",
+      "correct_answer": 3,
+      "category": "תאי מערכת העצבים"
+    },
+    {
+      "number": 38,
+      "question": "מהו הכינוי למיקום הסנטר ביחס לאף אצל בני האדם?",
+      "answer1": "דורסלי",
+      "answer2": "קאודלי",
+      "answer3": "רוסטרלי",
+      "answer4": "ונטרלי",
+      "correct_answer": 4,
+      "category": "מבוא"
+    },
+    {
+      "number": 39,
+      "question": "מהו האזור במוח הקשור ליצירת שפה?",
+      "answer1": "אזור ברוקה",
+      "answer2": "אזור וורניקה",
+      "answer3": "האמיגדלה",
+      "answer4": "ההיפוקמפוס",
+      "correct_answer": 1,
+      "category": "מבוא"
+    }
+  ]
+}

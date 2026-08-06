@@ -1,0 +1,24 @@
+{
+  "questions": [
+    {
+      "number": 1,
+      "question": "איזה מהמבנים הבאים נמצא בתעלה השדרתית?",
+      "answer1": "Conus Medullaris",
+      "answer2": "Dorsal Root Ganglion",
+      "answer3": "Filum Terminale",
+      "answer4": "Cervical Enlargement",
+      "correct_answer": 1,
+      "category": "התעלה השדרתית ותכולתה"
+    },
+    {
+      "number": 2,
+      "question": "מהו המבנה שבו עובר מוח השדרה?",
+      "answer1": "גוף החוליה",
+      "answer2": "התעלה השדרתית",
+      "answer3": "העורקים הצוואריים",
+      "answer4": "החומר הלבן",
+      "correct_answer": 2,
+      "category": "התעלה השדרתית ותכולתה"
+    }
+  ]
+}

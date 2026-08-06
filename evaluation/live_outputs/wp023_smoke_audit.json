@@ -1,0 +1,197 @@
+{
+  "exam_id": "exam-20260805T191347Z",
+  "generated_at": "2026-08-05T19:13:47.991225Z",
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "status": "COMPLETE",
+  "planned_question_count": 2,
+  "accepted_count": 2,
+  "failed_count": 0,
+  "questions": [
+    {
+      "number": 1,
+      "planned_position": 1,
+      "category": "התעלה השדרתית ותכולתה",
+      "generation_mode": "STYLE_SIMILAR",
+      "historical_reference_id": null,
+      "grounding": {
+        "grounded": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0009:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0006:0002",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0008:0001"
+        ],
+        "evidence_text": "Conus Medullaris – חלקו התחתון של מוח השדרה המסתיים בצורת קונוס בגובה חולייה1L. Filum terminale - כשנגמר חוט השדרה, הפיה שעוטפת אותו לא מסתיימת אלא נשארת כיריעה דקה בצבע כסוף. בנוסף, בין סגמנט C1- L1, מתחת ל-Conus medullaris יש שורשים רבים ללא חוט שדרה שעושים דרכם לחריר הבין חולייתי שלהם.",
+        "reason": "The question asks which structure is found within the spinal canal. The correct answer, Conus Medullaris, is explicitly mentioned in the evidence as the lower part of the spinal cord that ends in a conical shape at the level of the L1 vertebra. Other options like Dorsal Root Ganglion and Spinal Nerve are not stated as being within the spinal canal, making the Conus Medullaris the only supported answer. Therefore, the question is grounded, the correct answer is supported, and no other answer is equally correct.",
+        "confidence": 1.0
+      },
+      "evidence": [],
+      "mcq_validation": {
+        "valid": true,
+        "exactly_four_answers": true,
+        "single_best_answer": true,
+        "reason": "The candidate question has exactly four answer choices, all of which are plausible structures found within the התעלה השדרתית. Only one answer, Conus Medullaris, is unambiguously the single best answer, as it is a structure located within the spinal canal. The other options, while related to spinal anatomy, do not reside within the spinal canal itself, making them effective distractors. There are no obvious structural clues that indicate the correct answer, and all answer choices are coherent with the question."
+      },
+      "category_validation": {
+        "valid": true,
+        "requested_category": "התעלה השדרתית ותכולתה",
+        "assessed_category": null,
+        "reason": "The candidate question directly asks about structures located within the התעלה השדרתית, which aligns perfectly with the requested category."
+      },
+      "quality_validation": {
+        "valid": true,
+        "reason": "The question is clearly worded and unambiguous, asking specifically about structures located within the התעלה השדרתית. Each answer choice is relevant and distinct, allowing a knowledgeable student to select the correct answer without confusion. The language is natural and grammatically sound in Hebrew, with anatomical terminology used correctly. There is no unnecessary ambiguity present in the question or answer choices."
+      },
+      "textbook_check": {
+        "status": "CONSISTENT",
+        "evidence_chunk_ids": [
+          "COURSE_BOOK:course_book.pdf:0076:0001",
+          "COURSE_BOOK:course_book.pdf:0120:0003"
+        ],
+        "source_page": 76,
+        "reference_text": null,
+        "reason": "The course-book evidence confirms that the conus medullaris is the terminal end of the spinal cord, which aligns with the candidate question regarding structures within the spinal canal. Additionally, it mentions the filum terminale and dorsal root ganglia, further supporting the context of the question."
+      },
+      "generation_attempts": 1,
+      "diversity_target": 0.7,
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "grounding": {
+            "grounded": true,
+            "correct_answer_supported": true,
+            "other_answers_not_equally_correct": true,
+            "evidence_chunk_ids": [
+              "STUDENT_SUMMARY:student_summary_2.pdf:0009:0001",
+              "STUDENT_SUMMARY:student_summary_1.pdf:0006:0002",
+              "STUDENT_SUMMARY:student_summary_2.pdf:0008:0001"
+            ],
+            "evidence_text": "Conus Medullaris – חלקו התחתון של מוח השדרה המסתיים בצורת קונוס בגובה חולייה1L. Filum terminale - כשנגמר חוט השדרה, הפיה שעוטפת אותו לא מסתיימת אלא נשארת כיריעה דקה בצבע כסוף. בנוסף, בין סגמנט C1- L1, מתחת ל-Conus medullaris יש שורשים רבים ללא חוט שדרה שעושים דרכם לחריר הבין חולייתי שלהם.",
+            "reason": "The question asks which structure is found within the spinal canal. The correct answer, Conus Medullaris, is explicitly mentioned in the evidence as the lower part of the spinal cord that ends in a conical shape at the level of the L1 vertebra. Other options like Dorsal Root Ganglion and Spinal Nerve are not stated as being within the spinal canal, making the Conus Medullaris the only supported answer. Therefore, the question is grounded, the correct answer is supported, and no other answer is equally correct.",
+            "confidence": 1.0
+          },
+          "mcq_validation": {
+            "valid": true,
+            "exactly_four_answers": true,
+            "single_best_answer": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures found within the התעלה השדרתית. Only one answer, Conus Medullaris, is unambiguously the single best answer, as it is a structure located within the spinal canal. The other options, while related to spinal anatomy, do not reside within the spinal canal itself, making them effective distractors. There are no obvious structural clues that indicate the correct answer, and all answer choices are coherent with the question."
+          },
+          "category_validation": {
+            "valid": true,
+            "requested_category": "התעלה השדרתית ותכולתה",
+            "assessed_category": null,
+            "reason": "The candidate question directly asks about structures located within the התעלה השדרתית, which aligns perfectly with the requested category."
+          },
+          "quality_validation": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking specifically about structures located within the התעלה השדרתית. Each answer choice is relevant and distinct, allowing a knowledgeable student to select the correct answer without confusion. The language is natural and grammatically sound in Hebrew, with anatomical terminology used correctly. There is no unnecessary ambiguity present in the question or answer choices."
+          },
+          "textbook_check": {
+            "status": "CONSISTENT",
+            "evidence_chunk_ids": [
+              "COURSE_BOOK:course_book.pdf:0076:0001",
+              "COURSE_BOOK:course_book.pdf:0120:0003"
+            ],
+            "source_page": 76,
+            "reference_text": null,
+            "reason": "The course-book evidence confirms that the conus medullaris is the terminal end of the spinal cord, which aligns with the candidate question regarding structures within the spinal canal. Additionally, it mentions the filum terminale and dorsal root ganglia, further supporting the context of the question."
+          },
+          "generation_failure_type": null,
+          "generation_failure_message": null
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "planned_position": 2,
+      "category": "התעלה השדרתית ותכולתה",
+      "generation_mode": "INDEPENDENT",
+      "historical_reference_id": null,
+      "grounding": {
+        "grounded": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0003:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0009:0001"
+        ],
+        "evidence_text": "התעלה השדרתית – מקום מושבו של מוח השדרה, העובר דרך Vertebral Foramen. Conus Medullaris – חלקו התחתון של מוח השדרה המסתיים בצורת קונוס בגובה חוליה L1.",
+        "reason": "The question asks about the main structure located within the spinal canal, which is supported by the evidence stating that the spinal canal houses the spinal cord (מוח השדרה). The correct answer, 'מוח השדרה', is explicitly supported by the evidence. Other options like 'חוליות', 'עצב השדרה', and 'קונוס מדולאריס' are not the primary structure within the spinal canal, making them less supported or incorrect in this context.",
+        "confidence": 0.95
+      },
+      "evidence": [],
+      "mcq_validation": {
+        "valid": true,
+        "exactly_four_answers": true,
+        "single_best_answer": true,
+        "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about the structure located within the התעלה השדרתית. Only 'מוח השדרה' is unambiguously the single best answer, as it directly refers to the spinal cord, which is the primary structure within the spinal canal. The other options, while related, do not serve as the main structure within the canal, thus avoiding ambiguity in the correct answer."
+      },
+      "category_validation": {
+        "valid": true,
+        "requested_category": "התעלה השדרתית ותכולתה",
+        "assessed_category": null,
+        "reason": "The candidate question directly asks about the main structure located within the spinal canal, which is the spinal cord (מוח השדרה). This fits perfectly within the requested category of 'התעלה השדרתית ותכולתה' as it pertains to the contents of the spinal canal."
+      },
+      "quality_validation": {
+        "valid": true,
+        "reason": "The question is clearly worded and unambiguous, asking specifically about the main structure located within the spinal canal. A knowledgeable student could answer it based on the question as written, as it directly relates to the anatomy of the spinal canal. The multiple-choice format is appropriate for an exam, and the Hebrew used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices."
+      },
+      "textbook_check": {
+        "status": "NOT_FOUND",
+        "evidence_chunk_ids": [],
+        "source_page": null,
+        "reference_text": null,
+        "reason": "No course-book evidence could be independently retrieved for this candidate."
+      },
+      "generation_attempts": 1,
+      "diversity_target": 0.7,
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "grounding": {
+            "grounded": true,
+            "correct_answer_supported": true,
+            "other_answers_not_equally_correct": true,
+            "evidence_chunk_ids": [
+              "STUDENT_SUMMARY:student_summary_2.pdf:0003:0001",
+              "STUDENT_SUMMARY:student_summary_2.pdf:0009:0001"
+            ],
+            "evidence_text": "התעלה השדרתית – מקום מושבו של מוח השדרה, העובר דרך Vertebral Foramen. Conus Medullaris – חלקו התחתון של מוח השדרה המסתיים בצורת קונוס בגובה חוליה L1.",
+            "reason": "The question asks about the main structure located within the spinal canal, which is supported by the evidence stating that the spinal canal houses the spinal cord (מוח השדרה). The correct answer, 'מוח השדרה', is explicitly supported by the evidence. Other options like 'חוליות', 'עצב השדרה', and 'קונוס מדולאריס' are not the primary structure within the spinal canal, making them less supported or incorrect in this context.",
+            "confidence": 0.95
+          },
+          "mcq_validation": {
+            "valid": true,
+            "exactly_four_answers": true,
+            "single_best_answer": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about the structure located within the התעלה השדרתית. Only 'מוח השדרה' is unambiguously the single best answer, as it directly refers to the spinal cord, which is the primary structure within the spinal canal. The other options, while related, do not serve as the main structure within the canal, thus avoiding ambiguity in the correct answer."
+          },
+          "category_validation": {
+            "valid": true,
+            "requested_category": "התעלה השדרתית ותכולתה",
+            "assessed_category": null,
+            "reason": "The candidate question directly asks about the main structure located within the spinal canal, which is the spinal cord (מוח השדרה). This fits perfectly within the requested category of 'התעלה השדרתית ותכולתה' as it pertains to the contents of the spinal canal."
+          },
+          "quality_validation": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking specifically about the main structure located within the spinal canal. A knowledgeable student could answer it based on the question as written, as it directly relates to the anatomy of the spinal canal. The multiple-choice format is appropriate for an exam, and the Hebrew used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices."
+          },
+          "textbook_check": {
+            "status": "NOT_FOUND",
+            "evidence_chunk_ids": [],
+            "source_page": null,
+            "reference_text": null,
+            "reason": "No course-book evidence could be independently retrieved for this candidate."
+          },
+          "generation_failure_type": null,
+          "generation_failure_message": null
+        }
+      ]
+    }
+  ],
+  "failed_questions": []
+}

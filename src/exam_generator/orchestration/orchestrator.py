@@ -36,6 +36,7 @@ from exam_generator.models import (
     ExamOutput,
     ExamRequest,
     GenerationMode,
+    QuestionTarget,
     candidate_to_exam_question,
 )
 from exam_generator.orchestration.errors import InvalidOrchestrationConfigurationError, QuestionProductionFailedError
@@ -45,6 +46,7 @@ from exam_generator.orchestration.models import (
     PlannedQuestion,
     QuestionProductionRecord,
 )
+from exam_generator.planning import QuestionTargetPlanner
 from exam_generator.production import QuestionAttemptsExhaustedError, QuestionProducer, QuestionProductionResult
 from exam_generator.prompts import PromptError
 from exam_generator.retrieval import CategoryResolver, RetrievalError, build_category_resolver, resolve_exam_request_categories
@@ -144,10 +146,12 @@ class ExamOrchestrator:
         self,
         *,
         category_resolver: CategoryResolver,
+        target_planner: QuestionTargetPlanner,
         producer: QuestionProducer,
         max_duplicate_replacement_attempts: int,
     ) -> None:
         self._category_resolver = category_resolver
+        self._target_planner = target_planner
         self._producer = producer
         self._max_duplicate_replacement_attempts = _validate_max_duplicate_replacement_attempts(
             max_duplicate_replacement_attempts
@@ -156,16 +160,18 @@ class ExamOrchestrator:
     @classmethod
     def from_default_configuration(cls) -> "ExamOrchestrator":
         """Construct the normal application wiring: the real category
-        resolver, a real ``QuestionProducer`` (all five real validators),
-        and ``config/app.yaml``'s ``generation.max_duplicate_replacement_attempts``
+        resolver, a real ``QuestionTargetPlanner`` (WP-025), a real
+        ``QuestionProducer`` (all five real validators), and
+        ``config/app.yaml``'s ``generation.max_duplicate_replacement_attempts``
         as the duplicate-replacement bound - a new, small configuration
         value distinct from WP-013's own ``max_generation_attempts``.
 
         Requires ``OPENAI_API_KEY`` to be set (resolved by
-        ``QuestionProducer.from_default_configuration()``).
+        ``QuestionTargetPlanner``/``QuestionProducer.from_default_configuration()``).
         """
         return cls(
             category_resolver=build_category_resolver(),
+            target_planner=QuestionTargetPlanner.from_default_configuration(),
             producer=QuestionProducer.from_default_configuration(),
             max_duplicate_replacement_attempts=load_app_config().generation.max_duplicate_replacement_attempts,
         )
@@ -174,11 +180,15 @@ class ExamOrchestrator:
         self,
         planned: PlannedQuestion,
         *,
+        target: QuestionTarget,
         total_planned: int,
         completed_productions: tuple[QuestionProductionRecord, ...],
         seen_normalized_questions: set[str],
     ) -> QuestionProductionRecord | FailedPlannedQuestion:
-        """Produce one planned question, replacing (bounded) any result
+        """Produce one planned question toward its assigned ``target``
+        (WP-025 - held fixed across every attempt below, including every
+        bounded duplicate-replacement attempt; never re-planned merely
+        because an attempt was rejected), replacing (bounded) any result
         that exactly duplicates a question already accepted into this
         exam.
 
@@ -202,7 +212,7 @@ class ExamOrchestrator:
         for _ in range(self._max_duplicate_replacement_attempts + 1):
             try:
                 production = self._producer.produce_question(
-                    category=planned.category, generation_mode=planned.generation_mode
+                    category=planned.category, generation_mode=planned.generation_mode, target=target
                 )
             except QuestionAttemptsExhaustedError as exc:
                 return FailedPlannedQuestion(
@@ -256,10 +266,29 @@ class ExamOrchestrator:
 
         Resolves aliases to canonical categories and combines their
         requested counts (WP-006, never reimplemented here), builds a
-        deterministic plan, then sequentially calls WP-013's
-        ``QuestionProducer`` once per planned question - never
-        reimplementing generation/validation/acceptance/regeneration.
-        Only an accepted, non-duplicate candidate enters the exam.
+        deterministic plan, then - grouped by category, in plan order -
+        plans each category's question targets once (WP-025) before
+        sequentially calling WP-013's ``QuestionProducer`` once per
+        planned question in that category, toward its assigned target -
+        never reimplementing generation/validation/acceptance/
+        regeneration. Only an accepted, non-duplicate candidate enters
+        the exam.
+
+        WP-025: target planning happens exactly once per category,
+        yielding up to that category's requested count of distinct
+        targets - never more, possibly fewer if the category's evidence
+        does not support that many genuinely distinct targets. Any
+        planned position beyond the number of targets actually planned
+        becomes a question-local ``FailedPlannedQuestion``
+        (``failure_type="InsufficientDistinctTargetsError"``) without
+        ever calling the producer for it - this is not a candidate-
+        production problem, so it never consumes WP-013's attempt budget.
+        A genuine system-level failure while planning (provider/auth/
+        rate-limit/retrieval/prompt/config error, or no evidence
+        retrievable for the category at all) still aborts the whole run
+        immediately via ``QuestionProductionFailedError``, contextualized
+        against that category's first planned position - exactly as a
+        system-level candidate-production failure already does.
 
         Since WP-023, a question-local failure (see
         ``_QUESTION_LOCAL_ERROR_TYPES`` and ``_produce_unique_question``)
@@ -279,22 +308,55 @@ class ExamOrchestrator:
         resolved_request = resolve_exam_request_categories(request, self._category_resolver)
         plan = build_exam_plan(resolved_request)
 
+        positions_by_category: dict[str, list[PlannedQuestion]] = {}
+        for planned in plan:
+            positions_by_category.setdefault(planned.category, []).append(planned)
+
         productions: list[QuestionProductionRecord] = []
         failed_questions: list[FailedPlannedQuestion] = []
         seen_normalized_questions: set[str] = set()
 
-        for planned in plan:
-            result = self._produce_unique_question(
-                planned,
-                total_planned=len(plan),
-                completed_productions=tuple(productions),
-                seen_normalized_questions=seen_normalized_questions,
-            )
-            if isinstance(result, FailedPlannedQuestion):
-                failed_questions.append(result)
-                continue
-            productions.append(result)
-            seen_normalized_questions.add(_normalize_question_text(result.production.candidate.question))
+        for category, planned_positions in positions_by_category.items():
+            count = len(planned_positions)
+            try:
+                targets = self._target_planner.plan_targets(category=category, count=count)
+            except _SYSTEM_LEVEL_ERROR_TYPES as exc:
+                raise QuestionProductionFailedError(
+                    f"Exam generation failed planning targets for category {category!r} "
+                    f"(first planned question {planned_positions[0].position}/{len(plan)}). "
+                    f"Completed questions: {len(productions)}. "
+                    f"Cause: {type(exc).__name__}: {exc}",
+                    planned_question=planned_positions[0],
+                    completed_productions=tuple(productions),
+                    operational_cause=exc,
+                ) from exc
+
+            for index, planned in enumerate(planned_positions):
+                if index >= len(targets):
+                    failed_questions.append(
+                        FailedPlannedQuestion(
+                            planned=planned,
+                            failure_type="InsufficientDistinctTargetsError",
+                            failure_message=(
+                                f"category {category!r} evidence supports only {len(targets)} "
+                                f"distinct question target(s), but {count} were requested"
+                            ),
+                        )
+                    )
+                    continue
+
+                result = self._produce_unique_question(
+                    planned,
+                    target=targets[index],
+                    total_planned=len(plan),
+                    completed_productions=tuple(productions),
+                    seen_normalized_questions=seen_normalized_questions,
+                )
+                if isinstance(result, FailedPlannedQuestion):
+                    failed_questions.append(result)
+                    continue
+                productions.append(result)
+                seen_normalized_questions.add(_normalize_question_text(result.production.candidate.question))
 
         exam_questions = [
             candidate_to_exam_question(record.production.candidate, number)

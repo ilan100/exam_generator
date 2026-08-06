@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from exam_generator.config import load_app_config
 from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
-from exam_generator.models import CandidateQuestion, GenerationMode
+from exam_generator.models import CandidateQuestion, GenerationMode, QuestionTarget
 from exam_generator.production.errors import InvalidProductionConfigurationError, QuestionAttemptsExhaustedError
 from exam_generator.production.models import CandidateValidationResults, QuestionAttempt, QuestionProductionResult
 from exam_generator.validation import (
@@ -105,15 +105,22 @@ class QuestionProducer:
             textbook=self._textbook_validator.validate(candidate),
         )
 
-    def produce_question(self, *, category: str, generation_mode: GenerationMode) -> QuestionProductionResult:
+    def produce_question(
+        self, *, category: str, generation_mode: GenerationMode, target: QuestionTarget
+    ) -> QuestionProductionResult:
         """Produce exactly one accepted candidate for ``category``/
-        ``generation_mode``, generating and validating up to
+        ``generation_mode``, testing ``target`` (WP-025 - planned before
+        generation begins), generating and validating up to
         ``max_attempts`` candidates.
 
-        ``category``/``generation_mode`` are held fixed across every
-        attempt - never silently altered. Stops at the first accepted
-        candidate. Raises ``QuestionAttemptsExhaustedError`` (carrying
-        every completed attempt) if all attempts are rejected.
+        ``category``/``generation_mode``/``target`` are held fixed across
+        every attempt - never silently altered, and never replaced with a
+        newly-planned target merely because an earlier attempt was
+        rejected (target planning owns diversity; this bounded budget
+        owns candidate-production reliability - the two remain separate
+        concerns). Stops at the first accepted candidate. Raises
+        ``QuestionAttemptsExhaustedError`` (carrying every completed
+        attempt) if all attempts are rejected.
 
         WP-019: a recoverable generation-contract failure
         (``InvalidGeneratedOutputError`` - the model's structured response
@@ -133,7 +140,7 @@ class QuestionProducer:
         for attempt_number in range(1, self._max_attempts + 1):
             try:
                 candidate = self._generator.generate_candidate_question(
-                    category=category, generation_mode=generation_mode
+                    category=category, generation_mode=generation_mode, target=target
                 )
             except InvalidGeneratedOutputError as exc:
                 attempts.append(

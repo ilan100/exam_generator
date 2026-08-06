@@ -14,6 +14,11 @@ from exam_generator.models.question import (
     candidate_to_exam_question,
 )
 from exam_generator.models.source import HistoricalStyleReference, SourceEvidenceChunk, SourceType
+from exam_generator.models.target import (
+    PlannedQuestionTargetResponse,
+    QuestionTarget,
+    QuestionTargetPlanningResponse,
+)
 from exam_generator.models.validation import (
     CategoryValidationResult,
     GroundingValidationResponse,
@@ -40,9 +45,12 @@ __all__ = [
     "GroundingValidationResult",
     "HistoricalStyleReference",
     "MCQValidationResult",
+    "PlannedQuestionTargetResponse",
     "QualityValidationResult",
     "QuestionAttemptAudit",
     "QuestionAudit",
+    "QuestionTarget",
+    "QuestionTargetPlanningResponse",
     "SourceEvidenceChunk",
     "SourceType",
     "TextbookCheckResult",

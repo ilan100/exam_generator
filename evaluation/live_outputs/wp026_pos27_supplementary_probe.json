@@ -1,0 +1,49 @@
+[
+  {
+    "attempt": 1,
+    "question": "מהי החלוקה הבסיסית של מערכת העצבים ההיקפית?",
+    "answers": [
+      "מערכת העצבים האוטונומית ומערכת העצבים הסומטית",
+      "מערכת העצבים המרכזית ומערכת העצבים ההיקפית",
+      "מערכת העצבים הסימפתטית ומערכת העצבים הפאראסימפתטית",
+      "מערכת העצבים הסומטית והפראסימפתטית"
+    ],
+    "correct_answer": 1,
+    "accepted": false,
+    "reasons": [
+      "mcq:While the candidate has exactly four answer choices, there is not a single best answer. The intended correct answer (Answer 1) is a valid division of the peripheral nervous system, but Answers 3 and 4 also represent divisions within the nervous system, making it unclear which is the best answer. Additionally, Answer 2 incorrectly includes the central nervous system, which does not fit the question about the peripheral nervous system.",
+      "quality:The question is clear and unambiguous, but the answer choices contain inaccuracies regarding the basic division of the peripheral nervous system. The correct division should be between the מערכת העצבים האוטונומית and מערכת העצבים הסומטית, which is correctly stated in Answer 1. However, the presence of other answers that mix central and peripheral systems introduces confusion. Additionally, the question does not specify that it is asking about the peripheral nervous system, which could lead to misinterpretation. Overall, while the language is natural and the terminology is used correctly, the ambiguity in the answer choices and the lack of specificity in the question detract from its quality."
+    ]
+  },
+  {
+    "attempt": 2,
+    "question": "מהן שתי המערכות העיקריות שמחלקות את מערכת העצבים ההיקפית?",
+    "answers": [
+      "מערכת העצבים המרכזית ומערכת העצבים הסומטית",
+      "מערכת העצבים הסומטית ומערכת העצבים האוטונומית",
+      "מערכת העצבים האוטונומית ומערכת העצבים המרכזית",
+      "מערכת העצבים הסימפתטית ומערכת העצבים הפרא-סימפתטית"
+    ],
+    "correct_answer": 2,
+    "accepted": false,
+    "reasons": [
+      "category:The question asks about the main systems that divide the peripheral nervous system, but the provided answers include references to the central nervous system, which does not fit the requested category of מערכת העצבים ההיקפית."
+    ]
+  },
+  {
+    "attempt": 3,
+    "question": "מהן שתי המערכות העיקריות שמחלקות את מערכת העצבים ההיקפית?",
+    "answers": [
+      "מערכת העצבים הסומטית ומערכת העצבים האוטונומית",
+      "מערכת העצבים המרכזית ומערכת העצבים ההיקפית",
+      "מערכת העצבים הסימפתטית ומערכת העצבים הפאראסימפתטית",
+      "מערכת העצבים הפאראסימפתטית ומערכת העצבים המודעת"
+    ],
+    "correct_answer": 1,
+    "accepted": false,
+    "reasons": [
+      "mcq:While the candidate has exactly four answer choices, there are multiple answers that could be defended as correct. Specifically, Answer 1 is intended as the correct answer, but Answer 3 also includes components of the peripheral nervous system, making it plausible. This ambiguity means that there is not a single best answer, which invalidates the structure.",
+      "quality:The question is clear and unambiguous, but the answer choices include incorrect options that do not align with the question's focus on the peripheral nervous system. Specifically, Answer 2 incorrectly includes the central nervous system, and Answer 4 introduces terms that are not standard anatomical terminology. This undermines the clarity and appropriateness of the question as a multiple-choice exam item."
+    ]
+  }
+]

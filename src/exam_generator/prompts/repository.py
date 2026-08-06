@@ -26,6 +26,7 @@ from exam_generator.prompts.models import PromptId, PromptTemplate
 _PROMPT_FILES: Mapping[PromptId, tuple[str, str]] = MappingProxyType(
     {
         PromptId.SYSTEM: ("system", "exam_generator.txt"),
+        PromptId.QUESTION_TARGET_PLANNING: ("generation", "question_target_planning.txt"),
         PromptId.QUESTION_GENERATION: ("generation", "question.txt"),
         PromptId.GROUNDING_VALIDATION: ("validation", "grounding.txt"),
         PromptId.MCQ_VALIDATION: ("validation", "mcq.txt"),

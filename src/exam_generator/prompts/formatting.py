@@ -14,6 +14,7 @@ from exam_generator.models import (
     CandidateQuestion,
     ExamQuestion,
     HistoricalStyleReference,
+    QuestionTarget,
     SourceEvidenceChunk,
     SourceType,
 )
@@ -29,6 +30,9 @@ NO_COURSE_BOOK_EVIDENCE_TEXT = "No course-book evidence was supplied for this ch
 HISTORICAL_REFERENCE_BEGIN = "--- BEGIN HISTORICAL STYLE REFERENCE (NOT FACTUAL EVIDENCE) ---"
 HISTORICAL_REFERENCE_END = "--- END HISTORICAL STYLE REFERENCE (NOT FACTUAL EVIDENCE) ---"
 NO_HISTORICAL_REFERENCE_TEXT = "No historical style reference is supplied for this generation mode."
+
+QUESTION_TARGET_BEGIN = "--- BEGIN ASSIGNED QUESTION TARGET (REQUIRED FOCUS) ---"
+QUESTION_TARGET_END = "--- END ASSIGNED QUESTION TARGET (REQUIRED FOCUS) ---"
 
 
 def _format_answers(answers: Sequence[str]) -> str:
@@ -135,6 +139,20 @@ def format_historical_reference(reference: HistoricalStyleReference | None) -> s
         f"Correct Answer Position: {reference.correct_answer}"
     )
     return f"{HISTORICAL_REFERENCE_BEGIN}\n{body}\n{HISTORICAL_REFERENCE_END}"
+
+
+def format_question_target(target: QuestionTarget) -> str:
+    """Deterministically format an assigned WP-025 ``QuestionTarget`` for
+    the generation prompt.
+
+    Contains only the topic/factual-focus information already present on
+    the target - never the target's ``supporting_evidence_chunk_ids``
+    (those are canonical provenance already established during planning,
+    not something the generation prompt needs restated), and the target
+    itself is never modified.
+    """
+    body = f"Topic: {target.topic}\nFactual Focus: {target.factual_focus}"
+    return f"{QUESTION_TARGET_BEGIN}\n{body}\n{QUESTION_TARGET_END}"
 
 
 def format_candidate_question(candidate: CandidateQuestion) -> str:

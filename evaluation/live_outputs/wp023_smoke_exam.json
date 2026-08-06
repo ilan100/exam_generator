@@ -1,0 +1,24 @@
+{
+  "questions": [
+    {
+      "number": 1,
+      "question": "איזה מהמבנים הבאים נמצא בתוך התעלה השדרתית?",
+      "answer1": "עצב השדרה",
+      "answer2": "Filum Terminale",
+      "answer3": "Conus Medullaris",
+      "answer4": "Dorsal Root Ganglion",
+      "correct_answer": 3,
+      "category": "התעלה השדרתית ותכולתה"
+    },
+    {
+      "number": 2,
+      "question": "מהו המבנה העיקרי הממוקם בתוך התעלה השדרתית?",
+      "answer1": "מוח השדרה",
+      "answer2": "חוליות",
+      "answer3": "עצב השדרה",
+      "answer4": "קונוס מדולאריס",
+      "correct_answer": 1,
+      "category": "התעלה השדרתית ותכולתה"
+    }
+  ]
+}
