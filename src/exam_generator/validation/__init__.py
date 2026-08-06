@@ -8,6 +8,7 @@ from exam_generator.validation.errors import (
 )
 from exam_generator.validation.grounding import GroundingValidator
 from exam_generator.validation.mcq import MCQValidator
+from exam_generator.validation.models import ProvenanceRetryEvent
 from exam_generator.validation.quality import QualityValidator
 from exam_generator.validation.textbook import TextbookValidator
 
@@ -19,6 +20,7 @@ __all__ = [
     "InvalidTextbookOutputError",
     "MCQValidator",
     "NoValidationEvidenceError",
+    "ProvenanceRetryEvent",
     "QualityValidator",
     "TextbookValidationError",
     "TextbookValidator",

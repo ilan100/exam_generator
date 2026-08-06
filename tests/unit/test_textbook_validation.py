@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from exam_generator.llm import LLMProfile, LLMProvider, LLMProviderError, MessageRole
+from exam_generator.llm import LLMAuthenticationError, LLMProfile, LLMProvider, LLMProviderError, LLMRateLimitError, MessageRole
 from exam_generator.models import (
     CandidateQuestion,
     GenerationMode,
@@ -11,6 +11,7 @@ from exam_generator.models import (
     SourceType,
     TextbookCheckResult,
     TextbookCheckStatus,
+    TextbookValidationResponse,
 )
 from exam_generator.prompts import PromptId, PromptRepository
 from exam_generator.retrieval.models import RetrievalResult
@@ -51,15 +52,17 @@ def _chunk(
     )
 
 
-def _textbook_result(**kwargs) -> TextbookCheckResult:
+def _textbook_response(**kwargs) -> TextbookValidationResponse:
+    """Builds the LLM-facing response (WP-022): provenance via call-local
+    ``evidence_refs`` only - no source_page/reference_text, both now
+    deterministically derived by the validator instead."""
     defaults = dict(
         status=TextbookCheckStatus.CONSISTENT,
-        source_page=None,
-        reference_text=None,
+        evidence_refs=[],
         reason="supported by course-book material",
     )
     defaults.update(kwargs)
-    return TextbookCheckResult(**defaults)
+    return TextbookValidationResponse(**defaults)
 
 
 class _StubIndex:
@@ -90,12 +93,12 @@ class _RecordingPromptRepository:
         return self._real.get(prompt_id)
 
 
-def _provider(result: TextbookCheckResult | None = None, *, side_effect=None) -> MagicMock:
+def _provider(response: TextbookValidationResponse | None = None, *, side_effect=None) -> MagicMock:
     provider = MagicMock(spec=LLMProvider)
     if side_effect is not None:
         provider.generate_structured.side_effect = side_effect
     else:
-        provider.generate_structured.return_value = result if result is not None else _textbook_result()
+        provider.generate_structured.return_value = response if response is not None else _textbook_response()
     return provider
 
 
@@ -181,11 +184,11 @@ def test_llm_called_through_validation_profile():
     assert provider.generate_structured.call_args.kwargs["profile"] == LLMProfile.VALIDATION
 
 
-def test_llm_called_with_textbook_check_result_model():
+def test_llm_called_with_textbook_validation_response_model():
     provider = _provider()
     validator = _make_validator(provider=provider)
     validator.validate(_candidate())
-    assert provider.generate_structured.call_args.kwargs["response_model"] is TextbookCheckResult
+    assert provider.generate_structured.call_args.kwargs["response_model"] is TextbookValidationResponse
 
 
 def test_messages_are_system_then_user():
@@ -231,7 +234,7 @@ def test_no_grounding_mcq_category_quality_validation_triggered():
 
 
 def test_support_verdict_returned_normally():
-    supporting = _textbook_result(status=TextbookCheckStatus.CONSISTENT)
+    supporting = _textbook_response(status=TextbookCheckStatus.CONSISTENT)
     validator = _make_validator(provider=_provider(supporting))
     result = validator.validate(_candidate())
     assert result.status == TextbookCheckStatus.CONSISTENT
@@ -239,14 +242,14 @@ def test_support_verdict_returned_normally():
 
 
 def test_contradiction_verdict_returned_normally():
-    contradicting = _textbook_result(status=TextbookCheckStatus.POTENTIAL_CONFLICT, reason="conflicts with evidence")
+    contradicting = _textbook_response(status=TextbookCheckStatus.POTENTIAL_CONFLICT, reason="conflicts with evidence")
     validator = _make_validator(provider=_provider(contradicting))
     result = validator.validate(_candidate())
     assert result.status == TextbookCheckStatus.POTENTIAL_CONFLICT
 
 
 def test_insufficient_evidence_represented_as_not_found_status_from_llm():
-    unclear = _textbook_result(status=TextbookCheckStatus.NOT_FOUND, reason="evidence is unclear")
+    unclear = _textbook_response(status=TextbookCheckStatus.NOT_FOUND, reason="evidence is unclear")
     validator = _make_validator(provider=_provider(unclear))
     result = validator.validate(_candidate())
     assert result.status == TextbookCheckStatus.NOT_FOUND
@@ -270,44 +273,160 @@ def test_absence_of_retrieved_evidence_skips_llm_call_entirely():
 
 
 # ---------------------------------------------------------------------------
-# Provenance verification
+# WP-022: evidence-reference provenance (call-local -> canonical mapping)
 # ---------------------------------------------------------------------------
 
 
-def test_returned_source_page_must_belong_to_supplied_evidence():
-    chunk = _chunk(page=42)
+def test_valid_evidence_ref_resolves_to_canonical_chunk_id_and_page():
+    chunk = _chunk(chunk_id="COURSE_BOOK:course_book.pdf:0010:0001", page=10)
     index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
-    result = _textbook_result(source_page=42, reference_text=None)
-    validator = _make_validator(index=index, provider=_provider(result))
+    response = _textbook_response(evidence_refs=[1])
+    validator = _make_validator(index=index, provider=_provider(response))
     returned = validator.validate(_candidate())
-    assert returned.source_page == 42
+    assert returned.evidence_chunk_ids == ["COURSE_BOOK:course_book.pdf:0010:0001"]
+    # source_page is deterministically derived from the resolved chunk -
+    # never claimed directly by the LLM (WP-022).
+    assert returned.source_page == 10
 
 
-def test_invented_source_page_is_rejected():
-    chunk = _chunk(page=42)
+def test_reference_text_is_always_none_now():
+    # WP-022: reference_text is no longer LLM-facing at all; the field
+    # remains on the contract for downstream stability, always None.
+    chunk = _chunk(text=EVIDENCE_TEXT)
     index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
-    result = _textbook_result(source_page=999, reference_text=None)
-    validator = _make_validator(index=index, provider=_provider(result))
+    response = _textbook_response(evidence_refs=[1])
+    validator = _make_validator(index=index, provider=_provider(response))
+    returned = validator.validate(_candidate())
+    assert returned.reference_text is None
+
+
+def test_no_evidence_refs_means_no_source_page():
+    response = _textbook_response(evidence_refs=[])
+    validator = _make_validator(provider=_provider(response))
+    returned = validator.validate(_candidate())
+    assert returned.source_page is None
+    assert returned.evidence_chunk_ids == []
+
+
+def test_evidence_ref_beyond_supplied_range_is_rejected():
+    response = _textbook_response(evidence_refs=[4])
+    provider = _provider(response)
+    validator = _make_validator(provider=provider)
+    with pytest.raises(InvalidTextbookOutputError):
+        validator.validate(_candidate())
+    assert provider.generate_structured.call_count == 2  # WP-021 retries once
+
+
+def test_evidence_ref_zero_is_rejected():
+    response = _textbook_response(evidence_refs=[0])
+    validator = _make_validator(provider=_provider(response))
     with pytest.raises(InvalidTextbookOutputError):
         validator.validate(_candidate())
 
 
-def test_returned_reference_text_must_appear_in_supplied_evidence():
-    chunk = _chunk(text=EVIDENCE_TEXT)
-    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
-    result = _textbook_result(source_page=None, reference_text=EVIDENCE_TEXT)
-    validator = _make_validator(index=index, provider=_provider(result))
-    returned = validator.validate(_candidate())
-    assert returned.reference_text == EVIDENCE_TEXT
-
-
-def test_invented_reference_text_is_rejected():
-    chunk = _chunk(text=EVIDENCE_TEXT)
-    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
-    result = _textbook_result(source_page=None, reference_text="טקסט שלא סופק כלל")
-    validator = _make_validator(index=index, provider=_provider(result))
+def test_evidence_ref_negative_is_rejected():
+    response = _textbook_response(evidence_refs=[-1])
+    validator = _make_validator(provider=_provider(response))
     with pytest.raises(InvalidTextbookOutputError):
         validator.validate(_candidate())
+
+
+def test_no_local_reference_leaks_into_final_result():
+    chunk = _chunk(chunk_id="COURSE_BOOK:course_book.pdf:0010:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    response = _textbook_response(evidence_refs=[1])
+    validator = _make_validator(index=index, provider=_provider(response))
+    returned = validator.validate(_candidate())
+    assert "evidence_refs" not in type(returned).model_fields
+    assert all(cid.startswith("COURSE_BOOK:") for cid in returned.evidence_chunk_ids)
+
+
+# ---------------------------------------------------------------------------
+# WP-021: bounded provenance retry
+# ---------------------------------------------------------------------------
+
+
+def test_normal_success_makes_exactly_one_logical_call():
+    chunk = _chunk(chunk_id="COURSE_BOOK:course_book.pdf:0010:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    passing = _textbook_response(evidence_refs=[])
+    provider = _provider(passing)
+    validator = _make_validator(index=index, provider=provider)
+    validator.validate(_candidate())
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
+
+
+def test_invented_evidence_ref_then_valid_recovers():
+    chunk = _chunk(chunk_id="COURSE_BOOK:course_book.pdf:0010:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    invalid = _textbook_response(evidence_refs=[9])
+    valid = _textbook_response(evidence_refs=[1])
+    provider = _provider(side_effect=[invalid, valid])
+    validator = _make_validator(index=index, provider=provider)
+
+    result = validator.validate(_candidate())
+
+    assert result.evidence_chunk_ids == ["COURSE_BOOK:course_book.pdf:0010:0001"]
+    assert provider.generate_structured.call_count == 2
+    assert len(index.calls) == 1
+    first_call, second_call = provider.generate_structured.call_args_list
+    assert first_call.kwargs["messages"] == second_call.kwargs["messages"]
+    assert len(validator.provenance_retry_events) == 1
+    event = validator.provenance_retry_events[0]
+    assert event.validator == "textbook"
+    assert event.attempts_made == 2
+    assert event.recovered is True
+
+
+def test_invented_evidence_ref_twice_exhausts():
+    invalid = _textbook_response(evidence_refs=[9])
+    provider = _provider(side_effect=[invalid, invalid])
+    validator = _make_validator(provider=provider)
+    with pytest.raises(InvalidTextbookOutputError):
+        validator.validate(_candidate())
+    assert provider.generate_structured.call_count == 2
+    assert len(validator.provenance_retry_events) == 1
+    assert validator.provenance_retry_events[0].recovered is False
+
+
+def test_not_found_verdict_is_not_retried():
+    response = _textbook_response(status=TextbookCheckStatus.NOT_FOUND, evidence_refs=[])
+    provider = _provider(response)
+    validator = _make_validator(provider=provider)
+    returned = validator.validate(_candidate())
+    assert returned.status == TextbookCheckStatus.NOT_FOUND
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
+
+
+def test_potential_conflict_verdict_is_not_retried():
+    response = _textbook_response(status=TextbookCheckStatus.POTENTIAL_CONFLICT, evidence_refs=[])
+    provider = _provider(response)
+    validator = _make_validator(provider=provider)
+    returned = validator.validate(_candidate())
+    assert returned.status == TextbookCheckStatus.POTENTIAL_CONFLICT
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        LLMAuthenticationError("bad key"),
+        LLMRateLimitError("rate limited"),
+        LLMProviderError("connection failed"),
+    ],
+)
+def test_operational_errors_are_never_provenance_retried(exc):
+    chunk = _chunk()
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    provider = _provider(side_effect=exc)
+    validator = _make_validator(index=index, provider=provider)
+    with pytest.raises(type(exc)):
+        validator.validate(_candidate())
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
 
 
 # ---------------------------------------------------------------------------

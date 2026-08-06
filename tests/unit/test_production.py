@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from exam_generator.generation import QuestionGenerator
-from exam_generator.llm import LLMProviderError
+from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
+from exam_generator.llm import LLMAuthenticationError, LLMProviderError, LLMRateLimitError
 from exam_generator.models import (
     CandidateQuestion,
     CategoryValidationResult,
@@ -176,6 +176,54 @@ def test_question_attempt_accepted_delegates_to_validations():
 
 
 # ---------------------------------------------------------------------------
+# QuestionAttempt: WP-019 generation-contract-failure representation
+# ---------------------------------------------------------------------------
+
+
+def test_question_attempt_generation_failure_is_not_accepted():
+    attempt = QuestionAttempt(
+        attempt_number=1,
+        generation_failure_type="InvalidGeneratedOutputError",
+        generation_failure_message="invented evidence id",
+    )
+    assert attempt.accepted is False
+    assert attempt.is_generation_contract_failure is True
+    assert attempt.candidate is None
+    assert attempt.validations is None
+
+
+def test_question_attempt_normal_outcome_is_not_a_contract_failure():
+    attempt = QuestionAttempt(attempt_number=1, candidate=_candidate(), validations=_validations())
+    assert attempt.is_generation_contract_failure is False
+
+
+def test_question_attempt_cannot_carry_both_candidate_and_failure():
+    with pytest.raises(ValueError):
+        QuestionAttempt(
+            attempt_number=1,
+            candidate=_candidate(),
+            validations=_validations(),
+            generation_failure_type="InvalidGeneratedOutputError",
+            generation_failure_message="invented evidence id",
+        )
+
+
+def test_question_attempt_cannot_carry_neither_candidate_nor_failure():
+    with pytest.raises(ValueError):
+        QuestionAttempt(attempt_number=1)
+
+
+def test_question_attempt_candidate_without_validations_rejected():
+    with pytest.raises(ValueError):
+        QuestionAttempt(attempt_number=1, candidate=_candidate())
+
+
+def test_question_attempt_failure_type_without_message_rejected():
+    with pytest.raises(ValueError):
+        QuestionAttempt(attempt_number=1, generation_failure_type="InvalidGeneratedOutputError")
+
+
+# ---------------------------------------------------------------------------
 # Attempts
 # ---------------------------------------------------------------------------
 
@@ -283,6 +331,134 @@ def test_exhaustion_never_returns_a_rejected_candidate_as_accepted():
     producer = _make_producer(generator=generator, grounding=grounding, max_attempts=1)
     with pytest.raises(QuestionAttemptsExhaustedError):
         producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+
+
+# ---------------------------------------------------------------------------
+# WP-019: bounded generation-contract recovery
+# ---------------------------------------------------------------------------
+
+
+def test_recoverable_generation_contract_failure_is_retried_and_succeeds():
+    good_candidate = _candidate(question="שאלה תקינה")
+    generator = _passing_generator(
+        side_effect=[InvalidGeneratedOutputError("invented evidence id"), good_candidate]
+    )
+    mcq = _passing_validator(MCQValidator, "validate", _mcq_result(True))
+    producer = _make_producer(generator=generator, mcq=mcq, max_attempts=3)
+
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+
+    assert generator.generate_candidate_question.call_count == 2
+    assert len(result.attempts) == 2
+    assert result.attempts[0].is_generation_contract_failure is True
+    assert result.attempts[0].candidate is None
+    assert result.attempts[0].validations is None
+    assert result.attempts[0].accepted is False
+    assert result.attempts[1].accepted is True
+    assert result.candidate == good_candidate
+    # The recovered attempt ran the normal validator flow.
+    assert mcq.validate.call_count == 1
+
+
+def test_generation_contract_failure_records_type_and_message():
+    generator = _passing_generator(
+        side_effect=[InvalidGeneratedOutputError("invented evidence id: foo"), _candidate()]
+    )
+    producer = _make_producer(generator=generator, max_attempts=3)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    failed_attempt = result.attempts[0]
+    assert failed_attempt.generation_failure_type == "InvalidGeneratedOutputError"
+    assert failed_attempt.generation_failure_message == "invented evidence id: foo"
+
+
+def test_multiple_generation_contract_failures_then_success():
+    generator = _passing_generator(
+        side_effect=[
+            InvalidGeneratedOutputError("invented id 1"),
+            InvalidGeneratedOutputError("invented id 2"),
+            _candidate(question="שאלה תקינה"),
+        ]
+    )
+    producer = _make_producer(generator=generator, max_attempts=3)
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    assert generator.generate_candidate_question.call_count == 3
+    assert len(result.attempts) == 3
+    assert result.attempts[0].is_generation_contract_failure is True
+    assert result.attempts[1].is_generation_contract_failure is True
+    assert result.attempts[2].accepted is True
+    assert [attempt.attempt_number for attempt in result.attempts] == [1, 2, 3]
+
+
+def test_mixed_contract_failure_and_quality_rejection_share_one_budget():
+    candidate2 = _candidate(question="שאלה שנייה")
+    candidate3 = _candidate(question="שאלה שלישית")
+    generator = _passing_generator(
+        side_effect=[InvalidGeneratedOutputError("invented id"), candidate2, candidate3]
+    )
+    mcq = _passing_validator(MCQValidator, "validate", None, side_effect=[_mcq_result(False), _mcq_result(True)])
+    producer = _make_producer(generator=generator, mcq=mcq, max_attempts=3)
+
+    result = producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+
+    assert generator.generate_candidate_question.call_count == 3
+    assert len(result.attempts) == 3
+    assert result.attempts[0].is_generation_contract_failure is True
+    assert result.attempts[1].is_generation_contract_failure is False
+    assert result.attempts[1].accepted is False
+    assert result.attempts[2].accepted is True
+    assert result.candidate == candidate3
+
+
+def test_generation_contract_failures_exhaust_the_shared_attempt_budget():
+    generator = _passing_generator(
+        side_effect=[InvalidGeneratedOutputError(f"invented id {i}") for i in range(3)]
+    )
+    producer = _make_producer(generator=generator, max_attempts=3)
+    with pytest.raises(QuestionAttemptsExhaustedError) as excinfo:
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    assert generator.generate_candidate_question.call_count == 3
+    assert len(excinfo.value.attempts) == 3
+    assert all(attempt.is_generation_contract_failure for attempt in excinfo.value.attempts)
+    assert all(attempt.accepted is False for attempt in excinfo.value.attempts)
+
+
+def test_no_validator_is_called_for_a_generation_contract_failure_attempt():
+    generator = _passing_generator(
+        side_effect=[InvalidGeneratedOutputError("invented id"), _candidate()]
+    )
+    grounding = _passing_validator(GroundingValidator, "validate_grounding", _grounding_result(True))
+    mcq = _passing_validator(MCQValidator, "validate", _mcq_result(True))
+    category = _passing_validator(CategoryValidator, "validate", _category_result(True))
+    quality = _passing_validator(QualityValidator, "validate", _quality_result(True))
+    textbook = _passing_validator(TextbookValidator, "validate", _textbook_result(TextbookCheckStatus.CONSISTENT))
+    producer = _make_producer(
+        generator=generator, grounding=grounding, mcq=mcq, category=category, quality=quality, textbook=textbook,
+        max_attempts=3,
+    )
+    producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    # Exactly one validation cycle occurred - the discarded attempt never
+    # reached any validator.
+    assert grounding.validate_grounding.call_count == 1
+    assert mcq.validate.call_count == 1
+    assert category.validate.call_count == 1
+    assert quality.validate.call_count == 1
+    assert textbook.validate.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        LLMAuthenticationError("bad key"),
+        LLMRateLimitError("rate limited"),
+        LLMProviderError("connection failed"),
+    ],
+)
+def test_non_recoverable_generator_errors_are_never_retried(exc):
+    generator = _passing_generator(side_effect=exc)
+    producer = _make_producer(generator=generator, max_attempts=3)
+    with pytest.raises(type(exc)):
+        producer.produce_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    assert generator.generate_candidate_question.call_count == 1
 
 
 # ---------------------------------------------------------------------------

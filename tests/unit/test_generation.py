@@ -343,6 +343,24 @@ def test_valid_evidence_chunk_id_accepted():
     assert isinstance(candidate, CandidateQuestion)
 
 
+def test_evidence_chunk_id_missing_prefix_rejected():
+    chunk = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    response = _generated_response(evidence_chunk_ids=["s1.pdf:0002:0001"])
+    generator = _make_generator(index=index, provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+
+
+def test_shortened_evidence_chunk_id_rejected():
+    chunk = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    response = _generated_response(evidence_chunk_ids=["STUDENT_SUMMARY:s1.pdf:0002"])
+    generator = _make_generator(index=index, provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+
+
 def test_wrong_historical_reference_id_rejected():
     reference = _historical_reference(historical_question_id=5)
     hist_repo = _historical_repository((reference,))

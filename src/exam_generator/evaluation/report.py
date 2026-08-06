@@ -11,6 +11,7 @@ from exam_generator.evaluation.models import EvaluationReport
 def render_markdown_report(
     report: EvaluationReport,
     *,
+    title: str = "WP-017 Evaluation Report",
     human_quality_notes: str = "",
     exam_level_observations: str = "",
     recommendations: str = "",
@@ -18,7 +19,7 @@ def render_markdown_report(
     attempts = report.candidate_attempts
     lines: list[str] = []
 
-    lines.append("# WP-017 Evaluation Report")
+    lines.append(f"# {title}")
     lines.append("")
     lines.append("## Run Summary")
     lines.append("")

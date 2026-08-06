@@ -13,7 +13,13 @@ from __future__ import annotations
 
 from exam_generator.config import load_llm_config
 from exam_generator.llm import LLMProfile, LLMProvider, build_llm_provider
-from exam_generator.models import CandidateQuestion, SourceEvidenceChunk, TextbookCheckResult, TextbookCheckStatus
+from exam_generator.models import (
+    CandidateQuestion,
+    SourceEvidenceChunk,
+    TextbookCheckResult,
+    TextbookCheckStatus,
+    TextbookValidationResponse,
+)
 from exam_generator.prompts import (
     PromptId,
     PromptRepository,
@@ -23,6 +29,7 @@ from exam_generator.prompts import (
 )
 from exam_generator.retrieval import FactualRetrievalIndex, build_course_book_retrieval_index
 from exam_generator.validation.errors import InvalidTextbookOutputError
+from exam_generator.validation.models import ProvenanceRetryEvent
 
 _NO_EVIDENCE_REASON = "No course-book evidence could be independently retrieved for this candidate."
 
@@ -36,26 +43,41 @@ def _build_textbook_query(candidate: CandidateQuestion) -> str:
     return f"{candidate.category} {candidate.question} {correct_answer_text}"
 
 
-def _validate_textbook_provenance(
-    result: TextbookCheckResult, course_book_evidence: tuple[SourceEvidenceChunk, ...]
-) -> None:
-    """Reject (rather than silently drop/repair) a cited source page or
-    reference text that does not correspond to any course-book chunk
-    actually supplied to the validator."""
-    if result.source_page is not None:
-        supplied_pages = {chunk.page for chunk in course_book_evidence}
-        if result.source_page not in supplied_pages:
-            raise InvalidTextbookOutputError(
-                f"Textbook check result cites source_page={result.source_page}, which does not "
-                f"match any course-book page actually supplied to the validator: {sorted(supplied_pages)}"
-            )
+def _resolve_textbook_response(
+    response: TextbookValidationResponse, course_book_evidence: tuple[SourceEvidenceChunk, ...]
+) -> TextbookCheckResult:
+    """Strictly validate the LLM's call-local ``evidence_refs`` (WP-022)
+    against the evidence actually supplied to this call, then
+    deterministically construct the existing, unchanged
+    ``TextbookCheckResult``.
 
-    if result.reference_text is not None:
-        if not any(result.reference_text in chunk.text for chunk in course_book_evidence):
-            raise InvalidTextbookOutputError(
-                "Textbook check result cites reference_text that does not appear in any "
-                "course-book chunk actually supplied to the validator"
-            )
+    ``evidence_chunk_ids`` and ``source_page`` are both derived entirely
+    from the resolved canonical chunk(s) - never claimed by the LLM.
+    ``reference_text`` is no longer populated at all (WP-022): there is no
+    deterministic equivalent of a short human excerpt once verbatim
+    reproduction is no longer required, so it is always ``None`` going
+    forward - an honest absence, not a fabricated value.
+
+    Fails closed on any reference outside ``1..len(course_book_evidence)``
+    - including zero, negative, and out-of-range values, all treated
+    identically so every case benefits equally from WP-021's retry.
+    """
+    invalid_refs = [
+        ref for ref in response.evidence_refs if not (1 <= ref <= len(course_book_evidence))
+    ]
+    if invalid_refs:
+        raise InvalidTextbookOutputError(
+            f"Textbook check result claims evidence reference(s) outside the supplied range "
+            f"1..{len(course_book_evidence)}: {invalid_refs}"
+        )
+    resolved_chunks = [course_book_evidence[ref - 1] for ref in response.evidence_refs]
+    return TextbookCheckResult(
+        status=response.status,
+        evidence_chunk_ids=[chunk.chunk_id for chunk in resolved_chunks],
+        source_page=resolved_chunks[0].page if resolved_chunks else None,
+        reference_text=None,
+        reason=response.reason,
+    )
 
 
 class TextbookValidator:
@@ -68,6 +90,16 @@ class TextbookValidator:
     application wiring against real project configuration/data.
     """
 
+    #: Same bounded-recovery policy as the grounding validator (WP-021):
+    #: retried failure class is any ``InvalidTextbookOutputError`` raised
+    #: by ``_resolve_textbook_response()`` - an evidence reference (WP-022)
+    #: outside the supplied range - since it represents the same
+    #: stochastic "the model claimed provenance it was never actually
+    #: supplied" mistake, not a systematic defect. Never retried: a normal
+    #: CONSISTENT/POTENTIAL_CONFLICT/NOT_FOUND verdict with valid
+    #: provenance, or any operational failure.
+    _MAX_PROVENANCE_RETRIES = 1
+
     def __init__(
         self,
         *,
@@ -78,6 +110,7 @@ class TextbookValidator:
         self._course_book_index = course_book_index
         self._prompt_repository = prompt_repository
         self._llm_provider = llm_provider
+        self._provenance_retry_events: list[ProvenanceRetryEvent] = []
 
     @classmethod
     def from_default_configuration(cls) -> "TextbookValidator":
@@ -94,6 +127,14 @@ class TextbookValidator:
             llm_provider=build_llm_provider(load_llm_config()),
         )
 
+    @property
+    def provenance_retry_events(self) -> tuple[ProvenanceRetryEvent, ...]:
+        """Observability only (WP-021): every completed logical
+        ``validate()`` operation that needed at least one provenance
+        retry, in call order. Never used to make any application
+        decision."""
+        return tuple(self._provenance_retry_events)
+
     def validate(self, candidate: CandidateQuestion) -> TextbookCheckResult:
         """Independently determine whether course-book evidence is
         consistent with, contradicts, or is insufficient/unclear regarding
@@ -103,9 +144,24 @@ class TextbookValidator:
         secondary material: when independent retrieval finds nothing at
         all, that is returned directly as ``TextbookCheckStatus.NOT_FOUND``
         without making an LLM call - there is nothing for a model to judge
-        against. Otherwise makes exactly one ``LLMProfile.VALIDATION``
-        call - so a single invocation makes *at most* one LLM call, never
-        more, and never a retry. Never mutates ``candidate``.
+        against. Retrieval happens exactly once per call. Otherwise the
+        LLM is asked for a ``TextbookValidationResponse`` (WP-022) -
+        provenance reported as small, call-local ``evidence_refs``
+        matching the "[Evidence N]" labels already shown in the prompt,
+        never canonical chunk identifiers, and never ``source_page``/
+        ``reference_text`` as claimed provenance proof. The logical
+        validation itself may involve up to ``1 + _MAX_PROVENANCE_RETRIES``
+        physical ``LLMProfile.VALIDATION`` calls (WP-021) - only when a
+        syntactically valid response claims an evidence reference never
+        actually supplied; that response is discarded completely and the
+        same candidate/evidence/prompt/response model are resubmitted
+        unchanged. A normal verdict with valid provenance is never
+        retried. Independent of, and composes with, WP-020's own
+        provider-level structured-output retry. Returns the existing,
+        unchanged ``TextbookCheckResult`` with genuine canonical
+        ``evidence_chunk_ids``/``source_page`` - local references never
+        leak beyond this method. Never mutates ``candidate``, and never
+        creates a new candidate-production attempt.
         """
         query = _build_textbook_query(candidate)
         retrieval_results = self._course_book_index.search(query)
@@ -123,12 +179,28 @@ class TextbookValidator:
             },
         )
 
-        result = self._llm_provider.generate_structured(
-            messages=messages,
-            response_model=TextbookCheckResult,
-            profile=LLMProfile.VALIDATION,
-        )
+        max_calls = 1 + self._MAX_PROVENANCE_RETRIES
+        for attempt in range(1, max_calls + 1):
+            response = self._llm_provider.generate_structured(
+                messages=messages,
+                response_model=TextbookValidationResponse,
+                profile=LLMProfile.VALIDATION,
+            )
+            try:
+                result = _resolve_textbook_response(response, course_book_evidence)
+            except InvalidTextbookOutputError:
+                if attempt < max_calls:
+                    continue
+                if attempt > 1:
+                    self._provenance_retry_events.append(
+                        ProvenanceRetryEvent(validator="textbook", attempts_made=attempt, recovered=False)
+                    )
+                raise
+            else:
+                if attempt > 1:
+                    self._provenance_retry_events.append(
+                        ProvenanceRetryEvent(validator="textbook", attempts_made=attempt, recovered=True)
+                    )
+                return result
 
-        _validate_textbook_provenance(result, course_book_evidence)
-
-        return result
+        raise AssertionError("unreachable: the attempt loop always returns or raises")

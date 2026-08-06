@@ -9,9 +9,12 @@ Determine exactly one of the following outcomes:
 - POTENTIAL_CONFLICT: the supplied course-book evidence appears to contradict the candidate question's content.
 - NOT_FOUND: the supplied course-book evidence is insufficient, absent, or unclear regarding the candidate question's content. This is the correct outcome whenever the evidence below does not let you make a confident CONSISTENT or POTENTIAL_CONFLICT determination.
 
-If you report source_page, it must exactly match the "Page:" value of one of the evidence items below - never invent or guess a page number.
+If you report evidence_refs, each evidence item below is labeled "[Evidence N]" (for example "[Evidence 1]", "[Evidence 2]") - report only the number N of an item actually shown to you, exactly as labeled. Do not report a chunk identifier, page number, source file name, or any quoted text - only the plain number. Never invent a number for an evidence item that was not shown to you. If you are not confident which evidence number supports your determination, leave this list empty rather than guessing.
 
-If you report reference_text, it must be copied exactly, character for character, as a contiguous excerpt from that same evidence item's "Text:" content - never paraphrase, summarize, translate, or reconstruct it from memory, and never combine wording from more than one evidence item. If you cannot find a contiguous exact quote that supports your determination, omit reference_text entirely (return null, not an empty string) rather than approximating one.
+Your structured response corresponds to the following fields - report only what is asked, and do not add fields beyond what is requested:
+- status: exactly one of CONSISTENT, POTENTIAL_CONFLICT, or NOT_FOUND.
+- evidence_refs: the evidence item number(s) that support your determination, per the instruction above. Leave empty if status is NOT_FOUND or no supplied evidence is a good match - an empty list is always acceptable and preferred over an invented or approximate number.
+- reason: a concise explanation of your determination. This field is required and must always contain a substantive, non-empty explanation of your determination - it must never be an empty string.
 
 Candidate question:
 {candidate_question}

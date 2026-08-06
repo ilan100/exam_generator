@@ -5,10 +5,12 @@
       "description": "Category-appropriateness validation result.",
       "properties": {
         "valid": {
+          "description": "Whether the candidate question genuinely belongs to the requested canonical category.",
           "title": "Valid",
           "type": "boolean"
         },
         "requested_category": {
+          "description": "The canonical category name that was requested.",
           "title": "Requested Category",
           "type": "string"
         },
@@ -22,9 +24,11 @@
             }
           ],
           "default": null,
+          "description": "The category the question's subject matter actually appears to fit, if different.",
           "title": "Assessed Category"
         },
         "reason": {
+          "description": "A concise explanation of this determination. Required. Must always contain a substantive, non-empty explanation, even when the determination is positive - never an empty string.",
           "title": "Reason",
           "type": "string"
         }
@@ -35,6 +39,57 @@
         "reason"
       ],
       "title": "CategoryValidationResult",
+      "type": "object"
+    },
+    "ExamGenerationStatus": {
+      "description": "WP-023: the outcome shape of one orchestration run that reached the\nend of its plan. ``COMPLETE`` means every planned question was\naccepted; ``PARTIAL`` means the plan was safely exhausted but one or\nmore planned questions failed for question-local reasons. A\nsystem-level failure aborts the run entirely and never produces either\nstatus - there is no result to represent in that case.",
+      "enum": [
+        "COMPLETE",
+        "PARTIAL"
+      ],
+      "title": "ExamGenerationStatus",
+      "type": "string"
+    },
+    "FailedQuestionAudit": {
+      "additionalProperties": false,
+      "description": "WP-023: traceability for one planned question that failed for a\nquestion-local reason - orchestration continued past it rather than\naborting the whole run. Preserves whatever attempt history actually\nexists (possibly none, if the failure happened before any attempt\nrecord could be built) - never fabricates a candidate or validation\nresult for a question that never produced one.",
+      "properties": {
+        "planned_position": {
+          "gt": 0,
+          "title": "Planned Position",
+          "type": "integer"
+        },
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "generation_mode": {
+          "$ref": "#/$defs/GenerationMode"
+        },
+        "failure_type": {
+          "title": "Failure Type",
+          "type": "string"
+        },
+        "failure_message": {
+          "title": "Failure Message",
+          "type": "string"
+        },
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/QuestionAttemptAudit"
+          },
+          "title": "Attempts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "planned_position",
+        "category",
+        "generation_mode",
+        "failure_type",
+        "failure_message"
+      ],
+      "title": "FailedQuestionAudit",
       "type": "object"
     },
     "GenerationMode": {
@@ -48,21 +103,25 @@
     },
     "GroundingValidationResult": {
       "additionalProperties": false,
-      "description": "Result of independently checking a candidate against source evidence.\n\nA generator's own claim that its question is grounded is never trusted;\nthis result is produced only by an independent validator.",
+      "description": "Result of independently checking a candidate against source evidence.\n\nA generator's own claim that its question is grounded is never trusted;\nthis result is produced only by an independent validator.\n\nSince WP-022, this model is no longer sent directly to the LLM - the\nLLM-facing contract is ``GroundingValidationResponse`` (below), which\nreports provenance via call-local evidence references rather than\ncanonical chunk identifiers. ``GroundingValidator`` deterministically\nresolves those references and constructs this result; ``evidence_chunk_ids``\nis always a genuine, verified canonical identifier from the evidence\nactually supplied, never invented or guessed - the invariant is\nunchanged, only how it is established.",
       "properties": {
         "grounded": {
+          "description": "Whether the question's factual premise is supported by the supplied evidence.",
           "title": "Grounded",
           "type": "boolean"
         },
         "correct_answer_supported": {
+          "description": "Whether the candidate's stated correct answer is supported by the supplied evidence.",
           "title": "Correct Answer Supported",
           "type": "boolean"
         },
         "other_answers_not_equally_correct": {
+          "description": "Whether no other answer choice is equally well supported by the supplied evidence.",
           "title": "Other Answers Not Equally Correct",
           "type": "boolean"
         },
         "evidence_chunk_ids": {
+          "description": "Identifiers of only the supplied evidence chunks that actually support this determination. Resolved (WP-022) from the validator's own call-local evidence references - always a genuine identifier from the evidence actually supplied, never invented or guessed.",
           "items": {
             "type": "string"
           },
@@ -79,13 +138,16 @@
             }
           ],
           "default": null,
+          "description": "The supporting evidence text, when evidence_chunk_ids is reported.",
           "title": "Evidence Text"
         },
         "reason": {
+          "description": "A concise explanation of this determination. Required. Must always contain a substantive, non-empty explanation, even when the determination is positive - never an empty string.",
           "title": "Reason",
           "type": "string"
         },
         "confidence": {
+          "description": "Confidence in this determination, from 0.0 to 1.0. Does not by itself determine pass/fail.",
           "maximum": 1.0,
           "minimum": 0.0,
           "title": "Confidence",
@@ -107,18 +169,22 @@
       "description": "Structural/semantic MCQ validation result.",
       "properties": {
         "valid": {
+          "description": "Whether the candidate's multiple-choice structure is valid.",
           "title": "Valid",
           "type": "boolean"
         },
         "exactly_four_answers": {
+          "description": "Whether the candidate has exactly four answer choices.",
           "title": "Exactly Four Answers",
           "type": "boolean"
         },
         "single_best_answer": {
+          "description": "Whether exactly one answer choice is unambiguously the single best answer.",
           "title": "Single Best Answer",
           "type": "boolean"
         },
         "reason": {
+          "description": "A concise explanation of this determination. Required. Must always contain a substantive, non-empty explanation, even when the determination is positive - never an empty string.",
           "title": "Reason",
           "type": "string"
         }
@@ -137,10 +203,12 @@
       "description": "Minimal stylistic/quality validation result.",
       "properties": {
         "valid": {
+          "description": "Whether the candidate question meets general exam-quality expectations.",
           "title": "Valid",
           "type": "boolean"
         },
         "reason": {
+          "description": "A concise explanation of this determination. Required. Must always contain a substantive, non-empty explanation, even when the determination is positive - never an empty string.",
           "title": "Reason",
           "type": "string"
         }
@@ -154,7 +222,7 @@
     },
     "QuestionAttemptAudit": {
       "additionalProperties": false,
-      "description": "Traceability for one complete generate-then-validate attempt\n(WP-013) toward a single exam question, whether or not it was\nultimately accepted.\n\nAdded in WP-015 to preserve full per-attempt history in the audit -\n``QuestionAudit``'s own ``grounding``/``mcq_validation``/etc. fields\n(unchanged since WP-002) continue to represent only the final,\naccepted attempt's results.",
+      "description": "Traceability for one complete candidate-production attempt (WP-013)\ntoward a single exam question, whether or not it was ultimately\naccepted.\n\nAdded in WP-015 to preserve full per-attempt history in the audit -\n``QuestionAudit``'s own ``grounding``/``mcq_validation``/etc. fields\n(unchanged since WP-002) continue to represent only the final,\naccepted attempt's results.\n\nSince WP-019, an attempt may instead represent a recoverable\ngeneration-contract failure (the model's structured response could not\nsafely become a candidate, e.g. it claimed unsupplied evidence\nprovenance) - honestly represented via ``generation_failure_type``/\n``generation_failure_message`` with no validation results, since none\nwere ever computed. Never fabricates a candidate or validator verdict\nfor a response that never became one.",
       "properties": {
         "attempt_number": {
           "gt": 0,
@@ -166,16 +234,48 @@
           "type": "boolean"
         },
         "grounding": {
-          "$ref": "#/$defs/GroundingValidationResult"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GroundingValidationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "mcq_validation": {
-          "$ref": "#/$defs/MCQValidationResult"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MCQValidationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "category_validation": {
-          "$ref": "#/$defs/CategoryValidationResult"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CategoryValidationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "quality_validation": {
-          "$ref": "#/$defs/QualityValidationResult"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QualityValidationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "textbook_check": {
           "anyOf": [
@@ -187,15 +287,35 @@
             }
           ],
           "default": null
+        },
+        "generation_failure_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Failure Type"
+        },
+        "generation_failure_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Failure Message"
         }
       },
       "required": [
         "attempt_number",
-        "accepted",
-        "grounding",
-        "mcq_validation",
-        "category_validation",
-        "quality_validation"
+        "accepted"
       ],
       "title": "QuestionAttemptAudit",
       "type": "object"
@@ -207,6 +327,11 @@
         "number": {
           "gt": 0,
           "title": "Number",
+          "type": "integer"
+        },
+        "planned_position": {
+          "gt": 0,
+          "title": "Planned Position",
           "type": "integer"
         },
         "category": {
@@ -281,6 +406,7 @@
       },
       "required": [
         "number",
+        "planned_position",
         "category",
         "generation_mode",
         "grounding",
@@ -340,10 +466,19 @@
     },
     "TextbookCheckResult": {
       "additionalProperties": false,
-      "description": "Secondary textbook validation result.\n\nA ``CONSISTENT`` result does not itself satisfy student-summary grounding,\nand a missing/absent textbook check does not invalidate an otherwise\nproperly grounded question.",
+      "description": "Secondary textbook validation result.\n\nA ``CONSISTENT`` result does not itself satisfy student-summary grounding,\nand a missing/absent textbook check does not invalidate an otherwise\nproperly grounded question.\n\n``evidence_chunk_ids`` (WP-018) is the primary, strictly-verified\nprovenance signal. Since WP-022, this model is no longer sent directly\nto the LLM - the LLM-facing contract is ``TextbookValidationResponse``\n(below), which reports provenance via call-local evidence references;\n``TextbookValidator`` deterministically resolves those into this\nresult's canonical ``evidence_chunk_ids`` and, where available,\n``source_page`` (derived from the first resolved chunk - never claimed\nby the LLM). ``reference_text`` (WP-022: no longer LLM-facing at all -\nthere is no deterministic equivalent of a short human excerpt once\nverbatim reproduction is no longer required) is always ``None`` going\nforward; the field remains on the contract only for downstream/schema\nstability.",
       "properties": {
         "status": {
-          "$ref": "#/$defs/TextbookCheckStatus"
+          "$ref": "#/$defs/TextbookCheckStatus",
+          "description": "Exactly one of CONSISTENT, POTENTIAL_CONFLICT, or NOT_FOUND, describing how the supplied course-book evidence relates to the candidate question."
+        },
+        "evidence_chunk_ids": {
+          "description": "Identifiers of only the supplied course-book evidence chunks that support this determination. Resolved (WP-022) from the validator's own call-local evidence references - always a genuine identifier from the evidence actually supplied, never invented or guessed. Empty if status is NOT_FOUND or if no supplied chunk is a good match.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Chunk Ids",
+          "type": "array"
         },
         "source_page": {
           "anyOf": [
@@ -356,6 +491,7 @@
             }
           ],
           "default": null,
+          "description": "The page number of the supplied course-book evidence that supports this determination, if any was resolved. Deterministically derived (WP-022) from the first resolved evidence chunk - never claimed directly by the LLM.",
           "title": "Source Page"
         },
         "reference_text": {
@@ -368,9 +504,11 @@
             }
           ],
           "default": null,
+          "description": "No longer populated (WP-022) - retained on the contract for downstream/schema stability only. Always None; see the class docstring.",
           "title": "Reference Text"
         },
         "reason": {
+          "description": "A concise explanation of this determination. Required. Must always contain a substantive, non-empty explanation - never an empty string.",
           "title": "Reason",
           "type": "string"
         }
@@ -394,7 +532,7 @@
     }
   },
   "additionalProperties": false,
-  "description": "Top-level audit contract for one exam-generation run.",
+  "description": "Top-level audit contract for one exam-generation run.\n\nSince WP-023, a run that safely reached the end of its plan is always\nrepresented here, whether every planned question was accepted\n(``status=COMPLETE``) or one or more failed for a question-local\nreason (``status=PARTIAL``, with each failure recorded in\n``failed_questions``). A system-level failure still aborts the run\nbefore any ``ExamAudit`` is built at all.",
   "properties": {
     "exam_id": {
       "title": "Exam Id",
@@ -413,12 +551,36 @@
       "title": "Model",
       "type": "string"
     },
+    "status": {
+      "$ref": "#/$defs/ExamGenerationStatus"
+    },
+    "planned_question_count": {
+      "gt": 0,
+      "title": "Planned Question Count",
+      "type": "integer"
+    },
+    "accepted_count": {
+      "ge": 0,
+      "title": "Accepted Count",
+      "type": "integer"
+    },
+    "failed_count": {
+      "ge": 0,
+      "title": "Failed Count",
+      "type": "integer"
+    },
     "questions": {
       "items": {
         "$ref": "#/$defs/QuestionAudit"
       },
-      "minItems": 1,
       "title": "Questions",
+      "type": "array"
+    },
+    "failed_questions": {
+      "items": {
+        "$ref": "#/$defs/FailedQuestionAudit"
+      },
+      "title": "Failed Questions",
       "type": "array"
     }
   },
@@ -427,7 +589,10 @@
     "generated_at",
     "provider",
     "model",
-    "questions"
+    "status",
+    "planned_question_count",
+    "accepted_count",
+    "failed_count"
   ],
   "title": "ExamAudit",
   "type": "object"

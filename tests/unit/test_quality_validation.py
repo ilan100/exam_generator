@@ -184,3 +184,31 @@ def test_candidate_not_mutated():
     validator = _make_validator()
     validator.validate(candidate)
     assert candidate.model_dump() == before
+
+
+# ---------------------------------------------------------------------------
+# Deterministic structural pre-check (WP-018)
+# ---------------------------------------------------------------------------
+
+
+def test_duplicated_answer_numbering_rejected_without_llm_call():
+    provider = _provider()
+    candidate = _candidate(
+        answers=[
+            "1. לטרלית ל-Olfactory Tract",
+            "2. מדיאלית ל-Olfactory Tract",
+            "תשובה ג",
+            "תשובה ד",
+        ]
+    )
+    validator = _make_validator(provider=provider)
+    result = validator.validate(candidate)
+    assert result.valid is False
+    provider.generate_structured.assert_not_called()
+
+
+def test_ordinary_answers_still_reach_the_llm_call():
+    provider = _provider()
+    validator = _make_validator(provider=provider)
+    validator.validate(_candidate())
+    provider.generate_structured.assert_called_once()

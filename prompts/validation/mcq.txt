@@ -8,5 +8,11 @@ This is not a factual grounding check - factual grounding is validated independe
 - Whether the question or its answer choices contain obvious structural clues (for example length, phrasing, or grammatical mismatch) that give away the correct answer without requiring actual knowledge.
 - Whether the question and its answer choices are coherent with one another.
 
+Your structured response corresponds to the following fields - report only what is asked, and do not add fields beyond what is requested:
+- valid: whether the candidate's multiple-choice structure is valid.
+- exactly_four_answers: whether the candidate has exactly four answer choices.
+- single_best_answer: whether exactly one answer choice is unambiguously the single best answer.
+- reason: a concise explanation of your determination. This field is required and must always contain a substantive, non-empty explanation of your determination, even when valid is true - it must never be an empty string.
+
 Candidate question:
 {candidate_question}

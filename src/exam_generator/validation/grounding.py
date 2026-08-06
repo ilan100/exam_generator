@@ -18,10 +18,16 @@ from __future__ import annotations
 
 from exam_generator.config import load_llm_config
 from exam_generator.llm import LLMProfile, LLMProvider, build_llm_provider
-from exam_generator.models import CandidateQuestion, GroundingValidationResult, SourceEvidenceChunk
+from exam_generator.models import (
+    CandidateQuestion,
+    GroundingValidationResponse,
+    GroundingValidationResult,
+    SourceEvidenceChunk,
+)
 from exam_generator.prompts import GroundingPromptContext, PromptId, PromptRepository, build_prompt_messages
 from exam_generator.retrieval import FactualRetrievalIndex, build_student_summary_retrieval_index
 from exam_generator.validation.errors import InvalidGroundingOutputError, NoValidationEvidenceError
+from exam_generator.validation.models import ProvenanceRetryEvent
 
 
 def _build_validation_query(candidate: CandidateQuestion) -> str:
@@ -37,18 +43,38 @@ def _build_validation_query(candidate: CandidateQuestion) -> str:
     return f"{candidate.category} {candidate.question} {correct_answer_text}"
 
 
-def _validate_supporting_evidence_ids(
-    result: GroundingValidationResult, validation_evidence: tuple[SourceEvidenceChunk, ...]
-) -> None:
-    """Reject (rather than silently drop/repair) any supporting evidence id
-    the LLM claims that was not actually supplied to the validator."""
-    supplied_ids = {chunk.chunk_id for chunk in validation_evidence}
-    invented_ids = [chunk_id for chunk_id in result.evidence_chunk_ids if chunk_id not in supplied_ids]
-    if invented_ids:
+def _resolve_grounding_response(
+    response: GroundingValidationResponse, validation_evidence: tuple[SourceEvidenceChunk, ...]
+) -> GroundingValidationResult:
+    """Strictly validate the LLM's call-local ``evidence_refs`` (WP-022)
+    against the evidence actually supplied to this call, then
+    deterministically construct the existing, unchanged
+    ``GroundingValidationResult`` with genuine canonical
+    ``evidence_chunk_ids``.
+
+    Fails closed (raises, rather than drops/repairs/clamps/fuzzy-matches)
+    on any reference outside ``1..len(validation_evidence)`` - including
+    zero, negative, and out-of-range values, all treated identically so
+    every case benefits equally from WP-021's retry.
+    """
+    invalid_refs = [
+        ref for ref in response.evidence_refs if not (1 <= ref <= len(validation_evidence))
+    ]
+    if invalid_refs:
         raise InvalidGroundingOutputError(
-            f"Grounding result claims supporting evidence chunk id(s) that were not "
-            f"supplied to the validator: {invented_ids}"
+            f"Grounding result claims evidence reference(s) outside the supplied range "
+            f"1..{len(validation_evidence)}: {invalid_refs}"
         )
+    resolved_chunk_ids = [validation_evidence[ref - 1].chunk_id for ref in response.evidence_refs]
+    return GroundingValidationResult(
+        grounded=response.grounded,
+        correct_answer_supported=response.correct_answer_supported,
+        other_answers_not_equally_correct=response.other_answers_not_equally_correct,
+        evidence_chunk_ids=resolved_chunk_ids,
+        evidence_text=response.evidence_text,
+        reason=response.reason,
+        confidence=response.confidence,
+    )
 
 
 class GroundingValidator:
@@ -61,6 +87,16 @@ class GroundingValidator:
     application wiring against real project configuration/data.
     """
 
+    #: Number of retries AFTER the initial logical validation call, for the
+    #: narrowly-scoped case where the LLM returns a syntactically valid
+    #: ``GroundingValidationResult`` that claims evidence provenance never
+    #: actually supplied (WP-021) - never for a normal ``passed=False``
+    #: verdict, and never for an operational failure. A documented
+    #: validator-level constant, not new configuration, per WP-021 section
+    #: 8's explicit allowance (this is internal recovery policy for one
+    #: validator, not an application-wide or LLM-transport-level setting).
+    _MAX_PROVENANCE_RETRIES = 1
+
     def __init__(
         self,
         *,
@@ -71,6 +107,7 @@ class GroundingValidator:
         self._student_summary_index = student_summary_index
         self._prompt_repository = prompt_repository
         self._llm_provider = llm_provider
+        self._provenance_retry_events: list[ProvenanceRetryEvent] = []
 
     @classmethod
     def from_default_configuration(cls) -> "GroundingValidator":
@@ -87,14 +124,41 @@ class GroundingValidator:
             llm_provider=build_llm_provider(load_llm_config()),
         )
 
+    @property
+    def provenance_retry_events(self) -> tuple[ProvenanceRetryEvent, ...]:
+        """Observability only (WP-021): every completed logical
+        ``validate_grounding()`` operation that needed at least one
+        provenance retry, in call order. Never used to make any
+        application decision."""
+        return tuple(self._provenance_retry_events)
+
     def validate_grounding(self, candidate: CandidateQuestion) -> GroundingValidationResult:
         """Independently determine whether ``candidate`` is factually
         grounded in student-summary evidence.
 
-        Makes exactly one ``LLMProfile.VALIDATION`` call - no retry. A
-        negative verdict (``passed=False``) is a normal, successful
-        result; a provider/LLM failure raises instead of ever silently
-        becoming a fabricated ``passed=False``. Never mutates ``candidate``.
+        Retrieval happens exactly once per call. The LLM is asked for a
+        ``GroundingValidationResponse`` (WP-022) - provenance reported as
+        small, call-local ``evidence_refs`` matching the "[Evidence N]"
+        labels already shown in the prompt, never canonical chunk
+        identifiers. The logical validation itself may involve up to
+        ``1 + _MAX_PROVENANCE_RETRIES`` physical ``LLMProfile.VALIDATION``
+        calls (WP-021) - but only when a syntactically valid response
+        claims an evidence reference never actually supplied; that
+        response is discarded completely (never repaired/normalized/
+        guessed at) and the *same* candidate, evidence, evidence
+        ordering, prompt, and response model are resubmitted unchanged.
+        A normal negative verdict (``passed=False``) is never retried -
+        it is a valid, successful result and is returned immediately. A
+        provider/LLM failure raises instead of ever silently becoming a
+        fabricated verdict. This retry is independent of, and composes
+        with, WP-020's own provider-level structured-output retry (each
+        physical call here may itself involve up to WP-020's own bounded
+        recovery). Returns the existing, unchanged
+        ``GroundingValidationResult`` with genuine canonical
+        ``evidence_chunk_ids`` - the local references never leak beyond
+        this method. Never mutates ``candidate``, and never creates a new
+        candidate-production attempt - that remains entirely
+        `QuestionProducer`'s concern.
         """
         query = _build_validation_query(candidate)
         retrieval_results = self._student_summary_index.search(query)
@@ -113,12 +177,28 @@ class GroundingValidator:
             variables=context.render_variables(),
         )
 
-        result = self._llm_provider.generate_structured(
-            messages=messages,
-            response_model=GroundingValidationResult,
-            profile=LLMProfile.VALIDATION,
-        )
+        max_calls = 1 + self._MAX_PROVENANCE_RETRIES
+        for attempt in range(1, max_calls + 1):
+            response = self._llm_provider.generate_structured(
+                messages=messages,
+                response_model=GroundingValidationResponse,
+                profile=LLMProfile.VALIDATION,
+            )
+            try:
+                result = _resolve_grounding_response(response, validation_evidence)
+            except InvalidGroundingOutputError:
+                if attempt < max_calls:
+                    continue
+                if attempt > 1:
+                    self._provenance_retry_events.append(
+                        ProvenanceRetryEvent(validator="grounding", attempts_made=attempt, recovered=False)
+                    )
+                raise
+            else:
+                if attempt > 1:
+                    self._provenance_retry_events.append(
+                        ProvenanceRetryEvent(validator="grounding", attempts_made=attempt, recovered=True)
+                    )
+                return result
 
-        _validate_supporting_evidence_ids(result, validation_evidence)
-
-        return result
+        raise AssertionError("unreachable: the attempt loop always returns or raises")

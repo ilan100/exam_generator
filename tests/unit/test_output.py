@@ -9,6 +9,7 @@ from exam_generator.config import LLMConfig, LLMGenerationParams, LLMValidationP
 from exam_generator.models import (
     CandidateQuestion,
     CategoryValidationResult,
+    ExamGenerationStatus,
     ExamOutput,
     ExamQuestion,
     GenerationMode,
@@ -19,7 +20,12 @@ from exam_generator.models import (
     TextbookCheckStatus,
     candidate_to_exam_question,
 )
-from exam_generator.orchestration import ExamGenerationResult, PlannedQuestion, QuestionProductionRecord
+from exam_generator.orchestration import (
+    ExamGenerationResult,
+    FailedPlannedQuestion,
+    PlannedQuestion,
+    QuestionProductionRecord,
+)
 import exam_generator.output.audit as audit_module
 import exam_generator.output.bundle as bundle_module
 import exam_generator.output.serialization as serialization_module
@@ -107,10 +113,42 @@ def _record(
 
 
 def _generation_result(records: list[QuestionProductionRecord]) -> ExamGenerationResult:
-    exam_questions = [candidate_to_exam_question(r.production.candidate, r.planned.position) for r in records]
+    exam_questions = [
+        candidate_to_exam_question(r.production.candidate, number) for number, r in enumerate(records, start=1)
+    ]
     exam = ExamOutput(questions=exam_questions)
     return ExamGenerationResult(
-        exam=exam, plan=tuple(r.planned for r in records), productions=tuple(records)
+        status=ExamGenerationStatus.COMPLETE,
+        exam=exam,
+        plan=tuple(r.planned for r in records),
+        productions=tuple(records),
+    )
+
+
+def _failed_question(position: int, category: str = CATEGORY, *, attempts: tuple = ()) -> FailedPlannedQuestion:
+    planned = PlannedQuestion(position=position, category=category, generation_mode=GenerationMode.INDEPENDENT)
+    return FailedPlannedQuestion(
+        planned=planned,
+        failure_type="QuestionAttemptsExhaustedError",
+        failure_message="generation attempts exhausted without an accepted candidate",
+        attempts=attempts,
+    )
+
+
+def _partial_generation_result(
+    records: list[QuestionProductionRecord], failed: list[FailedPlannedQuestion]
+) -> ExamGenerationResult:
+    exam_questions = [
+        candidate_to_exam_question(r.production.candidate, number) for number, r in enumerate(records, start=1)
+    ]
+    exam = ExamOutput(questions=exam_questions) if exam_questions else None
+    plan = tuple(r.planned for r in records) + tuple(f.planned for f in failed)
+    return ExamGenerationResult(
+        status=ExamGenerationStatus.PARTIAL,
+        exam=exam,
+        plan=plan,
+        productions=tuple(records),
+        failed_questions=tuple(failed),
     )
 
 
@@ -232,6 +270,90 @@ def test_final_accepted_attempt_is_identifiable():
     assert accepted[0].attempt_number == 2
 
 
+# ---------------------------------------------------------------------------
+# WP-019: generation-contract-failure attempts in the audit
+# ---------------------------------------------------------------------------
+
+
+def _production_result_with_contract_failure(candidate: CandidateQuestion) -> QuestionProductionResult:
+    failed = QuestionAttempt(
+        attempt_number=1,
+        generation_failure_type="InvalidGeneratedOutputError",
+        generation_failure_message="invented evidence id",
+    )
+    accepted = QuestionAttempt(attempt_number=2, candidate=candidate, validations=_validations())
+    return QuestionProductionResult(candidate=candidate, attempts=(failed, accepted))
+
+
+def test_generation_contract_failure_represented_honestly_in_audit():
+    candidate = _candidate()
+    planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=candidate.generation_mode)
+    record = QuestionProductionRecord(
+        planned=planned,
+        production=_production_result_with_contract_failure(candidate),
+        duplicate_replacement_attempts=0,
+    )
+    audit = _build_audit([record])
+    attempts = audit.questions[0].attempts
+    assert len(attempts) == 2
+    assert attempts[0].accepted is False
+    assert attempts[0].generation_failure_type == "InvalidGeneratedOutputError"
+    assert attempts[0].generation_failure_message == "invented evidence id"
+    assert attempts[0].grounding is None
+    assert attempts[0].mcq_validation is None
+    assert attempts[0].category_validation is None
+    assert attempts[0].quality_validation is None
+    assert attempts[0].textbook_check is None
+    # The subsequent valid candidate attempt is represented normally.
+    assert attempts[1].accepted is True
+    assert attempts[1].grounding is not None
+    assert attempts[1].generation_failure_type is None
+
+
+def test_generation_attempts_count_includes_contract_failures():
+    candidate = _candidate()
+    planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=candidate.generation_mode)
+    record = QuestionProductionRecord(
+        planned=planned,
+        production=_production_result_with_contract_failure(candidate),
+        duplicate_replacement_attempts=0,
+    )
+    audit = _build_audit([record])
+    assert audit.questions[0].generation_attempts == 2
+
+
+def test_final_accepted_attempt_identifiable_after_contract_failure():
+    candidate = _candidate()
+    planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=candidate.generation_mode)
+    record = QuestionProductionRecord(
+        planned=planned,
+        production=_production_result_with_contract_failure(candidate),
+        duplicate_replacement_attempts=0,
+    )
+    audit = _build_audit([record])
+    accepted = [a for a in audit.questions[0].attempts if a.accepted]
+    assert len(accepted) == 1
+    assert accepted[0].attempt_number == 2
+
+
+def test_audit_with_contract_failure_serializes_and_preserves_hebrew():
+    hebrew_message = "טענה לזיהוי ראיה שלא סופקה"
+    candidate = _candidate()
+    planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=candidate.generation_mode)
+    failed = QuestionAttempt(
+        attempt_number=1,
+        generation_failure_type="InvalidGeneratedOutputError",
+        generation_failure_message=hebrew_message,
+    )
+    accepted = QuestionAttempt(attempt_number=2, candidate=candidate, validations=_validations())
+    production = QuestionProductionResult(candidate=candidate, attempts=(failed, accepted))
+    record = QuestionProductionRecord(planned=planned, production=production, duplicate_replacement_attempts=0)
+    audit = _build_audit([record])
+    serialized = serialize_audit_json(audit)
+    assert hebrew_message in serialized
+    assert "\\u" not in serialized
+
+
 def test_grounding_evidence_identity_preserved_within_attempt():
     records = [_record(1, CATEGORY, _candidate())]
     audit = _build_audit(records)
@@ -287,6 +409,105 @@ def test_exam_id_and_generated_at_recorded_as_supplied():
 
 
 # ---------------------------------------------------------------------------
+# Partial results (WP-023)
+# ---------------------------------------------------------------------------
+
+
+def test_partial_audit_separates_accepted_and_failed_questions():
+    records = [_record(1, CATEGORY, _candidate(question="שאלה טובה"))]
+    failed = [_failed_question(2)]
+    generation_result = _partial_generation_result(records, failed)
+    audit = build_exam_audit(
+        generation_result, exam_id="exam-partial", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    assert audit.status.value == "PARTIAL"
+    assert audit.planned_question_count == 2
+    assert audit.accepted_count == 1
+    assert audit.failed_count == 1
+    assert len(audit.questions) == 1
+    assert len(audit.failed_questions) == 1
+    assert audit.failed_questions[0].planned_position == 2
+    assert audit.failed_questions[0].failure_type == "QuestionAttemptsExhaustedError"
+
+
+def test_partial_audit_preserves_planned_position_distinct_from_final_number():
+    # Planned position 1 fails, planned position 2 is accepted - the
+    # accepted question's final clean-exam number is 1, but its planned
+    # position (2) remains separately visible in the audit.
+    records = [_record(2, CATEGORY, _candidate())]
+    failed = [_failed_question(1)]
+    generation_result = _partial_generation_result(records, failed)
+    audit = build_exam_audit(
+        generation_result, exam_id="exam-partial", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    assert audit.questions[0].number == 1
+    assert audit.questions[0].planned_position == 2
+    assert audit.failed_questions[0].planned_position == 1
+
+
+def test_partial_audit_preserves_attempt_history_of_failed_question():
+    exhausted_attempt = QuestionAttempt(attempt_number=1, candidate=_candidate(), validations=_validations())
+    failed = [_failed_question(1, attempts=(exhausted_attempt,))]
+    generation_result = _partial_generation_result([], failed)
+    audit = build_exam_audit(
+        generation_result, exam_id="exam-partial", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    assert len(audit.failed_questions[0].attempts) == 1
+    assert audit.failed_questions[0].attempts[0].attempt_number == 1
+
+
+def test_all_questions_failed_audit_has_no_accepted_questions_but_is_valid():
+    # WP-023 section 22: every planned question failing locally still
+    # produces a valid, useful audit - with an empty questions list.
+    failed = [_failed_question(1), _failed_question(2)]
+    generation_result = _partial_generation_result([], failed)
+    assert generation_result.exam is None
+    audit = build_exam_audit(
+        generation_result, exam_id="exam-all-failed", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    assert audit.accepted_count == 0
+    assert audit.questions == []
+    assert audit.failed_count == 2
+    assert audit.status.value == "PARTIAL"
+
+
+def test_all_questions_failed_bundle_has_no_exam_but_has_audit():
+    failed = [_failed_question(1)]
+    generation_result = _partial_generation_result([], failed)
+    bundle = build_exam_output_bundle(
+        generation_result, exam_id="exam-all-failed", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    assert bundle.exam is None
+    assert bundle.audit.accepted_count == 0
+    assert bundle.audit.failed_count == 1
+
+
+def test_all_questions_failed_bundle_writes_only_audit(tmp_path: Path):
+    failed = [_failed_question(1)]
+    generation_result = _partial_generation_result([], failed)
+    bundle = build_exam_output_bundle(
+        generation_result, exam_id="exam-all-failed", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    exam_path = tmp_path / "exam.json"
+    audit_path = tmp_path / "exam.audit.json"
+    write_exam_output_bundle(exam_path=exam_path, audit_path=audit_path, bundle=bundle)
+    assert not exam_path.exists()
+    assert audit_path.exists()
+
+
+def test_partial_audit_serializes_and_round_trips():
+    records = [_record(1, CATEGORY, _candidate())]
+    failed = [_failed_question(2)]
+    generation_result = _partial_generation_result(records, failed)
+    audit = build_exam_audit(
+        generation_result, exam_id="exam-partial", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5
+    )
+    parsed = json.loads(serialize_audit_json(audit))
+    assert parsed["status"] == "PARTIAL"
+    assert parsed["failed_questions"][0]["planned_position"] == 2
+
+
+# ---------------------------------------------------------------------------
 # Consistency
 # ---------------------------------------------------------------------------
 
@@ -301,6 +522,7 @@ def test_question_count_mismatch_fails_clearly():
     candidate = _candidate()
     record = _record(1, CATEGORY, candidate)
     tampered = ExamGenerationResult(
+        status=ExamGenerationStatus.COMPLETE,
         exam=ExamOutput(
             questions=[
                 candidate_to_exam_question(candidate, 1),
@@ -328,7 +550,10 @@ def test_mismatched_question_text_fails_consistency_check():
         category=candidate.category,
     )
     tampered = ExamGenerationResult(
-        exam=ExamOutput(questions=[wrong_question]), plan=(record.planned,), productions=(record,)
+        status=ExamGenerationStatus.COMPLETE,
+        exam=ExamOutput(questions=[wrong_question]),
+        plan=(record.planned,),
+        productions=(record,),
     )
     with pytest.raises(AuditConsistencyError):
         build_exam_audit(tampered, exam_id="x", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5)
@@ -339,7 +564,10 @@ def test_mismatched_category_fails_consistency_check():
     record = _record(1, CATEGORY, candidate)
     wrong_question = candidate_to_exam_question(candidate, 1).model_copy(update={"category": "קטגוריה אחרת"})
     tampered = ExamGenerationResult(
-        exam=ExamOutput(questions=[wrong_question]), plan=(record.planned,), productions=(record,)
+        status=ExamGenerationStatus.COMPLETE,
+        exam=ExamOutput(questions=[wrong_question]),
+        plan=(record.planned,),
+        productions=(record,),
     )
     with pytest.raises(AuditConsistencyError):
         build_exam_audit(tampered, exam_id="x", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5)
@@ -350,7 +578,10 @@ def test_mismatched_correct_answer_fails_consistency_check():
     record = _record(1, CATEGORY, candidate)
     wrong_question = candidate_to_exam_question(candidate, 1).model_copy(update={"correct_answer": 4})
     tampered = ExamGenerationResult(
-        exam=ExamOutput(questions=[wrong_question]), plan=(record.planned,), productions=(record,)
+        status=ExamGenerationStatus.COMPLETE,
+        exam=ExamOutput(questions=[wrong_question]),
+        plan=(record.planned,),
+        productions=(record,),
     )
     with pytest.raises(AuditConsistencyError):
         build_exam_audit(tampered, exam_id="x", generated_at=NOW, llm_config=_llm_config(), diversity_target=0.5)
@@ -371,6 +602,7 @@ def test_rejected_final_attempt_never_represented_as_accepted():
     planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=candidate.generation_mode)
     record = QuestionProductionRecord(planned=planned, production=rejected_only, duplicate_replacement_attempts=0)
     tampered = ExamGenerationResult(
+        status=ExamGenerationStatus.COMPLETE,
         exam=ExamOutput(questions=[candidate_to_exam_question(candidate, 1)]),
         plan=(planned,),
         productions=(record,),

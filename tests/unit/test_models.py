@@ -8,9 +8,11 @@ from exam_generator.models import (
     CandidateQuestion,
     CategoryValidationResult,
     ExamAudit,
+    ExamGenerationStatus,
     ExamOutput,
     ExamQuestion,
     ExamRequest,
+    FailedQuestionAudit,
     GenerationMode,
     GroundingValidationResult,
     HistoricalStyleReference,
@@ -64,6 +66,7 @@ def make_question_attempt_audit(**overrides) -> QuestionAttemptAudit:
 def make_question_audit(**overrides) -> QuestionAudit:
     base = dict(
         number=1,
+        planned_position=1,
         category="גזע המוח",
         generation_mode=GenerationMode.INDEPENDENT,
         historical_reference_id=None,
@@ -486,6 +489,59 @@ def test_quality_validation_result_accepted():
     assert result.valid is True
 
 
+def test_quality_validation_result_empty_reason_rejected():
+    with pytest.raises(ValidationError):
+        QualityValidationResult(valid=True, reason="")
+
+
+def test_mcq_validation_result_empty_reason_rejected():
+    with pytest.raises(ValidationError):
+        MCQValidationResult(valid=True, exactly_four_answers=True, single_best_answer=True, reason="")
+
+
+def test_category_validation_result_empty_reason_rejected():
+    with pytest.raises(ValidationError):
+        CategoryValidationResult(valid=True, requested_category="cat", assessed_category=None, reason="")
+
+
+def test_grounding_validation_result_empty_reason_rejected():
+    with pytest.raises(ValidationError):
+        make_grounding(reason="")
+
+
+def test_textbook_check_result_empty_reason_rejected():
+    with pytest.raises(ValidationError):
+        TextbookCheckResult(status=TextbookCheckStatus.NOT_FOUND, reason="")
+
+
+@pytest.mark.parametrize(
+    "model_cls",
+    [GroundingValidationResult, MCQValidationResult, CategoryValidationResult, QualityValidationResult, TextbookCheckResult],
+)
+def test_reason_field_has_a_non_empty_description(model_cls):
+    # WP-018: every reason-bearing structured-output contract must carry an
+    # explicit Field(description=...) so the model's own JSON schema (not
+    # just prompt prose) signals that the field is required and non-empty -
+    # the confirmed root cause of the empty-reason failure class.
+    field_info = model_cls.model_fields["reason"]
+    assert field_info.description
+    assert "empty" in field_info.description.lower()
+
+
+def test_textbook_check_result_evidence_chunk_ids_accepted():
+    result = TextbookCheckResult(
+        status=TextbookCheckStatus.CONSISTENT,
+        evidence_chunk_ids=["COURSE_BOOK:course_book.pdf:0010:0001"],
+        reason="checked",
+    )
+    assert result.evidence_chunk_ids == ["COURSE_BOOK:course_book.pdf:0010:0001"]
+
+
+def test_textbook_check_result_evidence_chunk_ids_default_empty():
+    result = TextbookCheckResult(status=TextbookCheckStatus.NOT_FOUND, reason="checked")
+    assert result.evidence_chunk_ids == []
+
+
 @pytest.mark.parametrize("status", list(TextbookCheckStatus))
 def test_textbook_status_accepts_approved_values(status):
     result = TextbookCheckResult(status=status, reason="checked")
@@ -616,6 +672,56 @@ def test_question_attempt_audit_optional_textbook_check_works():
 
 
 # ---------------------------------------------------------------------------
+# QuestionAttemptAudit: WP-019 generation-contract-failure representation
+# ---------------------------------------------------------------------------
+
+
+def test_question_attempt_audit_generation_failure_accepted():
+    attempt = QuestionAttemptAudit(
+        attempt_number=1,
+        accepted=False,
+        generation_failure_type="InvalidGeneratedOutputError",
+        generation_failure_message="invented evidence id",
+    )
+    assert attempt.generation_failure_type == "InvalidGeneratedOutputError"
+    assert attempt.grounding is None
+    assert attempt.mcq_validation is None
+
+
+def test_question_attempt_audit_generation_failure_cannot_be_accepted():
+    with pytest.raises(ValidationError):
+        QuestionAttemptAudit(
+            attempt_number=1,
+            accepted=True,
+            generation_failure_type="InvalidGeneratedOutputError",
+            generation_failure_message="invented evidence id",
+        )
+
+
+def test_question_attempt_audit_generation_failure_cannot_carry_validation_results():
+    with pytest.raises(ValidationError):
+        QuestionAttemptAudit(
+            attempt_number=1,
+            accepted=False,
+            grounding=make_grounding(),
+            generation_failure_type="InvalidGeneratedOutputError",
+            generation_failure_message="invented evidence id",
+        )
+
+
+def test_question_attempt_audit_normal_attempt_requires_all_four_primary_results():
+    with pytest.raises(ValidationError):
+        QuestionAttemptAudit(attempt_number=1, accepted=True, grounding=make_grounding())
+
+
+def test_question_attempt_audit_failure_type_without_message_rejected():
+    with pytest.raises(ValidationError):
+        QuestionAttemptAudit(
+            attempt_number=1, accepted=False, generation_failure_type="InvalidGeneratedOutputError"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Clean Exam Output
 # ---------------------------------------------------------------------------
 
@@ -659,13 +765,31 @@ def test_exam_output_sequence_beginning_above_one_rejected():
 # ---------------------------------------------------------------------------
 
 
+def make_failed_question_audit(**overrides) -> FailedQuestionAudit:
+    base = dict(
+        planned_position=1,
+        category="גזע המוח",
+        generation_mode=GenerationMode.INDEPENDENT,
+        failure_type="QuestionAttemptsExhaustedError",
+        failure_message="generation attempts exhausted without an accepted candidate",
+        attempts=[],
+    )
+    base.update(overrides)
+    return FailedQuestionAudit(**base)
+
+
 def _valid_exam_audit_kwargs(**overrides):
     base = dict(
         exam_id="exam-2026-08-03",
         generated_at=datetime.now(timezone.utc),
         provider="openai",
         model="gpt-4o-mini",
+        status=ExamGenerationStatus.COMPLETE,
+        planned_question_count=1,
+        accepted_count=1,
+        failed_count=0,
         questions=[make_question_audit()],
+        failed_questions=[],
     )
     base.update(overrides)
     return base
@@ -691,14 +815,90 @@ def test_exam_audit_empty_model_rejected():
         ExamAudit(**_valid_exam_audit_kwargs(model=""))
 
 
-def test_exam_audit_empty_question_list_rejected():
+def test_exam_audit_count_mismatch_rejected():
     with pytest.raises(ValidationError):
-        ExamAudit(**_valid_exam_audit_kwargs(questions=[]))
+        ExamAudit(**_valid_exam_audit_kwargs(accepted_count=2))
+
+
+def test_exam_audit_planned_count_not_matching_accepted_plus_failed_rejected():
+    with pytest.raises(ValidationError):
+        ExamAudit(**_valid_exam_audit_kwargs(planned_question_count=5))
+
+
+def test_exam_audit_complete_status_with_failed_question_rejected():
+    with pytest.raises(ValidationError):
+        ExamAudit(
+            **_valid_exam_audit_kwargs(
+                status=ExamGenerationStatus.COMPLETE,
+                planned_question_count=2,
+                accepted_count=1,
+                failed_count=1,
+                failed_questions=[make_failed_question_audit(planned_position=2)],
+            )
+        )
+
+
+def test_exam_audit_partial_status_with_no_failed_questions_rejected():
+    with pytest.raises(ValidationError):
+        ExamAudit(**_valid_exam_audit_kwargs(status=ExamGenerationStatus.PARTIAL))
+
+
+def test_exam_audit_zero_accepted_all_failed_is_a_valid_partial_result():
+    # WP-023 section 22: every planned question failing locally is still a
+    # representable, valid audit - just with an empty ``questions`` list.
+    audit = ExamAudit(
+        **_valid_exam_audit_kwargs(
+            status=ExamGenerationStatus.PARTIAL,
+            planned_question_count=1,
+            accepted_count=0,
+            failed_count=1,
+            questions=[],
+            failed_questions=[make_failed_question_audit(planned_position=1)],
+        )
+    )
+    assert audit.accepted_count == 0
+    assert audit.questions == []
+    assert len(audit.failed_questions) == 1
 
 
 def test_exam_audit_duplicate_question_numbers_rejected():
     with pytest.raises(ValidationError):
-        ExamAudit(**_valid_exam_audit_kwargs(questions=[make_question_audit(number=1), make_question_audit(number=1)]))
+        ExamAudit(
+            **_valid_exam_audit_kwargs(
+                planned_question_count=2,
+                accepted_count=2,
+                questions=[
+                    make_question_audit(number=1, planned_position=1),
+                    make_question_audit(number=1, planned_position=2),
+                ],
+            )
+        )
+
+
+def test_exam_audit_duplicate_planned_position_across_accepted_and_failed_rejected():
+    with pytest.raises(ValidationError):
+        ExamAudit(
+            **_valid_exam_audit_kwargs(
+                planned_question_count=2,
+                accepted_count=1,
+                failed_count=1,
+                questions=[make_question_audit(number=1, planned_position=1)],
+                failed_questions=[make_failed_question_audit(planned_position=1)],
+            )
+        )
+
+
+def test_exam_audit_planned_positions_must_exactly_cover_1_to_n():
+    with pytest.raises(ValidationError):
+        ExamAudit(
+            **_valid_exam_audit_kwargs(
+                planned_question_count=2,
+                accepted_count=1,
+                failed_count=1,
+                questions=[make_question_audit(number=1, planned_position=1)],
+                failed_questions=[make_failed_question_audit(planned_position=3)],
+            )
+        )
 
 
 def test_exam_audit_timezone_naive_datetime_rejected():

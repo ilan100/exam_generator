@@ -6,11 +6,11 @@ import pytest
 
 from exam_generator.cli import EXIT_GENERATION_FAILURE, EXIT_SUCCESS, EXIT_USAGE_ERROR, main
 from exam_generator.config import ConfigError
-from exam_generator.generation import MissingEvidenceError
 from exam_generator.llm import LLMConfigurationError, LLMProviderError
 from exam_generator.models import (
     CandidateQuestion,
     CategoryValidationResult,
+    ExamGenerationStatus,
     ExamOutput,
     GenerationMode,
     GroundingValidationResult,
@@ -20,8 +20,14 @@ from exam_generator.models import (
     TextbookCheckStatus,
     candidate_to_exam_question,
 )
-from exam_generator.orchestration import ExamGenerationResult, PlannedQuestion, QuestionProductionFailedError, QuestionProductionRecord
-from exam_generator.production import CandidateValidationResults, QuestionAttempt, QuestionAttemptsExhaustedError, QuestionProductionResult
+from exam_generator.orchestration import (
+    ExamGenerationResult,
+    FailedPlannedQuestion,
+    PlannedQuestion,
+    QuestionProductionFailedError,
+    QuestionProductionRecord,
+)
+from exam_generator.production import CandidateValidationResults, QuestionAttempt, QuestionProductionResult
 from exam_generator.retrieval import UnknownCategoryError
 
 CATEGORY = "קליפת המוח"
@@ -61,16 +67,56 @@ def _validations() -> CandidateValidationResults:
     )
 
 
+def _record(position: int) -> QuestionProductionRecord:
+    candidate = _candidate(question=f"{QUESTION_TEXT} ({position})")
+    attempt = QuestionAttempt(attempt_number=1, candidate=candidate, validations=_validations())
+    production = QuestionProductionResult(candidate=candidate, attempts=(attempt,))
+    planned = PlannedQuestion(position=position, category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    return QuestionProductionRecord(planned=planned, production=production, duplicate_replacement_attempts=0)
+
+
+def _failed_question(position: int, *, failure_type: str = "QuestionAttemptsExhaustedError") -> FailedPlannedQuestion:
+    planned = PlannedQuestion(position=position, category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    return FailedPlannedQuestion(
+        planned=planned,
+        failure_type=failure_type,
+        failure_message="generation attempts exhausted without an accepted candidate",
+    )
+
+
 def _generation_result(count: int = 1) -> ExamGenerationResult:
-    records = []
-    for i in range(1, count + 1):
-        candidate = _candidate(question=f"{QUESTION_TEXT} ({i})")
-        attempt = QuestionAttempt(attempt_number=1, candidate=candidate, validations=_validations())
-        production = QuestionProductionResult(candidate=candidate, attempts=(attempt,))
-        planned = PlannedQuestion(position=i, category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
-        records.append(QuestionProductionRecord(planned=planned, production=production, duplicate_replacement_attempts=0))
-    exam = ExamOutput(questions=[candidate_to_exam_question(r.production.candidate, r.planned.position) for r in records])
-    return ExamGenerationResult(exam=exam, plan=tuple(r.planned for r in records), productions=tuple(records))
+    records = [_record(i) for i in range(1, count + 1)]
+    exam = ExamOutput(
+        questions=[candidate_to_exam_question(r.production.candidate, number) for number, r in enumerate(records, start=1)]
+    )
+    return ExamGenerationResult(
+        status=ExamGenerationStatus.COMPLETE,
+        exam=exam,
+        plan=tuple(r.planned for r in records),
+        productions=tuple(records),
+    )
+
+
+def _partial_generation_result(*, accepted: int = 1, failed_positions: list[int] = None) -> ExamGenerationResult:
+    failed_positions = failed_positions if failed_positions is not None else [accepted + 1]
+    records = [_record(i) for i in range(1, accepted + 1)]
+    failed = [_failed_question(p) for p in failed_positions]
+    exam = None
+    if records:
+        exam = ExamOutput(
+            questions=[
+                candidate_to_exam_question(r.production.candidate, number)
+                for number, r in enumerate(records, start=1)
+            ]
+        )
+    plan = tuple(r.planned for r in records) + tuple(f.planned for f in failed)
+    return ExamGenerationResult(
+        status=ExamGenerationStatus.PARTIAL,
+        exam=exam,
+        plan=plan,
+        productions=tuple(records),
+        failed_questions=tuple(failed),
+    )
 
 
 def _mock_orchestrator(*, return_value=None, side_effect=None) -> MagicMock:
@@ -283,13 +329,21 @@ def test_failure_before_generation_writes_no_output(tmp_path, monkeypatch):
     assert not audit_path.exists()
 
 
-def test_failed_generation_writes_no_output(tmp_path, monkeypatch):
+def test_system_level_failure_writes_no_output(tmp_path, monkeypatch):
+    # WP-023: a genuine system-level failure still aborts before any
+    # output is written - only a question-local failure (recorded as a
+    # PARTIAL result) writes output.
     request_path = tmp_path / "request.json"
     _write_request(request_path, {CATEGORY: 1})
     exam_path = tmp_path / "exam.json"
     audit_path = tmp_path / "audit.json"
 
-    orchestrator = _mock_orchestrator(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=()))
+    planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
+    orchestrator = _mock_orchestrator(
+        side_effect=QuestionProductionFailedError(
+            "provider failure", planned_question=planned, completed_productions=(), operational_cause=LLMProviderError("boom")
+        )
+    )
     monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
 
     code = main(["generate", "--request", str(request_path), "--exam-output", str(exam_path), "--audit-output", str(audit_path)])
@@ -297,6 +351,70 @@ def test_failed_generation_writes_no_output(tmp_path, monkeypatch):
     assert code == EXIT_GENERATION_FAILURE
     assert not exam_path.exists()
     assert not audit_path.exists()
+
+
+def test_partial_result_writes_both_outputs_and_exits_success(tmp_path, monkeypatch):
+    # WP-023: a question-local failure yields a PARTIAL result, not an
+    # exception - both outputs are written and the exit code is success.
+    request_path = tmp_path / "request.json"
+    _write_request(request_path, {CATEGORY: 2})
+    exam_path = tmp_path / "exam.json"
+    audit_path = tmp_path / "audit.json"
+
+    orchestrator = _mock_orchestrator(return_value=_partial_generation_result(accepted=1, failed_positions=[2]))
+    monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
+
+    code = main(["generate", "--request", str(request_path), "--exam-output", str(exam_path), "--audit-output", str(audit_path)])
+
+    assert code == EXIT_SUCCESS
+    assert exam_path.exists()
+    assert audit_path.exists()
+    exam_data = json.loads(exam_path.read_text(encoding="utf-8"))
+    assert len(exam_data["questions"]) == 1
+    audit_data = json.loads(audit_path.read_text(encoding="utf-8"))
+    assert audit_data["status"] == "PARTIAL"
+    assert len(audit_data["failed_questions"]) == 1
+
+
+def test_partial_result_reports_failed_questions_in_stdout(tmp_path, monkeypatch, capsys):
+    request_path = tmp_path / "request.json"
+    _write_request(request_path, {CATEGORY: 2})
+    exam_path = tmp_path / "exam.json"
+    audit_path = tmp_path / "audit.json"
+
+    orchestrator = _mock_orchestrator(return_value=_partial_generation_result(accepted=1, failed_positions=[2]))
+    monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
+
+    code = main(["generate", "--request", str(request_path), "--exam-output", str(exam_path), "--audit-output", str(audit_path)])
+
+    assert code == EXIT_SUCCESS
+    out = capsys.readouterr().out
+    assert "partial results" in out.lower()
+    assert "Requested: 2" in out
+    assert "Generated: 1" in out
+    assert "Failed: 1" in out
+    assert CATEGORY in out
+    assert "QuestionAttemptsExhaustedError" in out
+
+
+def test_all_questions_failed_writes_only_audit_and_exits_success(tmp_path, monkeypatch, capsys):
+    # WP-023 section 22: every planned question failing locally still
+    # produces a valid, useful audit - just with no clean exam to write.
+    request_path = tmp_path / "request.json"
+    _write_request(request_path, {CATEGORY: 1})
+    exam_path = tmp_path / "exam.json"
+    audit_path = tmp_path / "audit.json"
+
+    orchestrator = _mock_orchestrator(return_value=_partial_generation_result(accepted=0, failed_positions=[1]))
+    monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
+
+    code = main(["generate", "--request", str(request_path), "--exam-output", str(exam_path), "--audit-output", str(audit_path)])
+
+    assert code == EXIT_SUCCESS
+    assert not exam_path.exists()
+    assert audit_path.exists()
+    out = capsys.readouterr().out
+    assert "no usable questions" in out.lower() or "not written" in out.lower()
 
 
 def test_output_is_valid_utf8_json(tmp_path, monkeypatch):
@@ -335,16 +453,19 @@ def test_missing_api_key_produces_clear_error(tmp_path, monkeypatch, capsys):
     assert "OPENAI_API_KEY" in capsys.readouterr().err
 
 
-def test_generation_exhaustion_produces_nonzero_exit(tmp_path, monkeypatch):
+def test_question_local_failure_no_longer_produces_nonzero_exit(tmp_path, monkeypatch):
+    # WP-023: what used to be an exam-aborting QuestionAttemptsExhaustedError
+    # is now absorbed as a question-local failure inside generate_exam(),
+    # yielding a PARTIAL result (exit success) rather than propagating.
     request_path = tmp_path / "request.json"
-    _write_request(request_path, {CATEGORY: 1})
+    _write_request(request_path, {CATEGORY: 2})
 
-    orchestrator = _mock_orchestrator(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=()))
+    orchestrator = _mock_orchestrator(return_value=_partial_generation_result(accepted=1, failed_positions=[2]))
     monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
 
     code = main(["generate", "--request", str(request_path)])
 
-    assert code == EXIT_GENERATION_FAILURE
+    assert code == EXIT_SUCCESS
 
 
 def test_exam_level_production_failed_produces_nonzero_exit(tmp_path, monkeypatch):
@@ -354,7 +475,7 @@ def test_exam_level_production_failed_produces_nonzero_exit(tmp_path, monkeypatc
     planned = PlannedQuestion(position=1, category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT)
     orchestrator = _mock_orchestrator(
         side_effect=QuestionProductionFailedError(
-            "duplicate exhaustion", planned_question=planned, completed_productions=(), duplicate_productions=()
+            "provider failure", planned_question=planned, completed_productions=(), operational_cause=LLMProviderError("boom")
         )
     )
     monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
@@ -403,16 +524,23 @@ def test_config_error_produces_usage_error(tmp_path, monkeypatch):
     assert code == EXIT_USAGE_ERROR
 
 
-def test_missing_evidence_generation_error_produces_generation_failure(tmp_path, monkeypatch):
+def test_missing_evidence_is_question_local_and_produces_partial_success(tmp_path, monkeypatch):
+    # WP-023: MissingEvidenceError is question-local (absorbed inside
+    # generate_exam()), not a CLI-level generation failure - it surfaces
+    # as a PARTIAL result's failed question, exit success.
     request_path = tmp_path / "request.json"
-    _write_request(request_path, {CATEGORY: 1})
+    _write_request(request_path, {CATEGORY: 2})
 
-    orchestrator = _mock_orchestrator(side_effect=MissingEvidenceError("no evidence"))
+    orchestrator = _mock_orchestrator(
+        return_value=_partial_generation_result(
+            accepted=1, failed_positions=[2]
+        )
+    )
     monkeypatch.setattr("exam_generator.cli.ExamOrchestrator.from_default_configuration", lambda: orchestrator)
 
     code = main(["generate", "--request", str(request_path)])
 
-    assert code == EXIT_GENERATION_FAILURE
+    assert code == EXIT_SUCCESS
 
 
 def test_expected_failures_do_not_emit_traceback(tmp_path, monkeypatch, capsys):

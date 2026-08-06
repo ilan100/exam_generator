@@ -48,6 +48,11 @@ def write_audit_json(path: Path | str, audit: ExamAudit) -> None:
 
 def write_exam_output_bundle(*, exam_path: Path | str, audit_path: Path | str, bundle: ExamOutputBundle) -> None:
     """Write both halves of ``bundle`` to their respective caller-supplied
-    paths, as two separate files - never merged into one."""
-    write_exam_json(exam_path, bundle.exam)
+    paths, as two separate files - never merged into one.
+
+    Since WP-023, ``bundle.exam`` is ``None`` only when zero planned
+    questions were accepted - in that edge case there is no valid clean
+    exam to write, so only the audit is written."""
+    if bundle.exam is not None:
+        write_exam_json(exam_path, bundle.exam)
     write_audit_json(audit_path, bundle.audit)

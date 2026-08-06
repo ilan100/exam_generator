@@ -16,9 +16,9 @@ Your structured response corresponds to the following fields - report only what 
 - grounded: whether the question's factual premise is supported by the supplied evidence.
 - correct_answer_supported: whether the candidate's stated correct answer is supported by the supplied evidence.
 - other_answers_not_equally_correct: whether no other answer choice is equally well supported by the supplied evidence.
-- evidence_chunk_ids: identifiers of only the supplied evidence chunks that actually support your determination. Copy each identifier exactly, character for character, from that evidence item's "Chunk:" line - the full value, including everything before and after any colon. Never shorten, paraphrase, or drop part of an identifier, and never invent one that was not supplied to you.
-- evidence_text: the supporting evidence text, when you report evidence_chunk_ids.
-- reason: a concise explanation of your determination.
+- evidence_refs: the evidence item number(s) that actually support your determination. Each evidence item below is labeled "[Evidence N]" (for example "[Evidence 1]", "[Evidence 2]") - report only the number N of an item actually shown to you, exactly as labeled. Do not report a chunk identifier, source file name, or any other text - only the plain number. Never invent a number for an evidence item that was not shown to you. If you are not confident which evidence number supports your determination, leave this list empty rather than guessing - an empty list is always acceptable and preferred over an invented or approximate number.
+- evidence_text: the supporting evidence text, when you report evidence_refs.
+- reason: a concise explanation of your determination. This field is required and must always contain a substantive, non-empty explanation of your determination - it must never be an empty string.
 - confidence: your confidence in this determination, from 0.0 to 1.0. Confidence does not by itself determine whether the candidate passes or fails.
 
 Candidate question:

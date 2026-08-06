@@ -13,3 +13,11 @@ generation:
 validation:
   temperature: 0.0
   max_tokens: 1024
+
+# Number of retries AFTER the initial physical structured-output API call,
+# for the narrowly-scoped case where the provider's response could not be
+# parsed into the requested structured result at all (e.g. truncated JSON) -
+# never for a successfully-parsed response that fails a domain validator, and
+# never for auth/rate-limit/network/refusal failures (see WP-020).
+# 0 = one call total, 1 = at most two calls total.
+structured_output_retries: 1

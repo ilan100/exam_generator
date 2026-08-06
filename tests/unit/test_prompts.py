@@ -837,22 +837,27 @@ def test_grounding_prompt_addresses_one_best_answer_support(production_repositor
     assert "single best answer" in rendered
 
 
-def test_grounding_prompt_aligns_with_grounding_validation_result_fields(production_repository):
+def test_grounding_prompt_aligns_with_grounding_validation_response_fields(production_repository):
     rendered = _rendered_grounding_prompt(production_repository)
     for field in (
         "grounded",
         "correct_answer_supported",
         "other_answers_not_equally_correct",
-        "evidence_chunk_ids",
+        "evidence_refs",
         "reason",
         "confidence",
     ):
         assert field in rendered
 
 
-def test_grounding_prompt_evidence_ids_must_come_from_supplied_evidence(production_repository):
+def test_grounding_prompt_evidence_refs_must_come_from_supplied_evidence(production_repository):
     rendered = _rendered_grounding_prompt(production_repository)
-    assert "never invent one that was not supplied to you" in rendered
+    assert "Never invent a number for an evidence item that was not shown to you" in rendered
+
+
+def test_grounding_prompt_does_not_ask_for_canonical_chunk_ids(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "Do not report a chunk identifier" in rendered
 
 
 def test_grounding_prompt_does_not_use_historical_reference_as_evidence(production_repository):
@@ -929,6 +934,39 @@ def test_textbook_prompt_aligns_with_textbook_check_result_statuses(production_r
     )
     for status in ("CONSISTENT", "NOT_FOUND", "POTENTIAL_CONFLICT"):
         assert status in rendered
+
+
+def test_textbook_prompt_uses_evidence_n_references(production_repository):
+    template = production_repository.get(PromptId.TEXTBOOK_VALIDATION)
+    rendered = render_prompt(
+        template,
+        candidate_question=format_candidate_question(_candidate()),
+        course_book_evidence=format_course_book_evidence((_course_book_chunk(),)),
+    )
+    assert "evidence_refs" in rendered
+    assert "[Evidence N]" in rendered or "[Evidence 1]" in rendered
+
+
+def test_textbook_prompt_does_not_require_canonical_id_reproduction(production_repository):
+    template = production_repository.get(PromptId.TEXTBOOK_VALIDATION)
+    rendered = render_prompt(
+        template,
+        candidate_question=format_candidate_question(_candidate()),
+        course_book_evidence=format_course_book_evidence((_course_book_chunk(),)),
+    )
+    assert "evidence_chunk_ids" not in rendered
+    assert "character for character" not in rendered
+
+
+def test_textbook_prompt_does_not_require_reference_text_reproduction(production_repository):
+    template = production_repository.get(PromptId.TEXTBOOK_VALIDATION)
+    rendered = render_prompt(
+        template,
+        candidate_question=format_candidate_question(_candidate()),
+        course_book_evidence=format_course_book_evidence((_course_book_chunk(),)),
+    )
+    assert "reference_text" not in rendered
+    assert "source_page" not in rendered
 
 
 def test_validation_prompts_remain_separate_files():

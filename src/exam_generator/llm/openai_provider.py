@@ -16,7 +16,7 @@ from typing import Sequence, TypeVar
 
 import openai
 from openai import OpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from exam_generator.config.models import LLMConfig, LLMGenerationParams, LLMValidationParams
 from exam_generator.llm.errors import (
@@ -27,9 +27,25 @@ from exam_generator.llm.errors import (
     LLMRefusalError,
     LLMRequestError,
     LLMResponseError,
+    LLMStructuredOutputError,
 )
-from exam_generator.llm.models import LLMMessage, LLMProfile
+from exam_generator.llm.models import LLMMessage, LLMProfile, StructuredOutputRetryEvent
 from exam_generator.llm.provider import LLMProvider
+
+
+def _is_malformed_structured_output(exc: ValidationError) -> bool:
+    """True only for a pure JSON-parse-level failure - the response text
+    itself could not be parsed as JSON at all (e.g. truncated by a token
+    limit), reported by pydantic-core as a single ``json_invalid`` error.
+
+    False for a response that parsed successfully but failed one of this
+    project's own domain-level validators (e.g. ``NonBlankStr``'s
+    non-empty check, reported as ``value_error``) - that is never a
+    provider-level structured-output failure and must never be retried
+    here (WP-020 section 6).
+    """
+    errors = exc.errors()
+    return len(errors) == 1 and errors[0]["type"] == "json_invalid"
 
 ResponseModelT = TypeVar("ResponseModelT", bound=BaseModel)
 
@@ -57,6 +73,7 @@ class OpenAIProvider(LLMProvider):
         generation_params: LLMGenerationParams,
         validation_params: LLMValidationParams,
         client: object | None = None,
+        structured_output_retries: int = 1,
     ) -> None:
         if not model or not model.strip():
             raise LLMConfigurationError("OpenAI provider requires a non-empty model")
@@ -65,11 +82,19 @@ class OpenAIProvider(LLMProvider):
                 f"OpenAI provider requires a non-empty API key "
                 f"(expected from the {API_KEY_ENV_VAR} environment variable)"
             )
+        if isinstance(structured_output_retries, bool) or (
+            not isinstance(structured_output_retries, int) or structured_output_retries < 0
+        ):
+            raise LLMConfigurationError(
+                f"structured_output_retries must be an integer >= 0, got {structured_output_retries!r}"
+            )
 
         self._model = model
         self._generation_params = generation_params
         self._validation_params = validation_params
         self._client = client if client is not None else OpenAI(api_key=api_key, max_retries=0)
+        self._structured_output_retries = structured_output_retries
+        self._structured_output_retry_events: list[StructuredOutputRetryEvent] = []
 
     @classmethod
     def from_config(
@@ -92,6 +117,7 @@ class OpenAIProvider(LLMProvider):
             generation_params=llm_config.generation,
             validation_params=llm_config.validation,
             client=client,
+            structured_output_retries=llm_config.structured_output_retries,
         )
 
     @property
@@ -101,6 +127,14 @@ class OpenAIProvider(LLMProvider):
     @property
     def model_name(self) -> str:
         return self._model
+
+    @property
+    def structured_output_retry_events(self) -> tuple[StructuredOutputRetryEvent, ...]:
+        """Observability only (WP-020): every completed logical
+        ``generate_structured()`` operation that needed at least one
+        provider-level structured-output retry, in call order. Never used
+        to make any application decision."""
+        return tuple(self._structured_output_retry_events)
 
     def _params_for_profile(self, profile: LLMProfile) -> LLMGenerationParams | LLMValidationParams:
         if profile == LLMProfile.GENERATION:
@@ -116,34 +150,83 @@ class OpenAIProvider(LLMProvider):
         response_model: type[ResponseModelT],
         profile: LLMProfile,
     ) -> ResponseModelT:
+        """Make one logical structured-output operation.
+
+        A logical operation may involve up to ``1 + structured_output_retries``
+        *physical* API calls (WP-020) - but only when the provider's
+        response text itself could not be parsed as JSON at all (e.g.
+        truncated by a token limit), never when a successfully-parsed
+        response merely fails one of this project's own domain-level
+        validators, and never for auth/rate-limit/connection/status
+        failures or refusals - those still make exactly one physical call
+        and propagate immediately, unchanged from before WP-020. Retrying
+        repeats the exact same request (same messages, same response
+        model, same profile parameters); nothing about the request is
+        regenerated or altered between physical attempts.
+        """
         if not messages:
             raise LLMRequestError("messages must contain at least one LLMMessage")
 
         params = self._params_for_profile(profile)
         input_items = [{"role": message.role.value, "content": message.content} for message in messages]
 
-        try:
-            response = self._client.responses.parse(
-                model=self._model,
-                input=input_items,
-                text_format=response_model,
-                temperature=params.temperature,
-                max_output_tokens=params.max_tokens,
-            )
-        except openai.AuthenticationError as exc:
-            raise LLMAuthenticationError(f"OpenAI authentication failed: {exc}") from exc
-        except openai.RateLimitError as exc:
-            raise LLMRateLimitError(f"OpenAI rate limit exceeded: {exc}") from exc
-        except openai.APIConnectionError as exc:
-            raise LLMProviderError(f"Failed to connect to the OpenAI API: {exc}") from exc
-        except openai.APIStatusError as exc:
-            raise LLMProviderError(
-                f"OpenAI API returned an error status ({exc.status_code}): {exc}"
-            ) from exc
-        except openai.APIError as exc:
-            raise LLMProviderError(f"OpenAI API request failed: {exc}") from exc
+        max_physical_calls = 1 + self._structured_output_retries
 
-        return self._extract_parsed(response, response_model)
+        for attempt in range(1, max_physical_calls + 1):
+            try:
+                response = self._client.responses.parse(
+                    model=self._model,
+                    input=input_items,
+                    text_format=response_model,
+                    temperature=params.temperature,
+                    max_output_tokens=params.max_tokens,
+                )
+            except openai.AuthenticationError as exc:
+                raise LLMAuthenticationError(f"OpenAI authentication failed: {exc}") from exc
+            except openai.RateLimitError as exc:
+                raise LLMRateLimitError(f"OpenAI rate limit exceeded: {exc}") from exc
+            except openai.APIConnectionError as exc:
+                raise LLMProviderError(f"Failed to connect to the OpenAI API: {exc}") from exc
+            except openai.APIStatusError as exc:
+                raise LLMProviderError(
+                    f"OpenAI API returned an error status ({exc.status_code}): {exc}"
+                ) from exc
+            except openai.APIError as exc:
+                raise LLMProviderError(f"OpenAI API request failed: {exc}") from exc
+            except ValidationError as exc:
+                if not _is_malformed_structured_output(exc):
+                    # A successfully-parsed response that violates one of
+                    # our own domain-level constraints - never a
+                    # structured-output failure, never retried here.
+                    raise
+                if attempt < max_physical_calls:
+                    continue
+                if attempt > 1:
+                    self._structured_output_retry_events.append(
+                        StructuredOutputRetryEvent(
+                            response_model_name=response_model.__name__,
+                            profile=profile,
+                            attempts_made=attempt,
+                            recovered=False,
+                        )
+                    )
+                raise LLMStructuredOutputError(
+                    f"The provider returned malformed/unparseable structured output for "
+                    f"{response_model.__name__} after {attempt} attempt(s): {exc}"
+                ) from exc
+            else:
+                if attempt > 1:
+                    self._structured_output_retry_events.append(
+                        StructuredOutputRetryEvent(
+                            response_model_name=response_model.__name__,
+                            profile=profile,
+                            attempts_made=attempt,
+                            recovered=True,
+                        )
+                    )
+                return self._extract_parsed(response, response_model)
+
+        raise AssertionError("unreachable: the attempt loop always returns or raises")
 
     @staticmethod
     def _extract_parsed(response: object, response_model: type[ResponseModelT]) -> ResponseModelT:

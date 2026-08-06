@@ -10,7 +10,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
 
-from exam_generator.models._common import NonBlankStr
+from exam_generator.models._common import NonBlankStr, PositiveIntStrict, StrictBool
 
 
 class MessageRole(str, Enum):
@@ -41,3 +41,19 @@ class LLMProfile(str, Enum):
 
     GENERATION = "GENERATION"
     VALIDATION = "VALIDATION"
+
+
+class StructuredOutputRetryEvent(BaseModel):
+    """Observability record (WP-020) for one logical
+    ``generate_structured()`` operation that needed at least one
+    provider-level structured-output retry - recorded only once the
+    operation is fully resolved (recovered or exhausted). Never used to
+    make any application decision; purely for evaluation/debugging
+    inspection. Never carries prompt/message content or secrets."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    response_model_name: NonBlankStr
+    profile: LLMProfile
+    attempts_made: PositiveIntStrict
+    recovered: StrictBool

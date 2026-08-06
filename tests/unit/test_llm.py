@@ -16,6 +16,7 @@ from exam_generator.llm import (
     LLMRefusalError,
     LLMRequestError,
     LLMResponseError,
+    LLMStructuredOutputError,
     MessageRole,
     OpenAIProvider,
     build_llm_provider,
@@ -79,14 +80,49 @@ def _empty_response() -> _FakeParsedResponse:
     return _FakeParsedResponse(output=[], parsed=None)
 
 
-def make_provider(client=None, model="gpt-4o-mini", api_key="test-api-key"):
+def make_provider(client=None, model="gpt-4o-mini", api_key="test-api-key", structured_output_retries=1):
     return OpenAIProvider(
         model=model,
         api_key=api_key,
         generation_params=LLMGenerationParams(temperature=0.7, max_tokens=1024),
         validation_params=LLMValidationParams(temperature=0.0, max_tokens=512),
         client=client if client is not None else MagicMock(),
+        structured_output_retries=structured_output_retries,
     )
+
+
+def _malformed_json_error() -> ValidationError:
+    """A real pydantic ValidationError whose single error is
+    ``json_invalid`` - the exact class WP-020 targets (e.g. truncated
+    structured-output JSON)."""
+    try:
+        _TestStructuredResponse.model_validate_json('{"value":"trunca')
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("expected truncated JSON to raise ValidationError")
+
+
+def _semantic_validation_error() -> ValidationError:
+    """A real pydantic ValidationError from a successfully-parsed JSON
+    document that violates a domain-level (value_error) constraint - must
+    never be retried by the structured-output recovery mechanism."""
+    from pydantic import field_validator
+
+    class _StrictModel(BaseModel):
+        value: str
+
+        @field_validator("value")
+        @classmethod
+        def _non_blank(cls, v: str) -> str:
+            if v.strip() == "":
+                raise ValueError("value must not be empty or whitespace-only")
+            return v
+
+    try:
+        _StrictModel.model_validate_json('{"value":""}')
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("expected empty value to raise ValidationError")
 
 
 def _llm_config(provider="openai", model="gpt-4o-mini"):
@@ -578,6 +614,231 @@ def test_original_sdk_exception_preserved_as_cause():
         pytest.fail("expected LLMAuthenticationError")
     except LLMAuthenticationError as exc:
         assert exc.__cause__ is original
+
+
+# ---------------------------------------------------------------------------
+# WP-020: bounded structured-output retry
+# ---------------------------------------------------------------------------
+
+
+def test_successful_first_call_makes_exactly_one_physical_call():
+    client = MagicMock()
+    client.responses.parse.return_value = _successful_response(_TestStructuredResponse(value="ok"))
+    provider = make_provider(client=client, structured_output_retries=1)
+    provider.generate_structured(
+        messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+        response_model=_TestStructuredResponse,
+        profile=LLMProfile.GENERATION,
+    )
+    assert client.responses.parse.call_count == 1
+    assert provider.structured_output_retry_events == ()
+
+
+def test_malformed_then_valid_recovers_with_exactly_two_physical_calls():
+    client = MagicMock()
+    client.responses.parse.side_effect = [
+        _malformed_json_error(),
+        _successful_response(_TestStructuredResponse(value="ok")),
+    ]
+    provider = make_provider(client=client, structured_output_retries=1)
+    result = provider.generate_structured(
+        messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+        response_model=_TestStructuredResponse,
+        profile=LLMProfile.VALIDATION,
+    )
+    assert result.value == "ok"
+    assert client.responses.parse.call_count == 2
+    # Same request on both physical calls.
+    first_call, second_call = client.responses.parse.call_args_list
+    assert first_call.kwargs == second_call.kwargs
+    assert len(provider.structured_output_retry_events) == 1
+    event = provider.structured_output_retry_events[0]
+    assert event.recovered is True
+    assert event.attempts_made == 2
+    assert event.response_model_name == "_TestStructuredResponse"
+    assert event.profile == LLMProfile.VALIDATION
+
+
+def test_retry_exhaustion_raises_structured_output_error_with_exactly_two_calls():
+    client = MagicMock()
+    client.responses.parse.side_effect = [_malformed_json_error(), _malformed_json_error()]
+    provider = make_provider(client=client, structured_output_retries=1)
+    with pytest.raises(LLMStructuredOutputError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 2
+    assert len(provider.structured_output_retry_events) == 1
+    assert provider.structured_output_retry_events[0].recovered is False
+
+
+def test_retry_exhaustion_preserves_original_cause():
+    client = MagicMock()
+    original = _malformed_json_error()
+    client.responses.parse.side_effect = [original, _malformed_json_error()]
+    provider = make_provider(client=client, structured_output_retries=1)
+    try:
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+        pytest.fail("expected LLMStructuredOutputError")
+    except LLMStructuredOutputError as exc:
+        assert isinstance(exc.__cause__, ValidationError)
+
+
+def test_retry_disabled_propagates_first_malformed_response_with_one_call():
+    client = MagicMock()
+    client.responses.parse.side_effect = [_malformed_json_error()]
+    provider = make_provider(client=client, structured_output_retries=0)
+    with pytest.raises(LLMStructuredOutputError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+    # No retry occurred, so no retry event is recorded.
+    assert provider.structured_output_retry_events == ()
+
+
+def test_negative_structured_output_retries_rejected():
+    with pytest.raises(LLMConfigurationError):
+        make_provider(structured_output_retries=-1)
+
+
+def test_boolean_structured_output_retries_rejected():
+    with pytest.raises(LLMConfigurationError):
+        make_provider(structured_output_retries=True)
+
+
+# ---------------------------------------------------------------------------
+# WP-020: semantic (domain) validation failures are never retried
+# ---------------------------------------------------------------------------
+
+
+def test_semantic_validation_failure_is_not_retried():
+    client = MagicMock()
+    client.responses.parse.side_effect = [_semantic_validation_error()]
+    provider = make_provider(client=client, structured_output_retries=1)
+    with pytest.raises(ValidationError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+    assert provider.structured_output_retry_events == ()
+
+
+def test_semantic_validation_failure_propagates_as_raw_validation_error_not_wrapped():
+    client = MagicMock()
+    original = _semantic_validation_error()
+    client.responses.parse.side_effect = [original]
+    provider = make_provider(client=client, structured_output_retries=1)
+    try:
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+        pytest.fail("expected ValidationError")
+    except LLMStructuredOutputError:
+        pytest.fail("a semantic validation failure must never become LLMStructuredOutputError")
+    except ValidationError as exc:
+        assert exc is original
+
+
+# ---------------------------------------------------------------------------
+# WP-020: no-retry boundaries - each makes exactly one physical call
+# ---------------------------------------------------------------------------
+
+
+def test_authentication_error_not_retried():
+    client = MagicMock()
+    client.responses.parse.side_effect = openai.AuthenticationError(
+        message="invalid api key", response=MagicMock(status_code=401, headers={}), body=None
+    )
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(LLMAuthenticationError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+
+
+def test_rate_limit_error_not_retried():
+    client = MagicMock()
+    client.responses.parse.side_effect = openai.RateLimitError(
+        message="rate limited", response=MagicMock(status_code=429, headers={}), body=None
+    )
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(LLMRateLimitError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+
+
+def test_connection_error_not_retried():
+    client = MagicMock()
+    client.responses.parse.side_effect = openai.APIConnectionError(request=MagicMock())
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(LLMProviderError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+
+
+def test_api_status_error_not_retried():
+    client = MagicMock()
+    client.responses.parse.side_effect = openai.APIStatusError(
+        message="server error", response=MagicMock(status_code=500, headers={}), body=None
+    )
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(LLMProviderError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+
+
+def test_refusal_not_retried():
+    client = MagicMock()
+    client.responses.parse.return_value = _refusal_response("cannot comply with this request")
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(LLMRefusalError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
+
+
+def test_unexpected_exception_not_retried_and_propagates():
+    client = MagicMock()
+    client.responses.parse.side_effect = RuntimeError("genuinely unexpected bug")
+    provider = make_provider(client=client, structured_output_retries=2)
+    with pytest.raises(RuntimeError):
+        provider.generate_structured(
+            messages=[LLMMessage(role=MessageRole.USER, content="hi")],
+            response_model=_TestStructuredResponse,
+            profile=LLMProfile.GENERATION,
+        )
+    assert client.responses.parse.call_count == 1
 
 
 def test_failure_does_not_expose_api_key():

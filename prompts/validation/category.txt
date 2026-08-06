@@ -9,3 +9,9 @@ Candidate question:
 
 Requested canonical category:
 {expected_category}
+
+Your structured response corresponds to the following fields - report only what is asked, and do not add fields beyond what is requested:
+- valid: whether the candidate question genuinely belongs to the requested canonical category.
+- requested_category: the canonical category name that was requested (copy it exactly as supplied above).
+- assessed_category: the category the question's subject matter actually appears to fit, only if different from the requested category; omit (null) otherwise.
+- reason: a concise explanation of your determination. This field is required and must always contain a substantive, non-empty explanation of your determination, even when valid is true - it must never be an empty string.

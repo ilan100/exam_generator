@@ -42,6 +42,7 @@ def test_load_default_llm_config_succeeds():
     assert config.model
     assert config.generation.max_tokens > 0
     assert config.validation.max_tokens > 0
+    assert config.structured_output_retries >= 0
 
 
 def test_missing_config_file_raises_clear_error(tmp_path: Path):
@@ -118,3 +119,28 @@ def test_empty_provider_rejected():
 def test_empty_model_rejected():
     with pytest.raises(ValidationError):
         LLMConfig(**_valid_llm_kwargs(model=""))
+
+
+def test_structured_output_retries_defaults_to_one():
+    config = LLMConfig(**_valid_llm_kwargs())
+    assert config.structured_output_retries == 1
+
+
+def test_structured_output_retries_zero_accepted():
+    config = LLMConfig(**_valid_llm_kwargs(structured_output_retries=0))
+    assert config.structured_output_retries == 0
+
+
+def test_structured_output_retries_positive_integer_accepted():
+    config = LLMConfig(**_valid_llm_kwargs(structured_output_retries=3))
+    assert config.structured_output_retries == 3
+
+
+def test_structured_output_retries_negative_rejected():
+    with pytest.raises(ValidationError):
+        LLMConfig(**_valid_llm_kwargs(structured_output_retries=-1))
+
+
+def test_structured_output_retries_bool_rejected():
+    with pytest.raises(ValidationError):
+        LLMConfig(**_valid_llm_kwargs(structured_output_retries=True))

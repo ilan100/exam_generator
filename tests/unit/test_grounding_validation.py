@@ -3,15 +3,16 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from exam_generator.llm import LLMProfile, LLMProvider, LLMProviderError, MessageRole
+from exam_generator.llm import LLMAuthenticationError, LLMProfile, LLMProvider, LLMProviderError, LLMRateLimitError, MessageRole
 from exam_generator.models import (
     CandidateQuestion,
     GenerationMode,
+    GroundingValidationResponse,
     GroundingValidationResult,
     SourceEvidenceChunk,
     SourceType,
 )
-from exam_generator.prompts import GroundingPromptContext, PromptContextError, PromptId, PromptRepository
+from exam_generator.prompts import GroundingPromptContext, PromptContextError, PromptId, PromptRenderError, PromptRepository
 from exam_generator.retrieval.models import RetrievalResult
 from exam_generator.validation import (
     GroundingValidator,
@@ -54,17 +55,19 @@ def _chunk(
     )
 
 
-def _grounding_result(**kwargs) -> GroundingValidationResult:
+def _grounding_response(**kwargs) -> GroundingValidationResponse:
+    """Builds the LLM-facing response (WP-022): provenance via call-local
+    ``evidence_refs``, never canonical chunk identifiers."""
     defaults = dict(
         grounded=True,
         correct_answer_supported=True,
         other_answers_not_equally_correct=True,
-        evidence_chunk_ids=[],
+        evidence_refs=[],
         reason="supported by the evidence",
         confidence=0.8,
     )
     defaults.update(kwargs)
-    return GroundingValidationResult(**defaults)
+    return GroundingValidationResponse(**defaults)
 
 
 class _StubIndex:
@@ -95,12 +98,12 @@ class _RecordingPromptRepository:
         return self._real.get(prompt_id)
 
 
-def _provider(result: GroundingValidationResult | None = None, *, side_effect=None) -> MagicMock:
+def _provider(response: GroundingValidationResponse | None = None, *, side_effect=None) -> MagicMock:
     provider = MagicMock(spec=LLMProvider)
     if side_effect is not None:
         provider.generate_structured.side_effect = side_effect
     else:
-        provider.generate_structured.return_value = result if result is not None else _grounding_result()
+        provider.generate_structured.return_value = response if response is not None else _grounding_response()
     return provider
 
 
@@ -123,7 +126,7 @@ def _make_validator(*, index=None, prompt_repository=None, provider=None):
 
 
 def test_clearly_supported_candidate_passes():
-    passing = _grounding_result(
+    passing = _grounding_response(
         grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True
     )
     validator = _make_validator(provider=_provider(passing))
@@ -132,7 +135,7 @@ def test_clearly_supported_candidate_passes():
 
 
 def test_unsupported_candidate_fails_as_normal_result_not_exception():
-    failing = _grounding_result(
+    failing = _grounding_response(
         grounded=False, correct_answer_supported=False, reason="no supporting evidence found"
     )
     validator = _make_validator(provider=_provider(failing))
@@ -234,11 +237,11 @@ def test_llm_called_through_validation_profile():
     assert provider.generate_structured.call_args.kwargs["profile"] == LLMProfile.VALIDATION
 
 
-def test_llm_called_with_grounding_validation_result_model():
+def test_llm_called_with_grounding_validation_response_model():
     provider = _provider()
     validator = _make_validator(provider=provider)
     validator.validate_grounding(_candidate())
-    assert provider.generate_structured.call_args.kwargs["response_model"] is GroundingValidationResult
+    assert provider.generate_structured.call_args.kwargs["response_model"] is GroundingValidationResponse
 
 
 def test_messages_are_system_then_user():
@@ -257,24 +260,165 @@ def test_no_retry_exactly_one_llm_call():
 
 
 # ---------------------------------------------------------------------------
-# Supporting-evidence-id provenance
+# WP-022: evidence-reference provenance (call-local -> canonical mapping)
 # ---------------------------------------------------------------------------
 
 
-def test_returned_supporting_evidence_ids_must_belong_to_supplied_evidence():
+def test_valid_evidence_ref_resolves_to_canonical_chunk_id():
     chunk = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
     index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
-    result = _grounding_result(evidence_chunk_ids=["STUDENT_SUMMARY:s1.pdf:0002:0001"])
-    validator = _make_validator(index=index, provider=_provider(result))
+    response = _grounding_response(evidence_refs=[1])
+    validator = _make_validator(index=index, provider=_provider(response))
     returned = validator.validate_grounding(_candidate())
     assert returned.evidence_chunk_ids == ["STUDENT_SUMMARY:s1.pdf:0002:0001"]
 
 
-def test_invented_supporting_evidence_id_is_rejected():
-    result = _grounding_result(evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"])
-    validator = _make_validator(provider=_provider(result))
+def test_multiple_evidence_refs_resolve_in_order():
+    chunk_a = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0001:0001")
+    chunk_b = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
+    chunk_c = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0003:0001")
+    index = _StubIndex(
+        (
+            RetrievalResult(chunk=chunk_a, score=0.9, rank=1),
+            RetrievalResult(chunk=chunk_b, score=0.8, rank=2),
+            RetrievalResult(chunk=chunk_c, score=0.7, rank=3),
+        )
+    )
+    response = _grounding_response(evidence_refs=[1, 3])
+    validator = _make_validator(index=index, provider=_provider(response))
+    returned = validator.validate_grounding(_candidate())
+    assert returned.evidence_chunk_ids == [
+        "STUDENT_SUMMARY:s1.pdf:0001:0001",
+        "STUDENT_SUMMARY:s1.pdf:0003:0001",
+    ]
+
+
+def test_evidence_ref_beyond_supplied_range_is_rejected():
+    # Only 1 chunk supplied - ref 4 does not exist.
+    response = _grounding_response(evidence_refs=[4])
+    provider = _provider(response)
+    validator = _make_validator(provider=provider)
     with pytest.raises(InvalidGroundingOutputError):
         validator.validate_grounding(_candidate())
+    assert provider.generate_structured.call_count == 2  # WP-021 retries once, same bad response
+
+
+def test_evidence_ref_zero_is_rejected():
+    response = _grounding_response(evidence_refs=[0])
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_evidence_ref_negative_is_rejected():
+    response = _grounding_response(evidence_refs=[-1])
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_canonical_chunk_id_string_instead_of_local_ref_is_rejected():
+    # The LLM-facing schema only accepts integers - a canonical ID string
+    # cannot even be constructed as a valid GroundingValidationResponse.
+    with pytest.raises(Exception):
+        GroundingValidationResponse(
+            grounded=True,
+            correct_answer_supported=True,
+            other_answers_not_equally_correct=True,
+            evidence_refs=["STUDENT_SUMMARY:s1.pdf:0002:0001"],
+            reason="stub",
+            confidence=0.8,
+        )
+
+
+def test_no_local_reference_leaks_into_final_result():
+    chunk = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    response = _grounding_response(evidence_refs=[1])
+    validator = _make_validator(index=index, provider=_provider(response))
+    returned = validator.validate_grounding(_candidate())
+    assert "evidence_refs" not in type(returned).model_fields
+    assert all(cid.startswith("STUDENT_SUMMARY:") for cid in returned.evidence_chunk_ids)
+    assert "1" not in returned.evidence_chunk_ids
+
+
+# ---------------------------------------------------------------------------
+# WP-021: bounded provenance retry
+# ---------------------------------------------------------------------------
+
+
+def test_normal_success_makes_exactly_one_logical_call():
+    passing = _grounding_response(evidence_refs=[])
+    provider = _provider(passing)
+    validator = _make_validator(provider=provider)
+    validator.validate_grounding(_candidate())
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
+
+
+def test_invented_evidence_ref_then_valid_recovers():
+    chunk = _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001")
+    index = _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),))
+    invalid = _grounding_response(evidence_refs=[9])
+    valid = _grounding_response(evidence_refs=[1])
+    provider = _provider(side_effect=[invalid, valid])
+    validator = _make_validator(index=index, provider=provider)
+
+    result = validator.validate_grounding(_candidate())
+
+    assert result.evidence_chunk_ids == ["STUDENT_SUMMARY:s1.pdf:0002:0001"]
+    assert provider.generate_structured.call_count == 2
+    # Same request resubmitted unchanged (retrieval happened only once) -
+    # the identical Evidence-N mapping is reused across the retry.
+    assert len(index.calls) == 1
+    first_call, second_call = provider.generate_structured.call_args_list
+    assert first_call.kwargs["messages"] == second_call.kwargs["messages"]
+    assert first_call.kwargs["response_model"] == second_call.kwargs["response_model"]
+    assert first_call.kwargs["profile"] == second_call.kwargs["profile"]
+    assert len(validator.provenance_retry_events) == 1
+    event = validator.provenance_retry_events[0]
+    assert event.validator == "grounding"
+    assert event.attempts_made == 2
+    assert event.recovered is True
+
+
+def test_invented_evidence_ref_twice_exhausts():
+    invalid = _grounding_response(evidence_refs=[9])
+    provider = _provider(side_effect=[invalid, invalid])
+    validator = _make_validator(provider=provider)
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+    assert provider.generate_structured.call_count == 2
+    assert len(validator.provenance_retry_events) == 1
+    assert validator.provenance_retry_events[0].recovered is False
+
+
+def test_normal_passed_false_verdict_is_not_retried():
+    failing = _grounding_response(grounded=False, correct_answer_supported=False, reason="not supported")
+    provider = _provider(failing)
+    validator = _make_validator(provider=provider)
+    result = validator.validate_grounding(_candidate())
+    assert result.passed is False
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
+
+
+@pytest.mark.parametrize(
+    "exc",
+    [
+        LLMAuthenticationError("bad key"),
+        LLMRateLimitError("rate limited"),
+        LLMProviderError("connection failed"),
+        PromptRenderError("bad prompt"),
+    ],
+)
+def test_operational_errors_are_never_provenance_retried(exc):
+    provider = _provider(side_effect=exc)
+    validator = _make_validator(provider=provider)
+    with pytest.raises(type(exc)):
+        validator.validate_grounding(_candidate())
+    assert provider.generate_structured.call_count == 1
+    assert validator.provenance_retry_events == ()
 
 
 # ---------------------------------------------------------------------------

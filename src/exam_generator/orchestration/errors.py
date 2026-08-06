@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from exam_generator.orchestration.models import PlannedQuestion, QuestionProductionRecord
-    from exam_generator.production import QuestionAttempt, QuestionProductionResult
 
 
 class ExamOrchestrationError(Exception):
@@ -27,26 +26,26 @@ class InvalidOrchestrationConfigurationError(ExamOrchestrationError):
 
 
 class QuestionProductionFailedError(ExamOrchestrationError):
-    """A planned exam question could not be completed - the exam is never
-    silently returned with fewer questions than requested.
+    """A system-level failure aborted exam generation entirely - the run
+    could not safely continue at all, so no partial result is returned.
 
-    Exactly one of two underlying causes applies, distinguished by which
-    optional context is populated:
+    Since WP-023, this exception represents *only* system-level failures
+    (e.g. authentication, rate-limit, provider/connection, configuration,
+    prompt-repository, or retrieval/corpus-initialization failures) -
+    always carries ``operational_cause``, the original exception that
+    triggered the abort. Question-local failures (WP-013 attempt-budget
+    exhaustion, WP-021 provenance-recovery exhaustion, duplicate-
+    replacement exhaustion, and similar per-candidate failures) no longer
+    raise this exception at all - they are recorded as
+    ``FailedPlannedQuestion`` entries and orchestration continues past
+    them, per WP-023's question-local/system-level distinction.
 
-    * WP-013's own bounded regeneration was exhausted for this planned
-      question (``attempts_exhausted`` is that ``QuestionAttemptsExhaustedError``'s
-      ``.attempts``, ``duplicate_productions`` is empty);
-    * every production for this planned question - including every bounded
-      duplicate-replacement attempt - yielded a candidate that duplicated a
-      question already accepted into this exam (``duplicate_productions``
-      holds each rejected ``QuestionProductionResult``, ``attempts_exhausted``
-      is ``None``).
-
-    Always carries ``planned_question`` (the failing plan entry) and
-    ``completed_productions`` (every ``QuestionProductionRecord`` already
-    successfully accepted into the exam before this failure), so the
-    partial state remains available for diagnostics even though it is
-    never returned as though it were a complete exam.
+    Always carries ``planned_question`` (the plan entry being produced
+    when the abort happened) and ``completed_productions`` (every
+    ``QuestionProductionRecord`` already successfully accepted into the
+    exam before this failure), so the partial state remains available for
+    diagnostics even though it is never returned as though it were a
+    complete or partial exam.
     """
 
     def __init__(
@@ -55,11 +54,9 @@ class QuestionProductionFailedError(ExamOrchestrationError):
         *,
         planned_question: "PlannedQuestion",
         completed_productions: tuple["QuestionProductionRecord", ...],
-        duplicate_productions: tuple["QuestionProductionResult", ...] = (),
-        attempts_exhausted: tuple["QuestionAttempt", ...] | None = None,
+        operational_cause: Exception,
     ) -> None:
         super().__init__(message)
         self.planned_question = planned_question
         self.completed_productions = completed_productions
-        self.duplicate_productions = duplicate_productions
-        self.attempts_exhausted = attempts_exhausted
+        self.operational_cause = operational_cause

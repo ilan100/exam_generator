@@ -26,12 +26,66 @@ and never mutates a candidate, plan entry, or validator/production result.
 
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from exam_generator.config import load_app_config
-from exam_generator.models import ExamOutput, ExamRequest, GenerationMode, candidate_to_exam_question
+from exam_generator.generation import GenerationError
+from exam_generator.llm import LLMError
+from exam_generator.models import (
+    ExamGenerationStatus,
+    ExamOutput,
+    ExamRequest,
+    GenerationMode,
+    candidate_to_exam_question,
+)
 from exam_generator.orchestration.errors import InvalidOrchestrationConfigurationError, QuestionProductionFailedError
-from exam_generator.orchestration.models import ExamGenerationResult, PlannedQuestion, QuestionProductionRecord
+from exam_generator.orchestration.models import (
+    ExamGenerationResult,
+    FailedPlannedQuestion,
+    PlannedQuestion,
+    QuestionProductionRecord,
+)
 from exam_generator.production import QuestionAttemptsExhaustedError, QuestionProducer, QuestionProductionResult
-from exam_generator.retrieval import CategoryResolver, build_category_resolver, resolve_exam_request_categories
+from exam_generator.prompts import PromptError
+from exam_generator.retrieval import CategoryResolver, RetrievalError, build_category_resolver, resolve_exam_request_categories
+from exam_generator.validation import GroundingValidationError, InvalidGroundingOutputError, InvalidTextbookOutputError, TextbookValidationError
+
+#: WP-023: failures demonstrably local to the one candidate/question being
+#: produced when they occur - never indicating a broader system/provider/
+#: infrastructure problem. Orchestration records these as a
+#: ``FailedPlannedQuestion`` and continues with the rest of the plan,
+#: exactly as though this single planned question had been skipped.
+#: ``QuestionAttemptsExhaustedError`` is handled separately (it carries its
+#: own ``.attempts`` history) but is question-local in the same sense.
+#:
+#: Deliberately minimal (WP-023 section 6: "do not guess"): limited to
+#: exactly the classes WP-023 section 4 names explicitly. Every other
+#: previously-"known-operational" failure (including a validator's own raw
+#: ``pydantic.ValidationError`` and a provider ``LLMResponseError``/
+#: ``LLMStructuredOutputError``) stays system-level, matching pre-existing,
+#: deliberately-written test expectations (see
+#: ``test_invalid_structured_validator_output_is_an_operational_failure``
+#: and ``test_structured_output_retry_exhaustion_is_a_contextualized_exam_failure``)
+#: that were never asked to change.
+_QUESTION_LOCAL_ERROR_TYPES: tuple[type[Exception], ...] = (
+    InvalidGroundingOutputError,  # WP-021 grounding provenance recovery exhausted for this candidate
+    InvalidTextbookOutputError,  # WP-021 textbook provenance recovery exhausted for this candidate
+)
+
+#: WP-023: every other known-operational failure - unchanged from what
+#: WP-019 originally called "operational" before WP-023 split that single
+#: bucket in two. Never specific to the one candidate/question being
+#: produced when it happens; orchestration aborts the entire run
+#: immediately via ``QuestionProductionFailedError``.
+_SYSTEM_LEVEL_ERROR_TYPES: tuple[type[Exception], ...] = (
+    LLMError,
+    GenerationError,
+    GroundingValidationError,
+    TextbookValidationError,
+    RetrievalError,
+    PromptError,
+    ValidationError,
+)
 
 
 def _validate_max_duplicate_replacement_attempts(value: int) -> int:
@@ -120,15 +174,29 @@ class ExamOrchestrator:
         self,
         planned: PlannedQuestion,
         *,
+        total_planned: int,
         completed_productions: tuple[QuestionProductionRecord, ...],
         seen_normalized_questions: set[str],
-    ) -> QuestionProductionRecord:
+    ) -> QuestionProductionRecord | FailedPlannedQuestion:
         """Produce one planned question, replacing (bounded) any result
         that exactly duplicates a question already accepted into this
-        exam. Raises ``QuestionProductionFailedError`` - never silently
-        continues with a partial exam - if WP-013 itself exhausts its
-        attempts, or if every duplicate-replacement attempt is also a
-        duplicate."""
+        exam.
+
+        Since WP-023, a question-local failure (WP-013's own bounded
+        regeneration exhausted, every duplicate-replacement attempt also
+        duplicated an already-accepted question, or another failure
+        demonstrably scoped to this one candidate - see
+        ``_QUESTION_LOCAL_ERROR_TYPES``) is returned as a
+        ``FailedPlannedQuestion`` rather than raised - a normal outcome the
+        caller records and continues past, exactly as a validator's
+        negative verdict is a normal result rather than an exception. A
+        system-level failure (``_SYSTEM_LEVEL_ERROR_TYPES``) still raises
+        ``QuestionProductionFailedError`` immediately, aborting the whole
+        run, contextualized with this planned question's position/
+        category/mode and how many questions were already completed, with
+        the original failure preserved via exception chaining. A
+        genuinely unexpected exception is left uncaught, propagating with
+        its full traceback."""
         duplicate_productions: list[QuestionProductionResult] = []
 
         for _ in range(self._max_duplicate_replacement_attempts + 1):
@@ -137,12 +205,30 @@ class ExamOrchestrator:
                     category=planned.category, generation_mode=planned.generation_mode
                 )
             except QuestionAttemptsExhaustedError as exc:
+                return FailedPlannedQuestion(
+                    planned=planned,
+                    failure_type=type(exc).__name__,
+                    failure_message=(
+                        f"generation attempts exhausted without an accepted candidate "
+                        f"({len(exc.attempts)} attempt(s) made)"
+                    ),
+                    attempts=exc.attempts,
+                )
+            except _QUESTION_LOCAL_ERROR_TYPES as exc:
+                return FailedPlannedQuestion(
+                    planned=planned,
+                    failure_type=type(exc).__name__,
+                    failure_message=str(exc),
+                )
+            except _SYSTEM_LEVEL_ERROR_TYPES as exc:
                 raise QuestionProductionFailedError(
-                    f"WP-013 exhausted its generation attempts for planned question at position "
-                    f"{planned.position} (category={planned.category!r}, mode={planned.generation_mode.value})",
+                    f"Exam generation failed at question {planned.position}/{total_planned} "
+                    f"(category={planned.category!r}, generation_mode={planned.generation_mode.value}). "
+                    f"Completed questions: {len(completed_productions)}. "
+                    f"Cause: {type(exc).__name__}: {exc}",
                     planned_question=planned,
                     completed_productions=completed_productions,
-                    attempts_exhausted=exc.attempts,
+                    operational_cause=exc,
                 ) from exc
 
             normalized = _normalize_question_text(production.candidate.question)
@@ -155,49 +241,72 @@ class ExamOrchestrator:
 
             duplicate_productions.append(production)
 
-        raise QuestionProductionFailedError(
-            f"Exhausted {self._max_duplicate_replacement_attempts} duplicate-replacement attempt(s) for "
-            f"planned question at position {planned.position} (category={planned.category!r}, "
-            f"mode={planned.generation_mode.value}) - every produced candidate duplicated a question "
-            "already accepted into this exam",
-            planned_question=planned,
-            completed_productions=completed_productions,
+        return FailedPlannedQuestion(
+            planned=planned,
+            failure_type="DuplicateReplacementExhausted",
+            failure_message=(
+                f"exhausted {self._max_duplicate_replacement_attempts} duplicate-replacement attempt(s) - "
+                "every produced candidate duplicated a question already accepted into this exam"
+            ),
             duplicate_productions=tuple(duplicate_productions),
         )
 
     def generate_exam(self, request: ExamRequest) -> ExamGenerationResult:
-        """Generate a complete exam for ``request``.
+        """Generate an exam for ``request``.
 
         Resolves aliases to canonical categories and combines their
         requested counts (WP-006, never reimplemented here), builds a
         deterministic plan, then sequentially calls WP-013's
         ``QuestionProducer`` once per planned question - never
         reimplementing generation/validation/acceptance/regeneration.
-        Only an accepted, non-duplicate candidate enters the exam. Any
-        operational failure (from the producer, any validator, or the
-        generator) propagates immediately; the entire exam is never
-        silently returned incomplete. Never mutates ``request`` or any
-        production/validation result.
+        Only an accepted, non-duplicate candidate enters the exam.
+
+        Since WP-023, a question-local failure (see
+        ``_QUESTION_LOCAL_ERROR_TYPES`` and ``_produce_unique_question``)
+        no longer aborts the run: it is recorded as a
+        ``FailedPlannedQuestion`` and the plan continues, yielding a
+        ``PARTIAL`` result if the plan otherwise completes. A system-level
+        failure still propagates immediately as
+        ``QuestionProductionFailedError`` - no result is returned at all
+        in that case. Accepted questions are renumbered contiguously
+        1..N in plan order (never gap-preserving, since a failed planned
+        position leaves no clean-exam slot to preserve); each accepted
+        question's original planned position remains available via its
+        ``QuestionProductionRecord.planned.position``, separate from its
+        final exam number. Never mutates ``request`` or any production/
+        validation result.
         """
         resolved_request = resolve_exam_request_categories(request, self._category_resolver)
         plan = build_exam_plan(resolved_request)
 
         productions: list[QuestionProductionRecord] = []
+        failed_questions: list[FailedPlannedQuestion] = []
         seen_normalized_questions: set[str] = set()
 
         for planned in plan:
-            record = self._produce_unique_question(
+            result = self._produce_unique_question(
                 planned,
+                total_planned=len(plan),
                 completed_productions=tuple(productions),
                 seen_normalized_questions=seen_normalized_questions,
             )
-            productions.append(record)
-            seen_normalized_questions.add(_normalize_question_text(record.production.candidate.question))
+            if isinstance(result, FailedPlannedQuestion):
+                failed_questions.append(result)
+                continue
+            productions.append(result)
+            seen_normalized_questions.add(_normalize_question_text(result.production.candidate.question))
 
         exam_questions = [
-            candidate_to_exam_question(record.production.candidate, record.planned.position)
-            for record in productions
+            candidate_to_exam_question(record.production.candidate, number)
+            for number, record in enumerate(productions, start=1)
         ]
-        exam = ExamOutput(questions=exam_questions)
+        exam = ExamOutput(questions=exam_questions) if exam_questions else None
+        status = ExamGenerationStatus.PARTIAL if failed_questions else ExamGenerationStatus.COMPLETE
 
-        return ExamGenerationResult(exam=exam, plan=plan, productions=tuple(productions))
+        return ExamGenerationResult(
+            status=status,
+            exam=exam,
+            plan=plan,
+            productions=tuple(productions),
+            failed_questions=tuple(failed_questions),
+        )

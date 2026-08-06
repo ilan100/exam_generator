@@ -14,7 +14,7 @@ with the validation results it summarizes.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from exam_generator.models import (
     CandidateQuestion,
@@ -25,7 +25,7 @@ from exam_generator.models import (
     TextbookCheckResult,
     TextbookCheckStatus,
 )
-from exam_generator.models._common import PositiveIntStrict
+from exam_generator.models._common import NonBlankStr, PositiveIntStrict
 
 
 class CandidateValidationResults(BaseModel):
@@ -65,18 +65,54 @@ class CandidateValidationResults(BaseModel):
 
 
 class QuestionAttempt(BaseModel):
-    """One completed generate-then-validate attempt: the generated
-    candidate, its full independent validation bundle, and the resulting
-    acceptance decision. Preserved for every attempt, accepted or not."""
+    """One completed candidate-production attempt: either a generated
+    candidate with its full independent validation bundle (and the
+    resulting acceptance decision), or - since WP-019 - a recoverable
+    generation-contract failure (the model's structured response could not
+    safely become a ``CandidateQuestion``, e.g. it claimed unsupplied
+    evidence provenance) that was discarded before any validator ran.
+    Preserved for every attempt, accepted or not.
+
+    Exactly one of ``(candidate, validations)`` or
+    ``(generation_failure_type, generation_failure_message)`` is ever
+    populated - a generation-contract failure never fabricates a candidate
+    or validation results, and a real candidate never carries a failure
+    description.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     attempt_number: PositiveIntStrict
-    candidate: CandidateQuestion
-    validations: CandidateValidationResults
+    candidate: CandidateQuestion | None = None
+    validations: CandidateValidationResults | None = None
+    generation_failure_type: NonBlankStr | None = None
+    generation_failure_message: NonBlankStr | None = None
+
+    @model_validator(mode="after")
+    def _check_exactly_one_outcome(self) -> "QuestionAttempt":
+        if (self.candidate is None) != (self.validations is None):
+            raise ValueError("candidate and validations must both be set or both be None")
+        if (self.generation_failure_type is None) != (self.generation_failure_message is None):
+            raise ValueError(
+                "generation_failure_type and generation_failure_message must both be set or both be None"
+            )
+        is_candidate_attempt = self.candidate is not None
+        is_failure_attempt = self.generation_failure_type is not None
+        if is_candidate_attempt == is_failure_attempt:
+            raise ValueError(
+                "exactly one of (candidate, validations) or (generation_failure_type, "
+                "generation_failure_message) must be set"
+            )
+        return self
+
+    @property
+    def is_generation_contract_failure(self) -> bool:
+        return self.generation_failure_type is not None
 
     @property
     def accepted(self) -> bool:
+        if self.validations is None:
+            return False
         return self.validations.accepted
 
 

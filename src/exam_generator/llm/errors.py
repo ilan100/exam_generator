@@ -42,3 +42,18 @@ class LLMResponseError(LLMError):
 class LLMRefusalError(LLMResponseError):
     """The model explicitly refused to produce the requested structured
     output."""
+
+
+class LLMStructuredOutputError(LLMResponseError):
+    """The provider returned a response, but the requested structured
+    result could not be obtained because the response text itself was
+    malformed/unparseable JSON (e.g. truncated by a token limit) - raised
+    only after the provider's own small, bounded structured-output retry
+    (WP-020) is exhausted.
+
+    Distinct from a response that parsed successfully but failed one of
+    this project's own domain-level validators (a ``pydantic.ValidationError``
+    whose errors are not all ``json_invalid``) - that case is never
+    retried or reinterpreted here; the provider does not decide domain
+    validity, only whether it managed to obtain usable structured output.
+    """

@@ -31,15 +31,12 @@ from typing import Sequence
 from pydantic import ValidationError
 
 from exam_generator.config import ConfigError, load_app_config, load_llm_config
-from exam_generator.generation import GenerationError
 from exam_generator.llm import LLMConfigurationError, LLMError
-from exam_generator.models import ExamRequest
+from exam_generator.models import ExamGenerationStatus, ExamRequest
 from exam_generator.orchestration import ExamOrchestrator, QuestionProductionFailedError
 from exam_generator.output import AuditConsistencyError, build_exam_output_bundle, serialize_audit_json, serialize_exam_json
-from exam_generator.production import QuestionAttemptsExhaustedError
 from exam_generator.prompts import PromptError
 from exam_generator.retrieval import CategoryResolutionError, RetrievalError
-from exam_generator.validation import GroundingValidationError, TextbookValidationError
 
 EXIT_SUCCESS = 0
 EXIT_GENERATION_FAILURE = 1
@@ -145,19 +142,45 @@ def _run_generate(args: argparse.Namespace) -> int:
     )
 
     # Serialize both outputs before writing either, so a serialization
-    # failure in one never leaves the other written alone.
-    exam_json = serialize_exam_json(bundle.exam)
+    # failure in one never leaves the other written alone. Since WP-023,
+    # ``bundle.exam`` is ``None`` only when zero planned questions were
+    # accepted - there is no valid clean exam to serialize/write in that
+    # edge case, since ``ExamOutput`` structurally requires at least one
+    # question.
+    exam_json = serialize_exam_json(bundle.exam) if bundle.exam is not None else None
     audit_json = serialize_audit_json(bundle.audit)
 
-    print("Writing exam output...")
-    _atomic_write_text(exam_output, exam_json)
+    if exam_json is not None:
+        print("Writing exam output...")
+        _atomic_write_text(exam_output, exam_json)
+    else:
+        print("No usable questions were produced - exam output was not written.")
 
     print("Writing audit output...")
     _atomic_write_text(audit_output, audit_json)
 
     print("Done.")
-    print(f"Exam generated successfully: {len(bundle.exam.questions)} question(s)")
-    print(f"  Exam output:  {exam_output}")
+    if generation_result.status == ExamGenerationStatus.COMPLETE:
+        print(f"Exam generated successfully: {len(bundle.exam.questions)} question(s)")
+    else:
+        planned = len(generation_result.plan)
+        accepted = len(generation_result.productions)
+        failed = len(generation_result.failed_questions)
+        print("Exam generation completed with partial results.")
+        print(f"Requested: {planned}")
+        print(f"Generated: {accepted}")
+        print(f"Failed: {failed}")
+        print()
+        print("Failed planned questions:")
+        for failed_question in generation_result.failed_questions:
+            planned_question = failed_question.planned
+            print(
+                f"  #{planned_question.position} - {planned_question.category} - "
+                f"{planned_question.generation_mode.value}"
+            )
+            print(f"    reason: {failed_question.failure_type}: {failed_question.failure_message}")
+
+    print(f"  Exam output:  {exam_output if bundle.exam is not None else '(not written - zero usable questions)'}")
     print(f"  Audit output: {audit_output}")
 
     return EXIT_SUCCESS
@@ -178,18 +201,10 @@ def _classify_error(exc: Exception) -> tuple[int, str] | None:
         return EXIT_USAGE_ERROR, f"Invalid category in request: {exc}"
     if isinstance(exc, OSError):
         return EXIT_USAGE_ERROR, f"Output write failed: {exc}"
-    if isinstance(exc, QuestionAttemptsExhaustedError):
-        return EXIT_GENERATION_FAILURE, f"Exam generation failed: {exc}"
     if isinstance(exc, QuestionProductionFailedError):
         return EXIT_GENERATION_FAILURE, f"Exam generation failed: {exc}"
     if isinstance(exc, AuditConsistencyError):
         return EXIT_GENERATION_FAILURE, f"Internal output-consistency check failed: {exc}"
-    if isinstance(exc, GenerationError):
-        return EXIT_GENERATION_FAILURE, f"Generation failed: {exc}"
-    if isinstance(exc, GroundingValidationError):
-        return EXIT_GENERATION_FAILURE, f"Grounding validation failed: {exc}"
-    if isinstance(exc, TextbookValidationError):
-        return EXIT_GENERATION_FAILURE, f"Textbook validation failed: {exc}"
     if isinstance(exc, RetrievalError):
         return EXIT_GENERATION_FAILURE, f"Retrieval failed: {exc}"
     if isinstance(exc, PromptError):

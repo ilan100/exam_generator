@@ -165,3 +165,4 @@ class LLMConfig(BaseModel):
     model: str = Field(min_length=1)
     generation: LLMGenerationParams
     validation: LLMValidationParams
+    structured_output_retries: StrictNonNegativeInt = 1

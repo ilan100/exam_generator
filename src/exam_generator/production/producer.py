@@ -22,7 +22,7 @@ validation logic, and never mutates a candidate or a validator's result.
 from __future__ import annotations
 
 from exam_generator.config import load_app_config
-from exam_generator.generation import QuestionGenerator
+from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
 from exam_generator.models import CandidateQuestion, GenerationMode
 from exam_generator.production.errors import InvalidProductionConfigurationError, QuestionAttemptsExhaustedError
 from exam_generator.production.models import CandidateValidationResults, QuestionAttempt, QuestionProductionResult
@@ -113,17 +113,38 @@ class QuestionProducer:
         ``category``/``generation_mode`` are held fixed across every
         attempt - never silently altered. Stops at the first accepted
         candidate. Raises ``QuestionAttemptsExhaustedError`` (carrying
-        every completed attempt) if all attempts are rejected. Any
-        operational failure from generation or validation propagates
-        immediately, consuming no further attempts. Never mutates a
-        candidate or a validator's result.
+        every completed attempt) if all attempts are rejected.
+
+        WP-019: a recoverable generation-contract failure
+        (``InvalidGeneratedOutputError`` - the model's structured response
+        could not safely become a ``CandidateQuestion``, e.g. it claimed
+        evidence provenance that was never supplied) is caught here,
+        recorded as a failed attempt consuming this same bounded attempt
+        budget, and never reaches any validator - the fabricated response
+        is discarded completely, never repaired, normalized, or guessed
+        at. Every other operational failure (from generation or any
+        validator - provider/auth/rate-limit/retrieval/prompt/config
+        errors) still propagates immediately, consuming no further
+        attempts and never retried here. Never mutates a candidate or a
+        validator's result.
         """
         attempts: list[QuestionAttempt] = []
 
         for attempt_number in range(1, self._max_attempts + 1):
-            candidate = self._generator.generate_candidate_question(
-                category=category, generation_mode=generation_mode
-            )
+            try:
+                candidate = self._generator.generate_candidate_question(
+                    category=category, generation_mode=generation_mode
+                )
+            except InvalidGeneratedOutputError as exc:
+                attempts.append(
+                    QuestionAttempt(
+                        attempt_number=attempt_number,
+                        generation_failure_type=type(exc).__name__,
+                        generation_failure_message=str(exc),
+                    )
+                )
+                continue
+
             validations = self._validate_candidate(candidate)
             attempt = QuestionAttempt(
                 attempt_number=attempt_number, candidate=candidate, validations=validations

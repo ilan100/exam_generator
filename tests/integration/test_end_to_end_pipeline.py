@@ -18,32 +18,39 @@ from datetime import datetime, timezone
 from typing import Sequence
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from exam_generator.config.models import LLMConfig, LLMGenerationParams, LLMValidationParams
-from exam_generator.generation import QuestionGenerator
+from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
 from exam_generator.historical import HistoricalQuestionRepository
 from exam_generator.llm import LLMMessage, LLMProfile, LLMProvider, LLMProviderError
 from exam_generator.models import (
     CategoryValidationResult,
+    ExamGenerationStatus,
     ExamRequest,
     GeneratedQuestionResponse,
     GenerationMode,
-    GroundingValidationResult,
+    GroundingValidationResponse,
     HistoricalStyleReference,
     MCQValidationResult,
     QualityValidationResult,
     SourceEvidenceChunk,
     SourceType,
-    TextbookCheckResult,
+    TextbookValidationResponse,
     TextbookCheckStatus,
 )
 from exam_generator.orchestration import ExamOrchestrator, QuestionProductionFailedError
-from exam_generator.output import build_exam_output_bundle
+from exam_generator.output import build_exam_output_bundle, serialize_audit_json
 from exam_generator.production import QuestionAttemptsExhaustedError, QuestionProducer
 from exam_generator.prompts import PromptRepository
 from exam_generator.retrieval import CategoryResolver, FactualRetrievalIndex
-from exam_generator.validation import CategoryValidator, GroundingValidator, MCQValidator, QualityValidator, TextbookValidator
+from exam_generator.validation import (
+    CategoryValidator,
+    GroundingValidator,
+    MCQValidator,
+    QualityValidator,
+    TextbookValidator,
+)
 from exam_generator.chunking import FactualSourceCorpus
 
 CATEGORY_A = "קליפת המוח"
@@ -159,10 +166,10 @@ def _generated_response(question: str = "שאלה לדוגמה?", correct_answer
     )
 
 
-def _grounding(passed: bool = True) -> GroundingValidationResult:
-    return GroundingValidationResult(
+def _grounding(passed: bool = True) -> GroundingValidationResponse:
+    return GroundingValidationResponse(
         grounded=passed, correct_answer_supported=passed, other_answers_not_equally_correct=passed,
-        evidence_chunk_ids=[], reason="stub", confidence=0.9,
+        evidence_refs=[], reason="stub", confidence=0.9,
     )
 
 
@@ -178,8 +185,8 @@ def _quality(valid: bool = True) -> QualityValidationResult:
     return QualityValidationResult(valid=valid, reason="stub")
 
 
-def _textbook(status: TextbookCheckStatus = TextbookCheckStatus.CONSISTENT) -> TextbookCheckResult:
-    return TextbookCheckResult(status=status, reason="stub")
+def _textbook(status: TextbookCheckStatus = TextbookCheckStatus.CONSISTENT) -> TextbookValidationResponse:
+    return TextbookValidationResponse(status=status, reason="stub")
 
 
 def _build_pipeline(
@@ -244,7 +251,7 @@ def _queue_passing_attempt(
     textbook_status: TextbookCheckStatus = TextbookCheckStatus.NOT_FOUND,
 ) -> None:
     fake_provider.queue(GeneratedQuestionResponse, _generated_response(question=question))
-    fake_provider.queue(GroundingValidationResult, _grounding(True))
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
     fake_provider.queue(MCQValidationResult, _mcq(True))
     fake_provider.queue(CategoryValidationResult, _category(category, True))
     fake_provider.queue(QualityValidationResult, _quality(True))
@@ -255,7 +262,7 @@ def _queue_passing_attempt(
     # "unrelated" text. If retrieval finds nothing, TextbookValidator's
     # own empty-retrieval short-circuit means this queued response is
     # simply never consumed.
-    fake_provider.queue(TextbookCheckResult, _textbook(textbook_status))
+    fake_provider.queue(TextbookValidationResponse, _textbook(textbook_status))
 
 
 # ---------------------------------------------------------------------------
@@ -306,11 +313,11 @@ def test_candidate_rejected_then_accepted():
     )
     # Attempt 1: rejected (MCQ fails).
     fake_provider.queue(GeneratedQuestionResponse, _generated_response(question="שאלה ראשונה"))
-    fake_provider.queue(GroundingValidationResult, _grounding(True))
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
     fake_provider.queue(MCQValidationResult, _mcq(False))
     fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
     fake_provider.queue(QualityValidationResult, _quality(True))
-    fake_provider.queue(TextbookCheckResult, _textbook(TextbookCheckStatus.NOT_FOUND))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
     # Attempt 2: accepted.
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שנייה")
 
@@ -328,7 +335,9 @@ def test_candidate_rejected_then_accepted():
 # ---------------------------------------------------------------------------
 
 
-def test_attempts_exhausted_propagates_as_question_production_failed():
+def test_attempts_exhausted_is_question_local_and_yields_partial_result():
+    # WP-023: WP-013's own attempt-budget exhaustion is question-local -
+    # orchestration returns a PARTIAL result rather than raising.
     orchestrator, fake_provider = _build_pipeline(
         student_summary_corpus=_student_summary_corpus(),
         course_book_corpus=_course_book_corpus_no_overlap(),
@@ -338,17 +347,77 @@ def test_attempts_exhausted_propagates_as_question_production_failed():
     )
     for i in range(2):
         fake_provider.queue(GeneratedQuestionResponse, _generated_response(question=f"שאלה {i}"))
-        fake_provider.queue(GroundingValidationResult, _grounding(False))
+        fake_provider.queue(GroundingValidationResponse, _grounding(False))
         fake_provider.queue(MCQValidationResult, _mcq(True))
         fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
         fake_provider.queue(QualityValidationResult, _quality(True))
-        fake_provider.queue(TextbookCheckResult, _textbook(TextbookCheckStatus.NOT_FOUND))
+        fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
 
-    with pytest.raises(QuestionProductionFailedError) as excinfo:
-        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
-    assert excinfo.value.attempts_exhausted is not None
-    assert len(excinfo.value.attempts_exhausted) == 2
+    assert result.status == ExamGenerationStatus.PARTIAL
+    assert result.exam is None
+    assert len(result.failed_questions) == 1
+    failed = result.failed_questions[0]
+    assert failed.failure_type == "QuestionAttemptsExhaustedError"
+    assert len(failed.attempts) == 2
+
+
+def test_partial_exam_end_to_end_through_output_boundary():
+    # WP-023 full pipeline: one planned question accepted, the next
+    # exhausts locally - the run still reaches the end of its plan, the
+    # clean exam contains only the accepted question renumbered to 1, and
+    # the audit/output boundary represents both outcomes.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+        max_generation_attempts=1,
+    )
+    # Planned position 1: accepted on the first attempt.
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה ראשונה")
+    # Planned position 2: a single generation-contract failure exhausts the
+    # (1-attempt) budget.
+    invented_response = GeneratedQuestionResponse(
+        question="שאלה שנייה?",
+        answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+        correct_answer=1,
+        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        historical_reference_id=None,
+    )
+    fake_provider.queue(GeneratedQuestionResponse, invented_response)
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
+
+    assert result.status == ExamGenerationStatus.PARTIAL
+    assert len(result.exam.questions) == 1
+    assert result.exam.questions[0].number == 1
+    assert result.exam.questions[0].question == "שאלה ראשונה"
+
+    bundle = build_exam_output_bundle(
+        result,
+        exam_id="exam-partial-e2e",
+        generated_at=datetime.now(timezone.utc),
+        llm_config=LLMConfig(
+            provider="openai",
+            model="gpt-4o-mini",
+            generation=LLMGenerationParams(temperature=0.7, max_tokens=800),
+            validation=LLMValidationParams(temperature=0.2, max_tokens=500),
+        ),
+        diversity_target=0.7,
+    )
+    assert bundle.exam is not None
+    assert len(bundle.exam.questions) == 1
+    assert bundle.audit.status.value == "PARTIAL"
+    assert bundle.audit.planned_question_count == 2
+    assert bundle.audit.accepted_count == 1
+    assert bundle.audit.failed_count == 1
+    assert bundle.audit.questions[0].planned_position == 1
+    assert bundle.audit.failed_questions[0].planned_position == 2
+
+    serialized = serialize_audit_json(bundle.audit)
+    assert "Evidence" not in serialized  # no local reference leaks into canonical output
 
 
 # ---------------------------------------------------------------------------
@@ -392,16 +461,16 @@ def test_textbook_potential_conflict_blocks_acceptance_and_exhausts():
         max_generation_attempts=1,
     )
     fake_provider.queue(GeneratedQuestionResponse, _generated_response())
-    fake_provider.queue(GroundingValidationResult, _grounding(True))
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
     fake_provider.queue(MCQValidationResult, _mcq(True))
     fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
     fake_provider.queue(QualityValidationResult, _quality(True))
-    fake_provider.queue(TextbookCheckResult, _textbook(TextbookCheckStatus.POTENTIAL_CONFLICT))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.POTENTIAL_CONFLICT))
 
-    with pytest.raises(QuestionProductionFailedError) as excinfo:
-        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
-    attempt = excinfo.value.attempts_exhausted[0]
+    assert result.status == ExamGenerationStatus.PARTIAL
+    attempt = result.failed_questions[0].attempts[0]
     assert attempt.accepted is False
     assert attempt.validations.textbook.status == TextbookCheckStatus.POTENTIAL_CONFLICT
     assert attempt.validations.grounding.passed is True  # primary validators all passed
@@ -439,6 +508,11 @@ def test_duplicate_candidate_is_replaced():
 
 
 def test_operational_failure_propagates_immediately():
+    # WP-019: no retry occurs, and the exam-level failure is contextualized
+    # (position/category/mode/completed count) rather than the raw
+    # LLMProviderError propagating unwrapped - the original cause remains
+    # inspectable via QuestionProductionFailedError.operational_cause and
+    # standard exception chaining.
     orchestrator, fake_provider = _build_pipeline(
         student_summary_corpus=_student_summary_corpus(),
         course_book_corpus=_course_book_corpus_no_overlap(),
@@ -447,8 +521,15 @@ def test_operational_failure_propagates_immediately():
     )
     fake_provider.queue(GeneratedQuestionResponse, LLMProviderError("connection failed"))
 
-    with pytest.raises(LLMProviderError):
+    with pytest.raises(QuestionProductionFailedError) as excinfo:
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert isinstance(excinfo.value.operational_cause, LLMProviderError)
+    assert isinstance(excinfo.value.__cause__, LLMProviderError)
+    assert excinfo.value.planned_question.position == 1
+    assert excinfo.value.planned_question.category == CATEGORY_A
+    assert excinfo.value.completed_productions == ()
+    assert fake_provider.call_log.count((GeneratedQuestionResponse, LLMProfile.GENERATION)) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -525,3 +606,360 @@ def test_final_clean_and_audit_outputs_are_consistent():
     for exam_question, audit_question in zip(bundle.exam.questions, bundle.audit.questions):
         assert exam_question.number == audit_question.number
         assert exam_question.category == audit_question.category
+
+
+# ---------------------------------------------------------------------------
+# WP-018: reliability hardening scenarios - invalid structured output,
+# provenance violations, and structural quality must each classify
+# correctly as operational failure vs. normal candidate-quality rejection.
+# ---------------------------------------------------------------------------
+
+
+def test_invalid_structured_validator_output_is_an_operational_failure():
+    # A pydantic ValidationError (e.g. the raw structured-output-model-level
+    # empty-reason contract violation WP-018 investigates) must still
+    # propagate as an operational failure, never be silently treated as a
+    # rejection - WP-019 only makes GENERATION-contract failures
+    # recoverable, never a validator's own structured-output failure.
+    try:
+        QualityValidationResult(valid=True, reason="")
+    except ValidationError as exc:
+        raw_validation_error = exc
+    else:
+        raise AssertionError("expected QualityValidationResult(reason='') to raise ValidationError")
+
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response())
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, raw_validation_error)
+
+    with pytest.raises(QuestionProductionFailedError) as excinfo:
+        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert isinstance(excinfo.value.operational_cause, ValidationError)
+    assert isinstance(excinfo.value.__cause__, ValidationError)
+
+
+def test_generation_provenance_violation_is_recovered_within_the_attempt_budget():
+    # WP-019: a single recoverable generation-contract failure (invented
+    # evidence_chunk_ids) is discarded and retried - not an operational
+    # failure at all anymore. No validator is ever called for the
+    # discarded attempt (nothing queued for it would be consumed).
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+        max_generation_attempts=3,
+    )
+    invented_response = GeneratedQuestionResponse(
+        question="שאלה לדוגמה?",
+        answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+        correct_answer=1,
+        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        historical_reference_id=None,
+    )
+    fake_provider.queue(GeneratedQuestionResponse, invented_response)
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה תקינה")
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    attempts = result.productions[0].production.attempts
+    assert len(attempts) == 2
+    assert attempts[0].is_generation_contract_failure is True
+    assert attempts[0].candidate is None
+    assert attempts[0].validations is None
+    assert attempts[0].accepted is False
+    assert attempts[1].accepted is True
+    assert result.exam.questions[0].question == "שאלה תקינה"
+    # No MCQ/category/quality/textbook/grounding call was made for the
+    # discarded attempt - only one full validation cycle occurred.
+    assert fake_provider.call_log.count((MCQValidationResult, LLMProfile.VALIDATION)) == 1
+
+
+def test_generation_provenance_violation_exhausts_when_every_attempt_is_invalid():
+    # WP-023: WP-013's attempt-budget exhaustion is question-local -
+    # orchestration returns a PARTIAL result rather than raising, even
+    # when every discarded attempt was a generation-contract failure.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+        max_generation_attempts=3,
+    )
+    invented_response = GeneratedQuestionResponse(
+        question="שאלה לדוגמה?",
+        answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+        correct_answer=1,
+        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        historical_reference_id=None,
+    )
+    for _ in range(3):
+        fake_provider.queue(GeneratedQuestionResponse, invented_response)
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert result.status == ExamGenerationStatus.PARTIAL
+    assert result.exam is None
+    failed = result.failed_questions[0]
+    assert len(failed.attempts) == 3
+    assert all(attempt.is_generation_contract_failure for attempt in failed.attempts)
+    assert failed.planned.position == 1
+    assert result.productions == ()
+    # No MCQ/grounding/etc. call was ever made - every attempt was
+    # discarded before validation.
+    assert fake_provider.call_log.count((MCQValidationResult, LLMProfile.VALIDATION)) == 0
+
+
+def test_generation_provenance_violation_then_quality_rejection_then_accepted():
+    # WP-019: contract failures and candidate-quality rejections share one
+    # bounded attempt budget.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+        max_generation_attempts=3,
+    )
+    invented_response = GeneratedQuestionResponse(
+        question="שאלה לדוגמה?",
+        answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+        correct_answer=1,
+        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        historical_reference_id=None,
+    )
+    fake_provider.queue(GeneratedQuestionResponse, invented_response)
+    # Attempt 2: valid candidate but MCQ rejects.
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response(question="שאלה שנייה"))
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(False))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, _quality(True))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
+    # Attempt 3: accepted.
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה שלישית")
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    attempts = result.productions[0].production.attempts
+    assert len(attempts) == 3
+    assert attempts[0].is_generation_contract_failure is True
+    assert attempts[1].is_generation_contract_failure is False
+    assert attempts[1].accepted is False
+    assert attempts[2].accepted is True
+    assert result.exam.questions[0].question == "שאלה שלישית"
+
+
+def test_grounding_provenance_violation_is_question_local_after_wp021_retry_exhausts():
+    # WP-021: a single invented grounding evidence id is retried once (same
+    # logical validation) before exhausting. WP-023: that exhaustion
+    # (InvalidGroundingOutputError) is question-local - orchestration
+    # returns a PARTIAL result rather than raising.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response())
+    invented_grounding = GroundingValidationResponse(
+        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
+        evidence_refs=[99], reason="stub", confidence=0.9,
+    )
+    fake_provider.queue(GroundingValidationResponse, invented_grounding, invented_grounding)
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert result.status == ExamGenerationStatus.PARTIAL
+    assert result.failed_questions[0].failure_type == "InvalidGroundingOutputError"
+    assert fake_provider.call_log.count((GroundingValidationResponse, LLMProfile.VALIDATION)) == 2
+
+
+def test_textbook_provenance_violation_is_question_local_after_wp021_retry_exhausts():
+    # WP-023: same retry-then-exhaust behavior for textbook provenance;
+    # exhaustion is question-local, yielding a PARTIAL result.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_with_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response())
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, _quality(True))
+    invented_textbook = TextbookValidationResponse(
+        status=TextbookCheckStatus.CONSISTENT,
+        evidence_refs=[99],
+        reason="stub",
+    )
+    fake_provider.queue(TextbookValidationResponse, invented_textbook, invented_textbook)
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert result.status == ExamGenerationStatus.PARTIAL
+    assert result.failed_questions[0].failure_type == "InvalidTextbookOutputError"
+    assert fake_provider.call_log.count((TextbookValidationResponse, LLMProfile.VALIDATION)) == 2
+
+
+def test_multi_question_exam_recovers_a_later_planned_questions_contract_failure():
+    # WP-019 section 22: one later planned question experiences a
+    # recoverable generation-contract failure and then succeeds; earlier
+    # completed questions and the final exam output remain correct.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A, CATEGORY_B],
+        max_generation_attempts=3,
+    )
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה ראשונה")
+    invented_response = GeneratedQuestionResponse(
+        question="שאלה לדוגמה?",
+        answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
+        correct_answer=1,
+        evidence_chunk_ids=["NOT_A_SUPPLIED_CHUNK_ID"],
+        historical_reference_id=None,
+    )
+    fake_provider.queue(GeneratedQuestionResponse, invented_response)
+    _queue_passing_attempt(fake_provider, category=CATEGORY_B, question="שאלה שנייה")
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
+
+    assert [q.question for q in result.exam.questions] == ["שאלה ראשונה", "שאלה שנייה"]
+    assert len(result.productions[0].production.attempts) == 1
+    assert len(result.productions[1].production.attempts) == 2
+    assert result.productions[1].production.attempts[0].is_generation_contract_failure is True
+
+
+def test_duplicated_answer_numbering_is_a_normal_quality_rejection_not_a_failure():
+    # The deterministic structural pre-check (WP-018) short-circuits before
+    # any LLM validation call, so no QualityValidationResult is queued for
+    # the defective attempt - if the pipeline tried to call the LLM anyway,
+    # FakeLLMProvider would raise AssertionError for under-provisioning.
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+        max_generation_attempts=2,
+    )
+    defective_response = GeneratedQuestionResponse(
+        question="שאלה לדוגמה?",
+        answers=[
+            "1. לטרלית ל-Olfactory Tract",
+            "2. מדיאלית ל-Olfactory Tract",
+            "תשובה ג",
+            "תשובה ד",
+        ],
+        correct_answer=1,
+        evidence_chunk_ids=[],
+        historical_reference_id=None,
+    )
+    fake_provider.queue(GeneratedQuestionResponse, defective_response)
+    fake_provider.queue(GroundingValidationResponse, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    # No QualityValidationResult queued - the structural pre-check must
+    # reject before reaching the LLM call. Textbook is still queued as a
+    # fallback (all five validators run regardless of quality's verdict),
+    # per the same real-TF-IDF caveat _queue_passing_attempt documents.
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
+    _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה תקינה")
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    attempts = result.productions[0].production.attempts
+    assert attempts[0].accepted is False
+    assert attempts[0].validations.quality.valid is False
+    assert "numbering" in attempts[0].validations.quality.reason.lower()
+    assert attempts[1].accepted is True
+    assert result.exam.questions[0].question == "שאלה תקינה"
+
+
+# ---------------------------------------------------------------------------
+# WP-021: bounded validator provenance recovery
+# ---------------------------------------------------------------------------
+
+
+def test_grounding_provenance_retry_recovers_within_one_question_attempt():
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response())
+    invented_grounding = GroundingValidationResponse(
+        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
+        evidence_refs=[99], reason="stub", confidence=0.9,
+    )
+    fake_provider.queue(GroundingValidationResponse, invented_grounding, _grounding(True))
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, _quality(True))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+
+    assert len(result.exam.questions) == 1
+    # The WP-021 provenance retry is internal to one logical validation -
+    # still exactly one QuestionAttempt, not two.
+    assert len(result.productions[0].production.attempts) == 1
+    assert fake_provider.call_log.count((GroundingValidationResponse, LLMProfile.VALIDATION)) == 2
+
+
+# ---------------------------------------------------------------------------
+# WP-022: local evidence references never leak into audit/output
+# ---------------------------------------------------------------------------
+
+
+def test_grounding_local_reference_never_leaks_into_serialized_audit():
+    orchestrator, fake_provider = _build_pipeline(
+        student_summary_corpus=_student_summary_corpus(),
+        course_book_corpus=_course_book_corpus_no_overlap(),
+        historical_repository=_historical_repository(),
+        canonical_categories=[CATEGORY_A],
+    )
+    fake_provider.queue(GeneratedQuestionResponse, _generated_response())
+    fake_provider.queue(
+        GroundingValidationResponse,
+        GroundingValidationResponse(
+            grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
+            evidence_refs=[1], reason="stub", confidence=0.9,
+        ),
+    )
+    fake_provider.queue(MCQValidationResult, _mcq(True))
+    fake_provider.queue(CategoryValidationResult, _category(CATEGORY_A, True))
+    fake_provider.queue(QualityValidationResult, _quality(True))
+    fake_provider.queue(TextbookValidationResponse, _textbook(TextbookCheckStatus.NOT_FOUND))
+
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    bundle = build_exam_output_bundle(
+        result,
+        exam_id="wp022-leak-test",
+        generated_at=datetime.now(timezone.utc),
+        llm_config=LLMConfig(
+            provider="fake", model="fake-model",
+            generation=LLMGenerationParams(temperature=0.7, max_tokens=800),
+            validation=LLMValidationParams(temperature=0.2, max_tokens=500),
+        ),
+        diversity_target=0.7,
+    )
+
+    audit_json = serialize_audit_json(bundle.audit)
+    resolved_ids = bundle.audit.questions[0].attempts[-1].grounding.evidence_chunk_ids
+    assert resolved_ids == ["STUDENT_SUMMARY:s1.pdf:0001:0001"]
+    assert "STUDENT_SUMMARY:s1.pdf:0001:0001" in audit_json
+    assert "Evidence 1" not in audit_json
+    assert "[Evidence" not in audit_json
+    assert "evidence_refs" not in audit_json
