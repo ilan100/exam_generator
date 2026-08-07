@@ -43,33 +43,72 @@ def _build_validation_query(candidate: CandidateQuestion) -> str:
     return f"{candidate.category} {candidate.question} {correct_answer_text}"
 
 
-def _resolve_grounding_response(
-    response: GroundingValidationResponse, validation_evidence: tuple[SourceEvidenceChunk, ...]
-) -> GroundingValidationResult:
-    """Strictly validate the LLM's call-local ``evidence_refs`` (WP-022)
-    against the evidence actually supplied to this call, then
-    deterministically construct the existing, unchanged
-    ``GroundingValidationResult`` with genuine canonical
-    ``evidence_chunk_ids``.
+_REQUIRED_ANSWER_INDICES = frozenset({1, 2, 3, 4})
 
-    Fails closed (raises, rather than drops/repairs/clamps/fuzzy-matches)
-    on any reference outside ``1..len(validation_evidence)`` - including
-    zero, negative, and out-of-range values, all treated identically so
-    every case benefits equally from WP-021's retry.
+
+def _resolve_grounding_response(
+    response: GroundingValidationResponse,
+    validation_evidence: tuple[SourceEvidenceChunk, ...],
+    candidate: CandidateQuestion,
+) -> GroundingValidationResult:
+    """Strictly validate the LLM's per-option assessments (WP-027) and
+    call-local ``evidence_refs`` (WP-022) against the evidence actually
+    supplied to this call, then deterministically derive the existing,
+    unchanged ``GroundingValidationResult`` fields - never trusting a
+    separate LLM-reported summary boolean for
+    ``correct_answer_supported``/``other_answers_not_equally_correct``
+    (WP-027: a holistic LLM summary proved able to contradict its own
+    per-option reasoning - see
+    ``evaluation/wp026_false_acceptance_diagnostic.md``).
+
+    Fails closed (raises, rather than drops/repairs/clamps/fuzzy-matches/
+    reorders-and-guesses) on:
+    - a malformed assessment set (not exactly one assessment for each of
+      answer indices 1-4 - missing, duplicated, or out-of-range indices);
+    - any evidence reference outside ``1..len(validation_evidence)`` -
+      including zero, negative, and out-of-range values.
+
+    Both failure kinds raise the same ``InvalidGroundingOutputError`` and
+    are treated identically by WP-021's bounded provenance retry - a
+    malformed/inconsistent structured response is exactly the kind of
+    recoverable contract failure that retry already exists for.
     """
+    indices = [assessment.answer_index for assessment in response.answer_assessments]
+    if set(indices) != _REQUIRED_ANSWER_INDICES or len(indices) != len(_REQUIRED_ANSWER_INDICES):
+        raise InvalidGroundingOutputError(
+            "Grounding result must contain exactly one assessment for each answer "
+            f"index 1-4, with no duplicates and no omissions; got indices {indices}"
+        )
+
     invalid_refs = [
-        ref for ref in response.evidence_refs if not (1 <= ref <= len(validation_evidence))
+        ref
+        for assessment in response.answer_assessments
+        for ref in assessment.evidence_refs
+        if not (1 <= ref <= len(validation_evidence))
     ]
     if invalid_refs:
         raise InvalidGroundingOutputError(
             f"Grounding result claims evidence reference(s) outside the supplied range "
             f"1..{len(validation_evidence)}: {invalid_refs}"
         )
-    resolved_chunk_ids = [validation_evidence[ref - 1].chunk_id for ref in response.evidence_refs]
+
+    by_index = {assessment.answer_index: assessment for assessment in response.answer_assessments}
+    supported_indices = {index for index, assessment in by_index.items() if assessment.supported_as_correct}
+
+    correct_answer_supported = candidate.correct_answer in supported_indices
+    other_answers_not_equally_correct = supported_indices <= {candidate.correct_answer}
+
+    resolved_chunk_ids: list[str] = []
+    for index in sorted(supported_indices):
+        for ref in by_index[index].evidence_refs:
+            chunk_id = validation_evidence[ref - 1].chunk_id
+            if chunk_id not in resolved_chunk_ids:
+                resolved_chunk_ids.append(chunk_id)
+
     return GroundingValidationResult(
         grounded=response.grounded,
-        correct_answer_supported=response.correct_answer_supported,
-        other_answers_not_equally_correct=response.other_answers_not_equally_correct,
+        correct_answer_supported=correct_answer_supported,
+        other_answers_not_equally_correct=other_answers_not_equally_correct,
         evidence_chunk_ids=resolved_chunk_ids,
         evidence_text=response.evidence_text,
         reason=response.reason,
@@ -185,7 +224,7 @@ class GroundingValidator:
                 profile=LLMProfile.VALIDATION,
             )
             try:
-                result = _resolve_grounding_response(response, validation_evidence)
+                result = _resolve_grounding_response(response, validation_evidence, candidate)
             except InvalidGroundingOutputError:
                 if attempt < max_calls:
                     continue

@@ -20,12 +20,17 @@ from exam_generator.generation import QuestionGenerator
 from exam_generator.llm import LLMProfile, LLMStructuredOutputError, OpenAIProvider
 from exam_generator.models import (
     CategoryValidationResult,
+    DistractorArchetype,
+    DistractorDesign,
     ExamRequest,
     GeneratedQuestionResponse,
+    GroundingAnswerAssessment,
     GroundingValidationResponse,
     MCQValidationResult,
     PlannedQuestionTargetResponse,
     QualityValidationResult,
+    QuestionBlueprint,
+    QuestionDifficulty,
     QuestionTargetPlanningResponse,
     SourceType,
     TextbookValidationResponse,
@@ -120,8 +125,29 @@ def _malformed_json_error(response_model: type) -> ValidationError:
 # ---------------------------------------------------------------------------
 
 
+def _distractor() -> DistractorDesign:
+    return DistractorDesign(
+        archetype=DistractorArchetype.SIBLING_STRUCTURE,
+        plausibility_reason="plausible",
+        incorrectness_reason="incorrect for the exact relationship asked",
+        evidence_checked=True,
+    )
+
+
+def _blueprint() -> QuestionBlueprint:
+    return QuestionBlueprint(
+        knowledge_target="knowledge target",
+        tested_relationship="tested relationship",
+        question_style="direct question",
+        intended_difficulty=QuestionDifficulty.MEDIUM,
+        correct_answer_role="supported by the evidence",
+        distractors=[_distractor(), _distractor(), _distractor()],
+    )
+
+
 def _generated_response(**kwargs) -> GeneratedQuestionResponse:
     defaults = dict(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -133,9 +159,19 @@ def _generated_response(**kwargs) -> GeneratedQuestionResponse:
 
 
 def _grounding(passed: bool = True) -> GroundingValidationResponse:
+    # WP-027: per-option assessments. Every _grounding() call in this file
+    # is paired with a _generated_response() using its default
+    # correct_answer=1, so only index 1 is ever marked supported here.
     return GroundingValidationResponse(
-        grounded=passed, correct_answer_supported=passed, other_answers_not_equally_correct=passed,
-        evidence_refs=[], reason="stub", confidence=0.9,
+        grounded=passed,
+        answer_assessments=[
+            GroundingAnswerAssessment(
+                answer_index=i, supported_as_correct=(passed and i == 1), evidence_refs=[], reason="stub"
+            )
+            for i in (1, 2, 3, 4)
+        ],
+        reason="stub",
+        confidence=0.9,
     )
 
 
@@ -368,8 +404,15 @@ def test_structured_output_recovery_then_invalid_provenance_then_wp021_recovery_
     client = _QueuedSdkClient()
     client.queue(GeneratedQuestionResponse, _generated_response())
     invented = GroundingValidationResponse(
-        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
-        evidence_refs=[99], reason="stub", confidence=0.9,
+        grounded=True,
+        answer_assessments=[
+            GroundingAnswerAssessment(answer_index=1, supported_as_correct=True, evidence_refs=[99], reason="stub"),
+            GroundingAnswerAssessment(answer_index=2, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=3, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=4, supported_as_correct=False, evidence_refs=[], reason="stub"),
+        ],
+        reason="stub",
+        confidence=0.9,
     )
     client.queue(
         GroundingValidationResponse,

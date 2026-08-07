@@ -1,0 +1,50 @@
+[
+  {
+    "label": "#8 CT-shape",
+    "category": "מיפוי ודימות מוחי",
+    "outcome": "accepted",
+    "attempt_number": 3,
+    "question": "מהו היתרון העיקרי של טומוגרפיה ממוחשבת (CT) בדימות מוחי בהשוואה לאולטרסאונד?",
+    "answers": [
+      "מהירה וזולה",
+      "מספקת תמונה תלת ממדית",
+      "מתאימה לדימות של מבוגרים בלבד",
+      "לא משתמשת בקרינת רנטגן"
+    ],
+    "correct_answer": 2,
+    "grounding_correct_answer_supported": true,
+    "grounding_other_answers_not_equally_correct": true
+  },
+  {
+    "label": "#23 PNS-shape",
+    "category": "מערכת העצבים ההיקפית",
+    "outcome": "accepted",
+    "attempt_number": 2,
+    "question": "איזה מהבאות מהווה את החלק הסומטי של מערכת העצבים ההיקפית?",
+    "answers": [
+      "מערכת העצבים האוטונומית",
+      "מערכת העצבים הסימפתטית",
+      "מערכת העצבים הפאראסימפתטית",
+      "מערכת העצבים הסומטית"
+    ],
+    "correct_answer": 4,
+    "grounding_correct_answer_supported": true,
+    "grounding_other_answers_not_equally_correct": true
+  },
+  {
+    "label": "#32 microglia-shape",
+    "category": "תאי מערכת העצבים",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקידם של תאי המיקרוגליה במערכת העצבים המרכזית?",
+    "answers": [
+      "הם מייצרים מיאלין סביב האקסונים",
+      "הם מפרישים סרוטונין",
+      "הם מבצעים פאגוציטוזה והרס סינפסות לא רלוונטיות",
+      "הם משמשים כמבנה תומך בלבד"
+    ],
+    "correct_answer": 3,
+    "grounding_correct_answer_supported": true,
+    "grounding_other_answers_not_equally_correct": true
+  }
+]

@@ -8,9 +8,13 @@ from exam_generator.models.audit import (
 from exam_generator.models.exam import ExamOutput, ExamRequest
 from exam_generator.models.question import (
     CandidateQuestion,
+    DistractorArchetype,
+    DistractorDesign,
     ExamQuestion,
     GeneratedQuestionResponse,
     GenerationMode,
+    QuestionBlueprint,
+    QuestionDifficulty,
     candidate_to_exam_question,
 )
 from exam_generator.models.source import HistoricalStyleReference, SourceEvidenceChunk, SourceType
@@ -21,6 +25,7 @@ from exam_generator.models.target import (
 )
 from exam_generator.models.validation import (
     CategoryValidationResult,
+    GroundingAnswerAssessment,
     GroundingValidationResponse,
     GroundingValidationResult,
     MCQValidationResult,
@@ -33,6 +38,8 @@ from exam_generator.models.validation import (
 __all__ = [
     "CandidateQuestion",
     "CategoryValidationResult",
+    "DistractorArchetype",
+    "DistractorDesign",
     "ExamAudit",
     "ExamGenerationStatus",
     "ExamOutput",
@@ -41,6 +48,7 @@ __all__ = [
     "FailedQuestionAudit",
     "GeneratedQuestionResponse",
     "GenerationMode",
+    "GroundingAnswerAssessment",
     "GroundingValidationResponse",
     "GroundingValidationResult",
     "HistoricalStyleReference",
@@ -49,6 +57,8 @@ __all__ = [
     "QualityValidationResult",
     "QuestionAttemptAudit",
     "QuestionAudit",
+    "QuestionBlueprint",
+    "QuestionDifficulty",
     "QuestionTarget",
     "QuestionTargetPlanningResponse",
     "SourceEvidenceChunk",

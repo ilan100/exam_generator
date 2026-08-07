@@ -1,0 +1,464 @@
+[
+  {
+    "category": "התעלה השדרתית ותכולתה",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "מבנה החוליות",
+        "factual_focus": "תיאור המבנה של החוליה, כולל גוף החוליה, Pedicle, Lamina ו-Vertebral Foramen.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0003:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0006:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0006:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "החומר האפור בחוט השדרה",
+        "factual_focus": "חלוקת החומר האפור בחוט השדרה לשכבות Laminae of Rexed ותפקוד כל שכבה.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0006:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "לוקליזציה פונקציונלית",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "קורטקס מוטורי",
+        "factual_focus": "המיקום והפונקציה של הקורטקס המוטורי הראשוני (M1)",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0050:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "קורטקס סנסורי",
+        "factual_focus": "המיקום והפונקציה של הקורטקס הסנסורי הראשוני (S1)",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0071:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "חומר לבן",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "סוגי חומר לבן במוח",
+        "factual_focus": "החומר הלבן במוח מחולק לשלושה סוגים: סיבי השלכה, סיבים קומיסורליים וסיבי אסוציאציה.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0018:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0028:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "תפקידי החומר הלבן",
+        "factual_focus": "תפקידים שונים של החומר הלבן כוללים חיבור אזורים קורטיקליים עם אזורים לא-קורטיקליים, חיבור בין שתי ההמיספרות וחיבור בין מבנים קורטיקליים שכנים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0018:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0028:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "עצבים קרניאליים",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "עצב ההרחה - Olfactory Nerve",
+        "factual_focus": "עצב ההרחה (CN I) הוא עצב קרניאלי יוצא דופן, המתפתח מהטלנצפלון ומגיע ישירות לקליפת המוח דרך מערות האף, ולא עובר דרך גזע המוח.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0124:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0090:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0110:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "עצב הראייה - Optic Nerve",
+        "factual_focus": "עצב הראייה (CN II) מתפתח מהדיאנצפלון ומגיע ישירות לתלמוס, ולא עובר דרך גזע המוח, מה שעושה אותו יוצא דופן בין העצבים הקרניאליים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0124:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0052:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0110:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מיפוי ודימות מוחי",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "שיטות דימות מוחי",
+        "factual_focus": "ההבדלים בין אולטרסאונד ו-CT לשימוש במיפוי מוחי",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0041:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0036:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מיפוי תפקוד המוח",
+        "factual_focus": "הקשר בין אזור ברוקה ליכולת לייצר שפה",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0080:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0041:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "היסטולוגיה",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "היסטולוגיה של מערכת העצבים המרכזית",
+        "factual_focus": "ההיסטולוגיה של תאי עצב והמאפיינים הייחודיים של רקמה עצבית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0067:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0046:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0028:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "שכבות הנאוקורטקס",
+        "factual_focus": "ההבדלים במבנה השכבות השונות בנאוקורטקס והשפעתם על תפקוד המוח.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0047:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0048:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "המערכת הלימבית",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "Cingulate Gyrus",
+        "factual_focus": "The cingulate gyrus is a key structure within the limbic system that plays a significant role in emotional processing and regulation.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0139:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0154:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0015:0002"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "Hippocampus and Memory",
+        "factual_focus": "The hippocampus is essential for the formation of new memories and is a central structure in the limbic system.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0139:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0154:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0069:0002"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "אספקת דם",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "אספקת דם לצרבלום",
+        "factual_focus": "עורקים המספקים דם לצרבלום כוללים את ה-Superior Cerebellar Artery, Anterior Inferior Cerebellar Artery (AICA) ו-Posterior Inferior Cerebellar Artery (PICA), כל אחד מהם מספק דם לאזורים שונים של הצרבלום.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0043:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "אספקת דם למערכת העצבים המרכזית",
+        "factual_focus": "ה-Basilar Artery מספק דם לאזורים אחוריים במערכת העצבים המרכזית, מתפצל ל-Posterior Cerebral Artery (PCA) ולשניים נוספים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0042:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0065:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "קרומים וסינוסים דוראליים",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "סינוסים וורידיים במוח",
+        "factual_focus": "תפקיד הסינוסים הוורידיים במערכת הדם של המוח והקשרים שלהם עם כלי דם אחרים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0070:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0044:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0045:0002",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0045:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מבנה הדורה",
+        "factual_focus": "ההבדל בין השכבות החיצוניות והפנימיות של הדורה וכיצד הן יוצרות חללים דמים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0070:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0044:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0007:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0046:0002"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "גזע המוח",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "מבנה גזע המוח",
+        "factual_focus": "גזע המוח מחולק לשלושה חלקים: Midbrain, Pons, Medulla Oblongata.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0108:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "תפקודים של גזע המוח",
+        "factual_focus": "גזע המוח אחראי על תפקודים בסיסיים כמו נשימה, לב, ושינה וערות.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0108:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מסילות עצביות",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "מסילות עולות",
+        "factual_focus": "המסילה הספינותלמית מעבירה תחושות של כאב וטמפרטורה מהפריפריה אל התלמוס.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0151:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מסילות עולות",
+        "factual_focus": "הmedial lemniscus tract מעביר תחושות מתקדמות כמו תודעה ותחושת מיקום.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0151:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "גרעיני הבסיס",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "תפקוד גרעיני הבסיס",
+        "factual_focus": "הגרעינים הבסיסיים מעורבים בהוצאה לפועל של תנועה מוטורית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0039:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0025:0002"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מסלולים במערכת גרעיני הבסיס",
+        "factual_focus": "גרעיני הבסיס פועלים דרך שני מסלולים: המסלול הישיר והמסלול העקיף.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0064:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0039:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0063:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "המוח הקטן",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "תפקוד הצרבלום",
+        "factual_focus": "המוח הקטן (צרבלום) תומך בקואורדינציה ובתפקודים מוטוריים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0120:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0168:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0122:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מבנה הצרבלום",
+        "factual_focus": "המבנה האנטומי של המוח הקטן כולל שני המיספרות, folia ו-fissures, וחומר אפור בחוץ וחומר לבן בפנים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0120:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0122:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "מערכת העצבים האוטונומית",
+        "factual_focus": "ההבחנה בין מערכת העצבים הסימפתטית למערכת העצבים הפאראסימפתטית והשפעתן על תהליכים פיזיולוגיים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0072:0001",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0145:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "תאי שוואן במערכת העצבים ההיקפית",
+        "factual_focus": "תפקידם של תאי שוואן בהפקת מיילין ובחשיבותם להולכה מהירה של אימפולסים עצביים.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0149:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0024:0003"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "דיאנצפלון",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "תפקודים של הדיאנצפלון",
+        "factual_focus": "הדיאנצפלון מעורב בתהליכים רגשיים ולמידה בזיכרון.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_3.pdf:0138:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מבנים בדיאנצפלון",
+        "factual_focus": "הדיאנצפלון כולל את התלמוס, היפותלמוס, אפיתלמוס וסאב-תלמוס.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0111:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "אמבריולוגיה",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "Gastrulation and Germ Layers",
+        "factual_focus": "The process of gastrulation leads to the formation of three germ layers: ectoderm, mesoderm, and endoderm.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0012:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "Neural Tube Flexures",
+        "factual_focus": "The development of major flexures in the neural tube, including cervical, pontine, and cephalic flexures, shapes the brain's three-dimensional structure.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0016:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "טופוגרפיה של ההמיספרות",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "חלוקה לאונות",
+        "factual_focus": "ההמיספרות מחולקות לארבע אונות: פרונטלית, טמפורלית, פריאטלית ואוקסיפיטלית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0013:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מבנים באונה הפריאטלית",
+        "factual_focus": "האזורים המרכזיים באונה הפריאטלית כוללים את ה-Postcentral Gyrus, Angular Gyrus, Supramarginal Gyrus, Superior Parietal Lobule ו-Inferior Parietal Lobule.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0021:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "חדרי המוח",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "חדרים לטרליים",
+        "factual_focus": "החדרים הלטרליים במוח מקבלים צורה של האות C במהלך ההתפתחות העוברית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0012:0002",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0022:0002",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0058:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "חדר שלישי",
+        "factual_focus": "החדר השלישי במוח מחובר לחדרים הלטרליים דרך ה-interventricular foramen.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0034:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0022:0002"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "תאי מיקרוגליה",
+        "factual_focus": "תפקיד המיקרוגליה כמרכיב חיסוני במערכת העצבים המרכזית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0024:0002",
+          "STUDENT_SUMMARY:student_summary_2.pdf:0134:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "תאי אפנדימה",
+        "factual_focus": "תפקיד תאי אפנדימה בפיקוח על מעבר נוזלים במערכת העצבים המרכזית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_1.pdf:0024:0002",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0023:0001"
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מבוא",
+    "targets": [
+      {
+        "target_id": 1,
+        "topic": "היסטוריה של חקר האנטומיה",
+        "factual_focus": "ההבנה ההיסטורית של הקשר בין פגיעות מוחיות לתפקוד המוחי, כפי שמתואר בפפירוס אדווין סמית.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0001:0001",
+          "STUDENT_SUMMARY:student_summary_3.pdf:0001:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0001:0001"
+        ]
+      },
+      {
+        "target_id": 2,
+        "topic": "מבנה מערכת העצבים",
+        "factual_focus": "האבולוציה של מערכת העצבים באדם, כולל תהליך תנועת Foramen Magnum והשפעתו על הזקיפות.",
+        "supporting_evidence_chunk_ids": [
+          "STUDENT_SUMMARY:student_summary_2.pdf:0002:0001",
+          "STUDENT_SUMMARY:student_summary_1.pdf:0004:0001"
+        ]
+      }
+    ]
+  }
+]

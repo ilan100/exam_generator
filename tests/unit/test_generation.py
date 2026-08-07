@@ -15,9 +15,13 @@ from exam_generator.historical import HistoricalQuestionRepository
 from exam_generator.llm import LLMProfile, LLMProvider, MessageRole
 from exam_generator.models import (
     CandidateQuestion,
+    DistractorArchetype,
+    DistractorDesign,
     GeneratedQuestionResponse,
     GenerationMode,
     HistoricalStyleReference,
+    QuestionBlueprint,
+    QuestionDifficulty,
     QuestionTarget,
     SourceEvidenceChunk,
     SourceType,
@@ -78,8 +82,33 @@ def _target(**kwargs) -> QuestionTarget:
     return QuestionTarget(**defaults)
 
 
+def _distractor(**kwargs) -> DistractorDesign:
+    defaults = dict(
+        archetype=DistractorArchetype.SIBLING_STRUCTURE,
+        plausibility_reason="plausible",
+        incorrectness_reason="incorrect for the exact relationship asked",
+        evidence_checked=True,
+    )
+    defaults.update(kwargs)
+    return DistractorDesign(**defaults)
+
+
+def _blueprint(**kwargs) -> QuestionBlueprint:
+    defaults = dict(
+        knowledge_target="knowledge target",
+        tested_relationship="tested relationship",
+        question_style="direct question",
+        intended_difficulty=QuestionDifficulty.MEDIUM,
+        correct_answer_role="supported by the evidence",
+        distractors=[_distractor(), _distractor(), _distractor()],
+    )
+    defaults.update(kwargs)
+    return QuestionBlueprint(**defaults)
+
+
 def _generated_response(**kwargs) -> GeneratedQuestionResponse:
     defaults = dict(
+        blueprint=_blueprint(),
         question=HEBREW_QUESTION_TEXT,
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=2,
@@ -597,3 +626,91 @@ def test_style_similar_historical_reference_cannot_override_target_focus():
     historical_end = content.index("END HISTORICAL STYLE REFERENCE")
     assert "מוקד ממוקד לבדיקה" not in content[historical_start:historical_end]
     assert "עובדה ספציפית שיש לבדוק" not in content[historical_start:historical_end]
+
+
+# ---------------------------------------------------------------------------
+# WP-028: internal question blueprint
+# ---------------------------------------------------------------------------
+
+
+def test_blueprint_is_required_on_generated_response():
+    with pytest.raises(ValidationError):
+        GeneratedQuestionResponse(
+            question="q", answers=["א", "ב", "ג", "ד"], correct_answer=1, evidence_refs=[], historical_reference_id=None
+        )
+
+
+def test_blueprint_requires_exactly_three_distractors():
+    with pytest.raises(ValidationError):
+        _blueprint(distractors=[_distractor(), _distractor()])
+    with pytest.raises(ValidationError):
+        _blueprint(distractors=[_distractor(), _distractor(), _distractor(), _distractor()])
+
+
+def test_distractor_archetype_must_be_a_named_strategy():
+    with pytest.raises(ValidationError):
+        _distractor(archetype="RANDOM_GUESS")
+
+
+def test_distractor_incorrectness_reason_cannot_be_blank():
+    with pytest.raises(ValidationError):
+        _distractor(incorrectness_reason="")
+
+
+def test_intended_difficulty_must_be_a_named_level():
+    with pytest.raises(ValidationError):
+        _blueprint(intended_difficulty="IMPOSSIBLE")
+
+
+def test_evidence_checked_must_be_strict_bool():
+    with pytest.raises(ValidationError):
+        _distractor(evidence_checked="yes")
+
+
+def test_generated_response_blueprint_schema_forbids_unknown_fields():
+    with pytest.raises(ValidationError):
+        QuestionBlueprint(
+            knowledge_target="t",
+            tested_relationship="r",
+            question_style="s",
+            intended_difficulty=QuestionDifficulty.EASY,
+            correct_answer_role="c",
+            distractors=[_distractor(), _distractor(), _distractor()],
+            invented_field="not allowed",
+        )
+
+
+def test_candidate_question_never_carries_a_blueprint_field():
+    # WP-028: the blueprint is a generation-time reasoning artifact, never
+    # persisted onto the existing, stable CandidateQuestion contract -
+    # mirrors the established pattern (QuestionTarget, per-option grounding
+    # assessments) of discarding LLM-facing-only reasoning after use.
+    assert "blueprint" not in CandidateQuestion.model_fields
+
+
+def test_deterministic_conversion_discards_blueprint():
+    response = _generated_response(blueprint=_blueprint(knowledge_target="a very specific narrow claim"))
+    provider = _provider(response)
+    generator = _make_generator(provider=provider)
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target()
+    )
+    assert not hasattr(candidate, "blueprint")
+    assert "blueprint" not in candidate.model_dump()
+
+
+def test_generation_still_makes_exactly_one_llm_call_with_blueprint():
+    # WP-028 section 1: the blueprint is constructed inside the existing
+    # generation call - never a second call.
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
+    assert provider.generate_structured.call_count == 1
+    assert provider.generate_structured.call_args.kwargs["response_model"] is GeneratedQuestionResponse
+
+
+def test_all_distractor_archetypes_are_constructible():
+    # Confirms the full named-strategy list (WP-028 section 5) is usable,
+    # not merely one example value.
+    for archetype in DistractorArchetype:
+        _distractor(archetype=archetype)

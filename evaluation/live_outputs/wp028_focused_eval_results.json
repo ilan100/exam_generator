@@ -1,0 +1,140 @@
+[
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "מערכת העצבים ההיקפית - חלוקה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "exhausted",
+    "attempts_made": 3,
+    "attempt_reasons": [
+      {
+        "question": "מה ההבדל בין מערכת העצבים הסומטית למערכת העצבים האוטונומית?",
+        "answers": [
+          "המערכת הסומטית אחראית על שליטה רצונית בשרירי השלד.",
+          "המערכת האוטונומית אחראית על שליטה רצונית בשרירי השלד.",
+          "המערכת הסימפתטית פועלת במצבי מנוחה.",
+          "המערכת הפרה-סימפתטית פועלת במצבי סטרס."
+        ],
+        "reasons": [
+          "mcq:The candidate question has exactly four answer choices, but there is not a single best answer. Answer 1 is correct, while Answers 2, 3, and 4 contain inaccuracies regarding the functions of the autonomic and sympathetic systems. Specifically, Answer 2 incorrectly states that the autonomic system controls voluntary muscle movement, and Answers 3 and 4 misrepresent the roles of the sympathetic and parasympathetic systems. This creates ambiguity, as more than one answer could be defended as correct based on the inaccuracies present.",
+          "category:The question focuses on the differences between the somatic and autonomic nervous systems, which are components of the peripheral nervous system, but the provided answers incorrectly state that the autonomic system is responsible for voluntary control, which is inaccurate. Additionally, the mention of sympathetic and parasympathetic systems suggests a focus on the autonomic nervous system rather than the peripheral nervous system as a whole.",
+          "quality:The question is clear and unambiguous, but the answer choices contain inaccuracies. Answer 2 incorrectly states that the המערכת האוטונומית is responsible for voluntary control, which is not true. Additionally, Answers 3 and 4 misrepresent the functions of the sympathetic and parasympathetic systems. This undermines the question's answerability and overall quality as a multiple-choice exam question."
+        ]
+      },
+      {
+        "question": "מה ההבדל העיקרי בין מערכת העצבים האוטונומית למערכת העצבים הסומטית?",
+        "answers": [
+          "מערכת העצבים האוטונומית פועלת על שרירים חלקים ולא רצוניים.",
+          "מערכת העצבים הסומטית פועלת על שרירים חלקים ולא רצוניים.",
+          "מערכת העצבים המרכזית פועלת על שרירים רצוניים.",
+          "מערכת העצבים הפאראסימפתטית פועלת על שרירים רצוניים."
+        ],
+        "reasons": [
+          "mcq:While the candidate has exactly four answer choices, there is not a single best answer. Answers 1 and 2 both contain incorrect information about the systems they describe, and answers 3 and 4 introduce confusion by incorrectly categorizing the functions of the central nervous system and the parasympathetic nervous system. This lack of clarity and the presence of multiple plausible distractors undermine the validity of the question.",
+          "category:The question specifically addresses the differences between the autonomic and somatic nervous systems, which are subcategories of the peripheral nervous system, but does not focus on the peripheral nervous system as a whole.",
+          "quality:The question is clear and unambiguous, but the answer choices contain inaccuracies. Answer 2 incorrectly states that the מערכת העצבים הסומטית operates on שרירים חלקים ולא רצוניים, which is not true; it operates on שרירים רצוניים. Additionally, Answer 3 incorrectly refers to the מערכת העצבים המרכזית, which is not relevant to the question. This misalignment in the answer choices creates confusion and undermines the question's effectiveness as a valid exam item."
+        ]
+      },
+      {
+        "question": "איזו מהמערכות הבאות אחראית על שליטה רצונית בשרירי השלד?",
+        "answers": [
+          "מערכת העצבים הסומטית",
+          "מערכת העצבים הסימפתטית",
+          "מערכת העצבים הפאראסימפתטית",
+          "מערכת העצבים המרכזית"
+        ],
+        "reasons": [
+          "category:The question specifically asks about voluntary control of skeletal muscles, which is primarily governed by the מערכת העצבים הסומטית, not the מערכת העצבים ההיקפית as a whole."
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "מערכת העצבים ההיקפית - תאי שוואן",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקידם של תאי שוואן במערכת העצבים ההיקפית?",
+    "answers": [
+      "למנוע פגיעה באקסונים",
+      "לייצר מיילין לאקסונים",
+      "לספק תמיכה לתאי עצב",
+      "להעביר מידע בין תאי עצב"
+    ],
+    "correct_answer": 2,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לצרבלום",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "באיזה עורק מסופק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery",
+      "Posterior Inferior Cerebellar Artery",
+      "Basilar Artery"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לחוט השדרה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 3,
+    "question": "איזה עורק מספק דם לחוט השדרה בצד הקדמי?",
+    "answers": [
+      "עורק קדמי ספינלי",
+      "עורק פוסטריורי ספינלי",
+      "עורק ספינלי",
+      "עורק ורטברלי"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": [
+      {
+        "correct_supported": true,
+        "others_not_equal": false
+      },
+      {
+        "correct_supported": true,
+        "others_not_equal": false
+      }
+    ]
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "מיקרוגליה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה מהתפקידים הבאים מבוצעים על ידי תאי המיקרוגליה במערכת העצבים המרכזית?",
+    "answers": [
+      "פאגוציטוזה והשמדת סינפסות לא רלוונטיות",
+      "ייצור מיאלין",
+      "תמיכה בתאי עצב",
+      "ציפוי צינור העצבים"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "תאי אפנדימה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקידם של תאי האפנדימה במערכת העצבים?",
+    "answers": [
+      "ציפוי צינור העצבים ואפשרות מעבר נוזלים מבלי לאפשר מעבר תאים.",
+      "תמיכה בתאי העצב והזנתם.",
+      "תפקוד כחלק ממערכת החיסון במוח.",
+      "סילוק פסולת במערכת העצבים."
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  }
+]

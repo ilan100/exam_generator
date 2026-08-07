@@ -76,21 +76,86 @@ class GroundingValidationResult(BaseModel):
         return self.grounded and self.correct_answer_supported and self.other_answers_not_equally_correct
 
 
+class GroundingAnswerAssessment(BaseModel):
+    """One LLM-facing per-option factual assessment (WP-027).
+
+    Grounding must explicitly judge, for THIS one answer choice, whether it
+    correctly answers the exact question asked - according to the supplied
+    evidence - not merely whether its text happens to appear somewhere in
+    the evidence, and never skipped merely because it is not the
+    generator's designated correct answer (an untrusted claim from a
+    separate process - see ``GroundingValidator``'s own docstring). A
+    distractor that genuinely satisfies the question is another correct
+    answer and must be reported as such here, regardless of what the
+    candidate itself claims.
+
+    Never exposed beyond ``GroundingValidator``: discarded immediately
+    after strict structural/reference validation, once resolved into the
+    existing, unchanged ``GroundingValidationResult`` - see
+    ``exam_generator.validation.grounding``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    answer_index: int = Field(
+        description=(
+            "Which answer choice this assessment is for: 1, 2, 3, or 4, matching the "
+            "candidate's own 1-based answer numbering shown above. Report exactly one "
+            "assessment for each of the four answer choices - never omit one, never "
+            "duplicate one, never invent an index outside 1-4."
+        )
+    )
+    supported_as_correct: StrictBool = Field(
+        description=(
+            "Whether this specific answer choice correctly answers the exact question "
+            "asked, according to the supplied evidence - not merely whether it is "
+            "mentioned in the evidence, and not merely whether it is a true statement "
+            "in general. A true fact about a different relationship than the one the "
+            "question asks does not count as supported here."
+        )
+    )
+    evidence_refs: list[int] = Field(
+        default_factory=list,
+        description=(
+            "1-based local references to the supplied evidence items that actually "
+            "support this specific answer's determination, matching the '[Evidence N]' "
+            "labels shown in the factual evidence below. Required when "
+            "supported_as_correct is true - cite the evidence that makes this answer "
+            "correct. May be empty when supported_as_correct is false - do not invent "
+            "evidence merely to justify a negative determination. Never invent a "
+            "number outside the supplied range."
+        ),
+    )
+    reason: NonBlankStr = Field(
+        description=(
+            "A concise explanation of this specific answer's determination. Required. "
+            "Must always contain a substantive, non-empty explanation - never an empty "
+            "string."
+        )
+    )
+
+
 class GroundingValidationResponse(BaseModel):
     """The LLM-facing structured-output contract for one grounding-validation
-    call (WP-022), returned by ``LLMProvider.generate_structured(...,
-    response_model=GroundingValidationResponse, profile=LLMProfile.VALIDATION)``.
+    call (WP-022, restructured by WP-027), returned by
+    ``LLMProvider.generate_structured(..., response_model=GroundingValidationResponse,
+    profile=LLMProfile.VALIDATION)``.
 
-    Deliberately mirrors ``GroundingValidationResult`` except for provenance:
-    the model reports ``evidence_refs`` - small, 1-based, call-local
-    integers matching the "[Evidence N]" labels already shown in the
-    prompt's factual-evidence section - instead of reproducing canonical
-    ``SourceEvidenceChunk.chunk_id`` strings character-for-character.
+    WP-027: ``correct_answer_supported``/``other_answers_not_equally_correct``
+    are no longer reported directly by the LLM - a single holistic
+    determination proved unreliable (see
+    ``evaluation/wp026_false_acceptance_diagnostic.md``: the LLM could assert
+    "no other answer is equally correct" without having actually evaluated
+    every distractor against the exact question). Instead the LLM must
+    report one ``GroundingAnswerAssessment`` per answer choice, and the
+    application deterministically derives both booleans from those four
+    independent judgments (``exam_generator.validation.grounding``) rather
+    than trusting a separate, potentially inconsistent LLM summary.
 
     Never exposed beyond ``GroundingValidator``: it is discarded immediately
-    after strict reference validation, once resolved into the existing,
-    unchanged ``GroundingValidationResult`` with genuine canonical
-    ``evidence_chunk_ids``. See ``exam_generator.validation.grounding``.
+    after strict reference/structure validation, once resolved into the
+    existing, unchanged ``GroundingValidationResult`` with genuine canonical
+    ``evidence_chunk_ids``.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -98,39 +163,30 @@ class GroundingValidationResponse(BaseModel):
     grounded: StrictBool = Field(
         description="Whether the question's factual premise is supported by the supplied evidence."
     )
-    correct_answer_supported: StrictBool = Field(
-        description="Whether the candidate's stated correct answer is supported by the supplied evidence."
-    )
-    other_answers_not_equally_correct: StrictBool = Field(
-        description="Whether no other answer choice is equally well supported by the supplied evidence."
-    )
-    evidence_refs: list[int] = Field(
-        default_factory=list,
+    answer_assessments: list[GroundingAnswerAssessment] = Field(
         description=(
-            "1-based local references to the supplied evidence items that actually "
-            "support this determination, matching the '[Evidence N]' labels shown in "
-            "the factual evidence below - e.g. 1 refers to [Evidence 1]. Cite only "
-            "evidence numbers that were actually supplied to you. Never invent a "
-            "number outside the supplied range. If you are not confident which "
-            "evidence number supports your determination, leave this list empty "
-            "rather than guessing - an empty list is always acceptable and preferred "
-            "over an invented or approximate reference."
-        ),
+            "Exactly one independent assessment for each of the four answer choices "
+            "(indices 1, 2, 3, 4 - no duplicates, no omissions). Evaluate every answer "
+            "choice against the exact question and the supplied evidence, including "
+            "the designated correct answer and every distractor - never stop once the "
+            "designated answer looks supported, and never assume a distractor is false "
+            "merely because the candidate labels it as one."
+        )
     )
     evidence_text: NonBlankStr | None = Field(
-        default=None, description="The supporting evidence text, when evidence_refs is reported."
+        default=None, description="The supporting evidence text for the overall determination, if reported."
     )
     reason: NonBlankStr = Field(
         description=(
-            "A concise explanation of this determination. Required. Must always contain a "
-            "substantive, non-empty explanation, even when the determination is positive - "
-            "never an empty string."
+            "A concise overall explanation of this determination. Required. Must always "
+            "contain a substantive, non-empty explanation, even when the determination "
+            "is positive - never an empty string."
         )
     )
     confidence: UnitInterval = Field(
         description=(
-            "Confidence in this determination, from 0.0 to 1.0. Does not by itself "
-            "determine pass/fail."
+            "Confidence in this overall determination, from 0.0 to 1.0. Does not by "
+            "itself determine pass/fail."
         )
     )
 

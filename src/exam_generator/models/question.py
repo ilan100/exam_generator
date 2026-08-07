@@ -8,7 +8,7 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from exam_generator.models._common import CorrectAnswerId, NonBlankStr, PositiveIntStrict
+from exam_generator.models._common import CorrectAnswerId, NonBlankStr, PositiveIntStrict, StrictBool
 
 
 class GenerationMode(str, Enum):
@@ -58,6 +58,107 @@ class CandidateQuestion(BaseModel):
     generation_mode: GenerationMode
 
 
+class DistractorArchetype(str, Enum):
+    """Named wrong-answer design strategies (WP-028) - generation must
+    intentionally choose one of these for each distractor rather than
+    inventing plausible-sounding wrong answers ad hoc. Not exhaustive of
+    every possible wrong-answer shape in principle, but names the shapes
+    observed in practice across WP-025 through WP-027's live evaluation."""
+
+    SIBLING_STRUCTURE = "SIBLING_STRUCTURE"
+    PARENT_CATEGORY = "PARENT_CATEGORY"
+    CHILD_CATEGORY = "CHILD_CATEGORY"
+    NEIGHBORING_ANATOMY = "NEIGHBORING_ANATOMY"
+    FUNCTIONAL_CONFUSION = "FUNCTIONAL_CONFUSION"
+    LOCATION_CONFUSION = "LOCATION_CONFUSION"
+    DEVELOPMENTAL_STAGE_CONFUSION = "DEVELOPMENTAL_STAGE_CONFUSION"
+    TERMINOLOGY_CONFUSION = "TERMINOLOGY_CONFUSION"
+
+
+class QuestionDifficulty(str, Enum):
+    """Intended difficulty (WP-028) - a blueprint-only design signal, never
+    validated or scored; exists so generation makes the choice explicitly
+    rather than leaving it implicit."""
+
+    EASY = "EASY"
+    MEDIUM = "MEDIUM"
+    HARD = "HARD"
+
+
+class DistractorDesign(BaseModel):
+    """One intentionally-designed wrong answer (WP-028), part of the
+    internal question blueprint - never exposed beyond the generation call
+    that produced it, and never persisted onto ``CandidateQuestion`` or any
+    audit output. Deliberately does not carry the distractor's own answer
+    text - it would duplicate the final ``answers`` list; the blueprint
+    exists to justify design choices, not to restate the MCQ (see
+    ``QuestionBlueprint``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    archetype: DistractorArchetype = Field(
+        description="The intentional wrong-answer strategy used for this distractor - never chosen at random."
+    )
+    plausibility_reason: NonBlankStr = Field(
+        description="Why a student might plausibly consider this distractor, absent full knowledge."
+    )
+    incorrectness_reason: NonBlankStr = Field(
+        description=(
+            "The single, exact reason this distractor is false for the specific relationship the "
+            "question asks about - not merely a different or less complete fact. Must be a single "
+            "clear reason, not several unrelated ones."
+        )
+    )
+    evidence_checked: StrictBool = Field(
+        description=(
+            "Whether this distractor was explicitly checked against the supplied factual evidence "
+            "and confirmed not to also correctly answer the exact question as worded. Must be true "
+            "for every distractor - a distractor that fails this check must not be used; choose a "
+            "different one instead."
+        )
+    )
+
+
+class QuestionBlueprint(BaseModel):
+    """The internal question design (WP-028), constructed before the final
+    MCQ, inside the same generation call - never a second LLM call, never
+    persisted, never exposed beyond ``QuestionGenerator``. Discarded
+    immediately once the final ``CandidateQuestion`` is constructed,
+    mirroring the established pattern of LLM-facing-only reasoning
+    artifacts (e.g. WP-027's ``GroundingAnswerAssessment``).
+
+    Generation is required to reason in terms of the tested relationship,
+    not merely "the correct answer" - see ``tested_relationship`` - and to
+    intentionally design each distractor - see ``distractors``. This
+    structurally forces the reasoning already requested in prose
+    (``prompts/generation/question.txt``) rather than leaving it optional.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    knowledge_target: NonBlankStr = Field(
+        description="The specific knowledge being tested - may narrow the assigned QuestionTarget to one relationship within it."
+    )
+    tested_relationship: NonBlankStr = Field(
+        description=(
+            "The precise factual relationship or property the question tests, stated as a "
+            "relationship rather than as 'the correct answer' - for example 'fibers connecting "
+            "cortical regions within the same hemisphere', not just 'association fibers'."
+        )
+    )
+    question_style: NonBlankStr = Field(description="A short description of the question's phrasing style.")
+    intended_difficulty: QuestionDifficulty = Field(description="The intended difficulty level for this question.")
+    correct_answer_role: NonBlankStr = Field(
+        description="Why the intended correct answer specifically satisfies the tested relationship, according to the supplied evidence."
+    )
+    distractors: list[DistractorDesign] = Field(
+        min_length=3,
+        max_length=3,
+        description="Exactly three intentionally-designed distractors, one for each incorrect answer choice.",
+    )
+
+
 class GeneratedQuestionResponse(BaseModel):
     """The LLM-facing structured-output contract for one generation call
     (WP-009), returned by ``LLMProvider.generate_structured(...,
@@ -79,10 +180,24 @@ class GeneratedQuestionResponse(BaseModel):
     into genuine canonical identifiers by
     ``exam_generator.generation.generator``, mirroring the pattern WP-022
     already established for grounding/textbook validation.
+
+    ``blueprint`` (WP-028) is required internal design reasoning,
+    constructed inside this same call - never a second LLM call. It is
+    discarded immediately after this response is validated; the existing
+    ``CandidateQuestion`` it converts into carries no blueprint field of
+    its own, unchanged since WP-009.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    blueprint: QuestionBlueprint = Field(
+        description=(
+            "The internal question design, constructed before the final question and answers: the "
+            "tested relationship, intended difficulty, why the correct answer satisfies that "
+            "relationship, and an intentional design (with an explicit evidence check) for each of "
+            "the three distractors. Required for every generated question."
+        )
+    )
     question: NonBlankStr = Field(description="The generated Hebrew exam question text.")
     answers: list[NonBlankStr] = Field(
         min_length=4, max_length=4, description="Exactly four Hebrew answer choices, in order."

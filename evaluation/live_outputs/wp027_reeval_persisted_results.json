@@ -1,0 +1,69 @@
+[
+  {
+    "number": 8,
+    "previous_verdict": "accepted",
+    "new_grounded": true,
+    "new_correct_answer_supported": true,
+    "new_other_answers_not_equally_correct": false,
+    "new_passed": false,
+    "reason": "The question's premise is supported by the evidence, which outlines the advantages of CT over ultrasound in brain imaging. Both Answer 1 and Answer 3 are supported by the evidence, while Answers 2 and 4 are not supported as they misrepresent the capabilities of ultrasound and CT respectively.",
+    "evidence_chunk_ids": [
+      "STUDENT_SUMMARY:student_summary_2.pdf:0041:0001",
+      "STUDENT_SUMMARY:student_summary_1.pdf:0036:0001",
+      "STUDENT_SUMMARY:student_summary_3.pdf:0080:0001"
+    ]
+  },
+  {
+    "number": 14,
+    "previous_verdict": "accepted",
+    "new_grounded": true,
+    "new_correct_answer_supported": true,
+    "new_other_answers_not_equally_correct": true,
+    "new_passed": true,
+    "reason": "The question is grounded in the evidence as it accurately asks about an artery that branches from the Basilar Artery and supplies posterior brain areas. The PCA is correctly identified as such in the evidence. The assessments of the answer choices confirm that only the PCA correctly answers the question, while the others do not, either because they do not branch from the Basilar Artery or do not supply the posterior areas of the brain.",
+    "evidence_chunk_ids": [
+      "STUDENT_SUMMARY:student_summary_2.pdf:0061:0001"
+    ]
+  },
+  {
+    "number": 23,
+    "previous_verdict": "accepted",
+    "new_grounded": true,
+    "new_correct_answer_supported": true,
+    "new_other_answers_not_equally_correct": false,
+    "new_passed": false,
+    "reason": "The question is grounded in the evidence, which clearly defines the peripheral nervous system and its components, including the somatic and autonomic systems. Multiple answer choices are supported as correct, indicating that the question allows for more than one valid response based on the evidence provided.",
+    "evidence_chunk_ids": [
+      "STUDENT_SUMMARY:student_summary_3.pdf:0160:0001",
+      "STUDENT_SUMMARY:student_summary_2.pdf:0145:0001",
+      "STUDENT_SUMMARY:student_summary_2.pdf:0146:0001",
+      "STUDENT_SUMMARY:student_summary_1.pdf:0002:0002"
+    ]
+  },
+  {
+    "number": 32,
+    "previous_verdict": "accepted",
+    "new_grounded": true,
+    "new_correct_answer_supported": true,
+    "new_other_answers_not_equally_correct": false,
+    "new_passed": false,
+    "reason": "השאלה על תפקידם המרכזי של תאי המיקרוגליה במערכת העצבים המרכזית מגובה היטב על ידי הראיות, שמפרטות את תפקידיהם בפאגוציטוזה ובחיסוניות, כמו גם את תפקידם בהרס סינפסות לא רלוונטיות. שני התשובות 1 ו-3 נתמכות על ידי הראיות, בעוד שהתשובות 2 ו-4 אינן נתמכות.",
+    "evidence_chunk_ids": [
+      "STUDENT_SUMMARY:student_summary_1.pdf:0024:0002",
+      "STUDENT_SUMMARY:student_summary_2.pdf:0134:0001",
+      "STUDENT_SUMMARY:student_summary_3.pdf:0167:0001"
+    ]
+  },
+  {
+    "number": 30,
+    "previous_verdict": "accepted",
+    "new_grounded": true,
+    "new_correct_answer_supported": true,
+    "new_other_answers_not_equally_correct": true,
+    "new_passed": true,
+    "reason": "The question is grounded in the evidence, which states that the lateral ventricles take on the shape of the letter C during embryonic development, specifically as the temporal lobes grow. The third answer choice is supported by this evidence, while the others are not, as they refer to incorrect stages of development.",
+    "evidence_chunk_ids": [
+      "STUDENT_SUMMARY:student_summary_3.pdf:0058:0001"
+    ]
+  }
+]

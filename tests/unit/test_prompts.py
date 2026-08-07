@@ -893,6 +893,106 @@ def test_generation_prompt_reinforces_clearly_incorrect_distractors(production_r
     assert "clearly, unambiguously incorrect" in rendered
 
 
+# ---------------------------------------------------------------------------
+# WP-027 section 11: every distractor must be false for the exact question,
+# generalized beyond enumeration/classification-shaped targets
+# ---------------------------------------------------------------------------
+
+
+def test_generation_prompt_requires_checking_each_distractor_against_evidence(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "check each of the three incorrect ones individually against the supplied evidence" in rendered
+
+
+def test_generation_prompt_distractor_rule_not_limited_to_enumeration_targets(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "not only when the target is itself phrased as an explicit enumeration" in rendered
+
+
+def test_generation_prompt_distractor_rule_worked_example_generic_no_category_names(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert '"X includes A and B,"' in rendered
+    assert "must not designate A as the correct answer while presenting B as an incorrect one" in rendered
+    assert "מערכת העצבים ההיקפית" not in rendered
+    assert "PNS" not in rendered
+
+
+def test_generation_prompt_true_fact_is_not_sufficient_to_be_a_valid_distractor(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "A distractor being a real, true anatomical entity or fact is not sufficient to make it a valid distractor" in rendered
+
+
+# ---------------------------------------------------------------------------
+# WP-028: internal question blueprint (prompt content)
+# ---------------------------------------------------------------------------
+
+
+def test_generation_prompt_requires_blueprint_before_final_answer(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Before writing the final question and answers, construct an internal question blueprint" in rendered
+    assert "This is part of the same response, not a separate step or a separate call" in rendered
+
+
+def test_generation_prompt_frames_relationship_not_bare_label(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Think in terms of the relationship being tested, not merely" in rendered
+    assert "a bare label invites recall-style ambiguity" in rendered
+
+
+def test_generation_prompt_requires_blueprint_fields(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    for phrase in (
+        "the specific knowledge target",
+        "the tested relationship itself",
+        "a short description of the question's phrasing style",
+        "the intended difficulty (easy, medium, or hard)",
+        "why the intended correct answer specifically satisfies the tested relationship",
+    ):
+        assert phrase in rendered
+
+
+def test_generation_prompt_requires_intentional_distractor_design(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Design each of the three distractors intentionally - never invent plausible-sounding wrong answers without a reason" in rendered
+
+
+def test_generation_prompt_lists_distractor_archetypes(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    for archetype_phrase in (
+        "a sibling structure from the same classification",
+        "a parent category",
+        "a child category",
+        "neighboring anatomy",
+        "functional confusion",
+        "location confusion",
+        "developmental-stage confusion",
+        "terminology confusion",
+    ):
+        assert archetype_phrase in rendered
+
+
+def test_generation_prompt_requires_single_clear_incorrectness_reason(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "the single, exact reason it is incorrect for the specific relationship the question asks about" in rendered
+    assert "not several unrelated reasons" in rendered
+
+
+def test_generation_prompt_requires_explicit_evidence_check_before_evidence_checked_true(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "only report evidence_checked as true once you have actually performed this check" in rendered
+
+
+def test_generation_prompt_blueprint_stays_within_same_call(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "never request or assume a second generation call" in rendered
+
+
+def test_generation_prompt_blueprint_self_review_checklist(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "review your own blueprint against this checklist" in rendered
+    assert "the supplied evidence does not support any distractor for the exact question asked" in rendered
+
+
 def test_generation_prompt_style_similar_form_subordinate_to_mcq_correctness(production_repository):
     reference = _historical_reference()
     rendered = _rendered_generation_prompt(
@@ -1048,16 +1148,21 @@ def test_grounding_prompt_requires_correct_answer_support(production_repository)
 
 
 def test_grounding_prompt_addresses_one_best_answer_support(production_repository):
+    # WP-027: the single-holistic-boolean framing was replaced by explicit
+    # per-option evaluation, but the underlying invariant - a question can
+    # have more than one factually correct answer even though only one was
+    # designated - must still be stated.
     rendered = _rendered_grounding_prompt(production_repository)
-    assert "single best answer" in rendered
+    assert "more than one factually correct answer choice" in rendered
 
 
 def test_grounding_prompt_aligns_with_grounding_validation_response_fields(production_repository):
     rendered = _rendered_grounding_prompt(production_repository)
     for field in (
         "grounded",
-        "correct_answer_supported",
-        "other_answers_not_equally_correct",
+        "answer_assessments",
+        "answer_index",
+        "supported_as_correct",
         "evidence_refs",
         "reason",
         "confidence",
@@ -1078,6 +1183,65 @@ def test_grounding_prompt_does_not_ask_for_canonical_chunk_ids(production_reposi
 def test_grounding_prompt_does_not_use_historical_reference_as_evidence(production_repository):
     template = production_repository.get(PromptId.GROUNDING_VALIDATION)
     assert "historical_reference" not in template.required_variables
+
+
+# ---------------------------------------------------------------------------
+# WP-027: per-option grounding and distractor correctness (prompt content)
+# ---------------------------------------------------------------------------
+
+
+def test_grounding_prompt_warns_against_stopping_after_designated_answer(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "Do not stop once you have confirmed the designated correct answer is supported" in rendered
+
+
+def test_grounding_prompt_warns_designated_label_is_not_proof(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "only the generator's claim about which answer it intended to be correct" in rendered
+    assert "not proof that this answer is uniquely correct" in rendered
+
+
+def test_grounding_prompt_requires_evaluating_every_answer_independently(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "Answer 1, Answer 2, Answer 3, and Answer 4" in rendered
+    assert "independently" in rendered.lower()
+
+
+def test_grounding_prompt_warns_against_trusting_distractor_labels(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "regardless of the fact that the generator labeled it as an incorrect distractor" in rendered
+
+
+def test_grounding_prompt_requires_reporting_a_genuinely_correct_distractor_as_supported(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "if a distractor genuinely does satisfy the exact question asked" in rendered.lower() or (
+        "if a distractor genuinely does satisfy" in rendered
+    )
+
+
+def test_grounding_prompt_protects_genuine_sibling_members(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "A true sibling member of the same classification, category, or relationship" in rendered
+    assert "must not be dismissed merely because it is not the designated answer" in rendered
+
+
+def test_grounding_prompt_worked_example_matches_pns_shape_generically(production_repository):
+    # WP-027 section 8's own worked example ("PNS includes somatic and
+    # autonomic" -> both membership answers supported), stated generically
+    # with no real category name, mirroring the WP-026 prompt's own
+    # no-category-names convention.
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert '"X divides into A and B"' in rendered
+    assert "both A and B must be assessed as supported" in rendered
+    assert "מערכת העצבים ההיקפית" not in rendered
+    assert "PNS" not in rendered
+
+
+def test_grounding_prompt_answer_assessment_fields_documented(production_repository):
+    rendered = _rendered_grounding_prompt(production_repository)
+    assert "exactly one assessment for each of the four answer choices" in rendered
+    assert "Required when supported_as_correct is true" in rendered
+    assert "do not invent evidence merely to justify a negative determination" in rendered
 
 
 # ---------------------------------------------------------------------------

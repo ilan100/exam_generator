@@ -7,6 +7,7 @@ from exam_generator.llm import LLMAuthenticationError, LLMProfile, LLMProvider, 
 from exam_generator.models import (
     CandidateQuestion,
     GenerationMode,
+    GroundingAnswerAssessment,
     GroundingValidationResponse,
     GroundingValidationResult,
     SourceEvidenceChunk,
@@ -55,19 +56,44 @@ def _chunk(
     )
 
 
-def _grounding_response(**kwargs) -> GroundingValidationResponse:
-    """Builds the LLM-facing response (WP-022): provenance via call-local
-    ``evidence_refs``, never canonical chunk identifiers."""
-    defaults = dict(
-        grounded=True,
-        correct_answer_supported=True,
-        other_answers_not_equally_correct=True,
-        evidence_refs=[],
-        reason="supported by the evidence",
-        confidence=0.8,
+def _assessment(index: int, *, supported: bool, refs: list[int] = (), reason: str = "stub") -> GroundingAnswerAssessment:
+    return GroundingAnswerAssessment(
+        answer_index=index, supported_as_correct=supported, evidence_refs=list(refs), reason=reason
     )
-    defaults.update(kwargs)
-    return GroundingValidationResponse(**defaults)
+
+
+def _grounding_response(
+    *,
+    grounded: bool = True,
+    supported: frozenset[int] = frozenset({2}),
+    evidence_refs: list[int] | None = None,
+    reason: str = "supported by the evidence",
+    confidence: float = 0.8,
+    evidence_text: str | None = None,
+) -> GroundingValidationResponse:
+    """Builds the LLM-facing response (WP-022/WP-027): one independent
+    per-option assessment for each of the four answer choices, provenance
+    via call-local ``evidence_refs`` on the relevant assessment(s), never
+    canonical chunk identifiers.
+
+    ``supported`` names which 1-based answer indices are judged
+    ``supported_as_correct`` - by default only index 2 (this file's
+    ``_candidate()`` default ``correct_answer``), modeling a clean single-
+    answer pass. Passing more than one index models WP-027's false-
+    acceptance shape (more than one answer choice genuinely supported);
+    passing an empty set models "designated answer unsupported."
+    ``evidence_refs``, when given, is attached to every supported index's
+    own assessment (there is normally at most one in these fixtures).
+    """
+    refs = evidence_refs or []
+    assessments = [_assessment(i, supported=i in supported, refs=refs if i in supported else []) for i in (1, 2, 3, 4)]
+    return GroundingValidationResponse(
+        grounded=grounded,
+        answer_assessments=assessments,
+        evidence_text=evidence_text,
+        reason=reason,
+        confidence=confidence,
+    )
 
 
 class _StubIndex:
@@ -126,18 +152,14 @@ def _make_validator(*, index=None, prompt_repository=None, provider=None):
 
 
 def test_clearly_supported_candidate_passes():
-    passing = _grounding_response(
-        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True
-    )
+    passing = _grounding_response(grounded=True, supported=frozenset({2}))
     validator = _make_validator(provider=_provider(passing))
     result = validator.validate_grounding(_candidate())
     assert result.passed is True
 
 
 def test_unsupported_candidate_fails_as_normal_result_not_exception():
-    failing = _grounding_response(
-        grounded=False, correct_answer_supported=False, reason="no supporting evidence found"
-    )
+    failing = _grounding_response(grounded=False, supported=frozenset(), reason="no supporting evidence found")
     validator = _make_validator(provider=_provider(failing))
     result = validator.validate_grounding(_candidate())
     assert result.passed is False
@@ -319,15 +341,13 @@ def test_evidence_ref_negative_is_rejected():
 
 def test_canonical_chunk_id_string_instead_of_local_ref_is_rejected():
     # The LLM-facing schema only accepts integers - a canonical ID string
-    # cannot even be constructed as a valid GroundingValidationResponse.
+    # cannot even be constructed as a valid GroundingAnswerAssessment.
     with pytest.raises(Exception):
-        GroundingValidationResponse(
-            grounded=True,
-            correct_answer_supported=True,
-            other_answers_not_equally_correct=True,
+        GroundingAnswerAssessment(
+            answer_index=1,
+            supported_as_correct=True,
             evidence_refs=["STUDENT_SUMMARY:s1.pdf:0002:0001"],
             reason="stub",
-            confidence=0.8,
         )
 
 
@@ -394,7 +414,7 @@ def test_invented_evidence_ref_twice_exhausts():
 
 
 def test_normal_passed_false_verdict_is_not_retried():
-    failing = _grounding_response(grounded=False, correct_answer_supported=False, reason="not supported")
+    failing = _grounding_response(grounded=False, supported=frozenset(), reason="not supported")
     provider = _provider(failing)
     validator = _make_validator(provider=provider)
     result = validator.validate_grounding(_candidate())
@@ -495,3 +515,226 @@ def test_style_similar_and_independent_candidates_use_identical_prompt_shape():
         _candidate(generation_mode=GenerationMode.INDEPENDENT)
     )
     assert recording_repository_a.requested_ids == recording_repository_b.requested_ids
+
+
+# ---------------------------------------------------------------------------
+# WP-027: per-option factual grounding and distractor correctness
+#
+# Root cause (evaluation/wp026_false_acceptance_diagnostic.md): a single
+# holistic "no other answer is equally correct" LLM boolean could be wrong
+# even when the LLM had, and cited, the evidence that contradicted it.
+# WP-027 requires an explicit independent assessment of all four answer
+# choices, with correct_answer_supported/other_answers_not_equally_correct
+# now deterministically DERIVED in Python from those four assessments -
+# never trusted as a separate LLM-reported summary.
+# ---------------------------------------------------------------------------
+
+
+def test_second_correct_answer_forces_rejection_pns_shape():
+    # WP-027 section 16 core regression case, reproducing WP-026 question
+    # #23's exact factual structure: evidence states a classification
+    # divides into two named members, both of which appear among the four
+    # answer choices, but only one was designated correct. Both must be
+    # assessed as supported, and that must force rejection - this candidate
+    # must never be accepted.
+    response = _grounding_response(grounded=True, supported=frozenset({1, 3}), evidence_refs=[1])
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=1))
+    assert result.correct_answer_supported is True
+    assert result.other_answers_not_equally_correct is False
+    assert result.passed is False
+
+
+def test_second_correct_answer_ct_shape_distractor_directly_evidenced():
+    # WP-027 section 17 "CT case" (#8): a distractor directly, verbatim
+    # supported by the same evidence shown to the validator must be caught
+    # even though a different option was designated correct.
+    response = _grounding_response(grounded=True, supported=frozenset({2, 3}), evidence_refs=[1])
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=2))
+    assert result.other_answers_not_equally_correct is False
+    assert result.passed is False
+
+
+def test_second_correct_answer_blood_supply_shape_broad_relationship_distractor():
+    # WP-027 section 17 "blood-supply case" (#14): a distractor satisfying a
+    # broader/less direct anatomical relationship than the designated
+    # answer must still be represented as supported when it genuinely is -
+    # never silently ignored merely because its support is less obvious.
+    response = _grounding_response(grounded=True, supported=frozenset({3, 4}), evidence_refs=[1])
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=3))
+    assert result.other_answers_not_equally_correct is False
+    assert result.passed is False
+
+
+def test_second_correct_answer_microglia_shape_multiple_real_functions():
+    # WP-027 section 17 "microglia case" (#32): when evidence states more
+    # than one real function/property and the question asks broadly for
+    # "the central" one, grounding must not arbitrarily declare one false
+    # without addressing it - if both are genuinely supported, both must be
+    # marked supported, forcing rejection rather than a silent single pick.
+    response = _grounding_response(grounded=True, supported=frozenset({1, 2}), evidence_refs=[1])
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=2))
+    assert result.other_answers_not_equally_correct is False
+    assert result.passed is False
+
+
+def test_unsupported_designated_answer_shape():
+    # WP-027 section 17 "#30 case": a different defect shape entirely - the
+    # designated answer's own specific claim is not established by the
+    # supplied evidence, and no other answer is supported either. WP-027's
+    # distractor-correctness focus must not weaken this ordinary check.
+    response = _grounding_response(grounded=True, supported=frozenset(), reason="no answer choice is supported")
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=2))
+    assert result.correct_answer_supported is False
+    assert result.other_answers_not_equally_correct is True  # vacuously true - no OTHER answer is supported either
+    assert result.passed is False
+
+
+def test_positive_case_distractors_true_elsewhere_but_do_not_satisfy_exact_question():
+    # WP-027 section 18 ("do not overcorrect"): distractors may be real
+    # entities with true properties described elsewhere in the evidence,
+    # but if they do not satisfy the EXACT question asked they remain
+    # unsupported and the candidate must still pass.
+    response = _grounding_response(grounded=True, supported=frozenset({2}), evidence_refs=[1])
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=2))
+    assert result.correct_answer_supported is True
+    assert result.other_answers_not_equally_correct is True
+    assert result.passed is True
+
+
+def test_deterministic_derivation_ignores_reason_text_and_uses_only_booleans():
+    # WP-027 section 19: application-side derivation must never trust a
+    # free-text reason's claim over the actual structured per-option
+    # booleans - even if `reason` asserts the candidate is fine, two
+    # supported indices still force rejection.
+    response = _grounding_response(
+        grounded=True,
+        supported=frozenset({1, 2}),
+        evidence_refs=[1],
+        reason="the correct answer is the only one supported by the evidence",
+    )
+    validator = _make_validator(provider=_provider(response))
+    result = validator.validate_grounding(_candidate(correct_answer=2))
+    assert result.other_answers_not_equally_correct is False
+    assert result.passed is False
+
+
+def test_grounding_response_no_longer_exposes_llm_facing_summary_booleans():
+    # WP-027: correct_answer_supported/other_answers_not_equally_correct
+    # are no longer LLM-facing fields at all - there is nothing for the
+    # model to inconsistently self-summarize; they exist only on the
+    # unchanged public GroundingValidationResult, always derived.
+    assert "correct_answer_supported" not in GroundingValidationResponse.model_fields
+    assert "other_answers_not_equally_correct" not in GroundingValidationResponse.model_fields
+    assert "answer_assessments" in GroundingValidationResponse.model_fields
+    assert "correct_answer_supported" in GroundingValidationResult.model_fields
+    assert "other_answers_not_equally_correct" in GroundingValidationResult.model_fields
+
+
+# ---------------------------------------------------------------------------
+# WP-027 section 5: exactly-four-assessments structural validation
+# ---------------------------------------------------------------------------
+
+
+def test_missing_answer_index_is_rejected():
+    response = GroundingValidationResponse(
+        grounded=True,
+        answer_assessments=[_assessment(1, supported=True), _assessment(2, supported=False), _assessment(3, supported=False)],
+        reason="stub",
+        confidence=0.8,
+    )
+    provider = _provider(response)
+    validator = _make_validator(provider=provider)
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate(correct_answer=1))
+    assert provider.generate_structured.call_count == 2  # WP-021 retries once, same malformed response
+
+
+def test_duplicate_answer_index_is_rejected():
+    response = GroundingValidationResponse(
+        grounded=True,
+        answer_assessments=[
+            _assessment(1, supported=True),
+            _assessment(1, supported=False),
+            _assessment(3, supported=False),
+            _assessment(4, supported=False),
+        ],
+        reason="stub",
+        confidence=0.8,
+    )
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_answer_index_zero_is_rejected():
+    response = GroundingValidationResponse(
+        grounded=True,
+        answer_assessments=[
+            _assessment(0, supported=True),
+            _assessment(2, supported=False),
+            _assessment(3, supported=False),
+            _assessment(4, supported=False),
+        ],
+        reason="stub",
+        confidence=0.8,
+    )
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_answer_index_negative_is_rejected():
+    response = GroundingValidationResponse(
+        grounded=True,
+        answer_assessments=[
+            _assessment(-1, supported=True),
+            _assessment(2, supported=False),
+            _assessment(3, supported=False),
+            _assessment(4, supported=False),
+        ],
+        reason="stub",
+        confidence=0.8,
+    )
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_answer_index_above_four_is_rejected():
+    response = GroundingValidationResponse(
+        grounded=True,
+        answer_assessments=[
+            _assessment(1, supported=True),
+            _assessment(2, supported=False),
+            _assessment(3, supported=False),
+            _assessment(5, supported=False),
+        ],
+        reason="stub",
+        confidence=0.8,
+    )
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())
+
+
+def test_invalid_ref_on_non_designated_assessment_is_also_rejected():
+    # Bounds-checking must cover every assessment's evidence_refs, not only
+    # the designated answer's - an invalid ref anywhere in the response is
+    # fail-closed, mirroring WP-022's whole-response-discard philosophy,
+    # generalized from "per-response" to "per-option."
+    assessments = [
+        _assessment(1, supported=False),
+        _assessment(2, supported=True, refs=[1]),
+        _assessment(3, supported=False, refs=[99]),  # invalid - out of the supplied range
+        _assessment(4, supported=False),
+    ]
+    response = GroundingValidationResponse(grounded=True, answer_assessments=assessments, reason="stub", confidence=0.8)
+    validator = _make_validator(provider=_provider(response))
+    with pytest.raises(InvalidGroundingOutputError):
+        validator.validate_grounding(_candidate())

@@ -26,15 +26,20 @@ from exam_generator.historical import HistoricalQuestionRepository
 from exam_generator.llm import LLMMessage, LLMProfile, LLMProvider, LLMProviderError, MessageRole
 from exam_generator.models import (
     CategoryValidationResult,
+    DistractorArchetype,
+    DistractorDesign,
     ExamGenerationStatus,
     ExamRequest,
     GeneratedQuestionResponse,
     GenerationMode,
+    GroundingAnswerAssessment,
     GroundingValidationResponse,
     HistoricalStyleReference,
     MCQValidationResult,
     PlannedQuestionTargetResponse,
     QualityValidationResult,
+    QuestionBlueprint,
+    QuestionDifficulty,
     QuestionTargetPlanningResponse,
     SourceEvidenceChunk,
     SourceType,
@@ -164,8 +169,29 @@ def _historical_repository() -> HistoricalQuestionRepository:
     return HistoricalQuestionRepository(questions, [CATEGORY_A, CATEGORY_B])
 
 
+def _distractor() -> DistractorDesign:
+    return DistractorDesign(
+        archetype=DistractorArchetype.SIBLING_STRUCTURE,
+        plausibility_reason="plausible",
+        incorrectness_reason="incorrect for the exact relationship asked",
+        evidence_checked=True,
+    )
+
+
+def _blueprint() -> QuestionBlueprint:
+    return QuestionBlueprint(
+        knowledge_target="knowledge target",
+        tested_relationship="tested relationship",
+        question_style="direct question",
+        intended_difficulty=QuestionDifficulty.MEDIUM,
+        correct_answer_role="supported by the evidence",
+        distractors=[_distractor(), _distractor(), _distractor()],
+    )
+
+
 def _generated_response(question: str = "שאלה לדוגמה?", correct_answer: int = 1) -> GeneratedQuestionResponse:
     return GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question=question,
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=correct_answer,
@@ -175,9 +201,19 @@ def _generated_response(question: str = "שאלה לדוגמה?", correct_answer
 
 
 def _grounding(passed: bool = True) -> GroundingValidationResponse:
+    # WP-027: per-option assessments. Every _grounding() call in this file
+    # is paired with a _generated_response() using its default
+    # correct_answer=1, so only index 1 is ever marked supported here.
     return GroundingValidationResponse(
-        grounded=passed, correct_answer_supported=passed, other_answers_not_equally_correct=passed,
-        evidence_refs=[], reason="stub", confidence=0.9,
+        grounded=passed,
+        answer_assessments=[
+            GroundingAnswerAssessment(
+                answer_index=i, supported_as_correct=(passed and i == 1), evidence_refs=[], reason="stub"
+            )
+            for i in (1, 2, 3, 4)
+        ],
+        reason="stub",
+        confidence=0.9,
     )
 
 
@@ -416,6 +452,7 @@ def test_partial_exam_end_to_end_through_output_boundary():
     # Planned position 2: a single generation-contract failure exhausts the
     # (1-attempt) budget.
     invented_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה שנייה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -706,6 +743,7 @@ def test_generation_provenance_violation_is_recovered_within_the_attempt_budget(
         max_generation_attempts=3,
     )
     invented_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -743,6 +781,7 @@ def test_generation_provenance_violation_exhausts_when_every_attempt_is_invalid(
         max_generation_attempts=3,
     )
     invented_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -778,6 +817,7 @@ def test_generation_provenance_violation_then_quality_rejection_then_accepted():
         max_generation_attempts=3,
     )
     invented_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -820,8 +860,15 @@ def test_grounding_provenance_violation_is_question_local_after_wp021_retry_exha
     )
     fake_provider.queue(GeneratedQuestionResponse, _generated_response())
     invented_grounding = GroundingValidationResponse(
-        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
-        evidence_refs=[99], reason="stub", confidence=0.9,
+        grounded=True,
+        answer_assessments=[
+            GroundingAnswerAssessment(answer_index=1, supported_as_correct=True, evidence_refs=[99], reason="stub"),
+            GroundingAnswerAssessment(answer_index=2, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=3, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=4, supported_as_correct=False, evidence_refs=[], reason="stub"),
+        ],
+        reason="stub",
+        confidence=0.9,
     )
     fake_provider.queue(GroundingValidationResponse, invented_grounding, invented_grounding)
 
@@ -875,6 +922,7 @@ def test_multi_question_exam_recovers_a_later_planned_questions_contract_failure
     )
     _queue_passing_attempt(fake_provider, category=CATEGORY_A, question="שאלה ראשונה")
     invented_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
         correct_answer=1,
@@ -906,6 +954,7 @@ def test_duplicated_answer_numbering_is_a_normal_quality_rejection_not_a_failure
         max_generation_attempts=2,
     )
     defective_response = GeneratedQuestionResponse(
+        blueprint=_blueprint(),
         question="שאלה לדוגמה?",
         answers=[
             "1. לטרלית ל-Olfactory Tract",
@@ -953,8 +1002,15 @@ def test_grounding_provenance_retry_recovers_within_one_question_attempt():
     )
     fake_provider.queue(GeneratedQuestionResponse, _generated_response())
     invented_grounding = GroundingValidationResponse(
-        grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
-        evidence_refs=[99], reason="stub", confidence=0.9,
+        grounded=True,
+        answer_assessments=[
+            GroundingAnswerAssessment(answer_index=1, supported_as_correct=True, evidence_refs=[99], reason="stub"),
+            GroundingAnswerAssessment(answer_index=2, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=3, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            GroundingAnswerAssessment(answer_index=4, supported_as_correct=False, evidence_refs=[], reason="stub"),
+        ],
+        reason="stub",
+        confidence=0.9,
     )
     fake_provider.queue(GroundingValidationResponse, invented_grounding, _grounding(True))
     fake_provider.queue(MCQValidationResult, _mcq(True))
@@ -988,8 +1044,15 @@ def test_grounding_local_reference_never_leaks_into_serialized_audit():
     fake_provider.queue(
         GroundingValidationResponse,
         GroundingValidationResponse(
-            grounded=True, correct_answer_supported=True, other_answers_not_equally_correct=True,
-            evidence_refs=[1], reason="stub", confidence=0.9,
+            grounded=True,
+            answer_assessments=[
+                GroundingAnswerAssessment(answer_index=1, supported_as_correct=True, evidence_refs=[1], reason="stub"),
+                GroundingAnswerAssessment(answer_index=2, supported_as_correct=False, evidence_refs=[], reason="stub"),
+                GroundingAnswerAssessment(answer_index=3, supported_as_correct=False, evidence_refs=[], reason="stub"),
+                GroundingAnswerAssessment(answer_index=4, supported_as_correct=False, evidence_refs=[], reason="stub"),
+            ],
+            reason="stub",
+            confidence=0.9,
         ),
     )
     fake_provider.queue(MCQValidationResult, _mcq(True))
@@ -1034,6 +1097,7 @@ def test_generation_local_reference_never_leaks_downstream():
     fake_provider.queue(
         GeneratedQuestionResponse,
         GeneratedQuestionResponse(
+            blueprint=_blueprint(),
             question="שאלה לדוגמה עם הפניה מקומית",
             answers=["תשובה א", "תשובה ב", "תשובה ג", "תשובה ד"],
             correct_answer=1,
