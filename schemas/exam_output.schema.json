@@ -2,12 +2,20 @@
   "$defs": {
     "ExamQuestion": {
       "additionalProperties": false,
-      "description": "The authoritative, externally-facing exam question contract.\n\nContains only clean question content - no source, grounding, validation,\nhistorical-reference, generation-mode, model, confidence, or other audit\ninformation. See ``exam_generator.models.audit.QuestionAudit`` for that.",
+      "description": "The authoritative, externally-facing exam question contract - also\nthe WP-033 \"production question\" contract reused (never duplicated)\nby ``exam_generator.category_generation``'s ``CategoryQuestionSet``\nAPI for both ``existing_questions`` and the freshly-generated question.\n\nContains only clean question content - no source, grounding, validation,\nhistorical-reference, generation-mode, model, confidence, or other audit\ninformation. See ``exam_generator.models.audit.QuestionAudit`` for that.\n\n``number`` is optional (WP-033) - a freshly-generated question does not\nyet have a runtime identifier assigned (``CategoryQuestionSetService``\nis \"responsible only for the question content\" per WP-033 section 4);\nthe orchestration layer assigns ``number`` when it is not already\navailable. A question actually inserted into ``ExamOutput.questions``\nmust always carry a real, contiguous number - ``ExamOutput``'s own\nvalidator enforces this unconditionally and was not relaxed.",
       "properties": {
         "number": {
-          "gt": 0,
-          "title": "Number",
-          "type": "integer"
+          "anyOf": [
+            {
+              "gt": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Number"
         },
         "question": {
           "title": "Question",
@@ -41,7 +49,6 @@
         }
       },
       "required": [
-        "number",
         "question",
         "answer1",
         "answer2",

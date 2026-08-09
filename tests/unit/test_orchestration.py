@@ -1,9 +1,8 @@
-import inspect
 from unittest.mock import MagicMock
 
 import pytest
 
-from exam_generator.generation import MissingEvidenceError
+from exam_generator.category_generation import CategoryQuestionSetResponse, CategoryQuestionSetService
 from exam_generator.llm import LLMProviderError
 from exam_generator.models import (
     CandidateQuestion,
@@ -14,27 +13,13 @@ from exam_generator.models import (
     GroundingValidationResult,
     MCQValidationResult,
     QualityValidationResult,
-    QuestionTarget,
     TextbookCheckResult,
     TextbookCheckStatus,
+    candidate_to_exam_question,
 )
-from exam_generator.orchestration import (
-    ExamOrchestrator,
-    InvalidOrchestrationConfigurationError,
-    QuestionProductionFailedError,
-    build_exam_plan,
-)
-import exam_generator.orchestration.orchestrator as orchestrator_module
-from exam_generator.planning import QuestionTargetPlanner
-from exam_generator.production import (
-    CandidateValidationResults,
-    QuestionAttempt,
-    QuestionAttemptsExhaustedError,
-    QuestionProducer,
-    QuestionProductionResult,
-)
+from exam_generator.orchestration import ExamOrchestrator, QuestionProductionFailedError, build_exam_plan
+from exam_generator.production import CandidateValidationResults, QuestionAttempt, QuestionProductionResult
 from exam_generator.retrieval import CategoryResolver, resolve_exam_request_categories
-from exam_generator.validation import InvalidGroundingOutputError, InvalidTextbookOutputError
 
 CATEGORY_A = "קליפת המוח"
 CATEGORY_B = "גזע המוח"
@@ -78,6 +63,26 @@ def _production_result(candidate: CandidateQuestion) -> QuestionProductionResult
     return QuestionProductionResult(candidate=candidate, attempts=(attempt,))
 
 
+def _accepted_response(candidate: CandidateQuestion, *, duplicate_replacement_attempts: int = 0):
+    return CategoryQuestionSetResponse(
+        accepted=True,
+        question=candidate_to_exam_question(candidate),
+        production=_production_result(candidate),
+        duplicate_replacement_attempts=duplicate_replacement_attempts,
+    )
+
+
+def _failed_response(
+    *,
+    failure_type: str = "QuestionAttemptsExhaustedError",
+    failure_message: str = "exhausted",
+    failure_attempts: tuple = (),
+):
+    return CategoryQuestionSetResponse(
+        accepted=False, failure_type=failure_type, failure_message=failure_message, failure_attempts=failure_attempts
+    )
+
+
 def _identity_resolver() -> MagicMock:
     """A resolver stub where every requested category name is already
     canonical (no aliasing) - used by tests that are not exercising
@@ -87,47 +92,24 @@ def _identity_resolver() -> MagicMock:
     return mock
 
 
-def _producer(*, return_value=None, side_effect=None) -> MagicMock:
-    mock = MagicMock(spec=QuestionProducer)
+def _service(*, return_value=None, side_effect=None) -> MagicMock:
+    mock = MagicMock(spec=CategoryQuestionSetService)
     if side_effect is not None:
-        mock.produce_question.side_effect = side_effect
+        mock.generate_next.side_effect = side_effect
     else:
-        mock.produce_question.return_value = return_value or _production_result(_candidate())
+        mock.generate_next.return_value = return_value or _accepted_response(_candidate())
     return mock
 
 
-def _target(*, category: str = CATEGORY_A, target_id: int = 1) -> QuestionTarget:
-    return QuestionTarget(target_id=target_id, category=category, topic="topic", factual_focus="focus")
-
-
-def _planner(*, side_effect=None) -> MagicMock:
-    """A fake ``QuestionTargetPlanner`` (WP-025). By default, always plans
-    exactly the requested count of targets for whatever category is asked -
-    tests not specifically exercising planning behavior never need to
-    think about it."""
-    mock = MagicMock(spec=QuestionTargetPlanner)
-    if side_effect is not None:
-        mock.plan_targets.side_effect = side_effect
-    else:
-        mock.plan_targets.side_effect = lambda *, category, count: [
-            _target(category=category, target_id=i) for i in range(1, count + 1)
-        ]
-    return mock
-
-
-def _make_orchestrator(
-    *, resolver=None, planner=None, producer=None, max_duplicate_replacement_attempts=2
-) -> ExamOrchestrator:
+def _make_orchestrator(*, resolver=None, service=None) -> ExamOrchestrator:
     return ExamOrchestrator(
         category_resolver=resolver or _identity_resolver(),
-        target_planner=planner or _planner(),
-        producer=producer or _producer(),
-        max_duplicate_replacement_attempts=max_duplicate_replacement_attempts,
+        category_question_set_service=service or _service(),
     )
 
 
 # ---------------------------------------------------------------------------
-# Planning
+# Planning (build_exam_plan - unchanged by WP-032)
 # ---------------------------------------------------------------------------
 
 
@@ -173,7 +155,7 @@ def test_aliases_combine_counts_before_planning():
 
 
 # ---------------------------------------------------------------------------
-# Orchestration
+# Orchestration: delegation to CategoryQuestionSetService (WP-032/WP-033)
 # ---------------------------------------------------------------------------
 
 
@@ -189,8 +171,8 @@ def test_multiple_categories_counts_produce_exact_requested_distribution():
     candidates = [_candidate(question=f"שאלה {i}", category=CATEGORY_A) for i in range(3)] + [
         _candidate(question=f"שאלה ב {i}", category=CATEGORY_B) for i in range(2)
     ]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(resolver=resolver, producer=producer)
+    service = _service(side_effect=[_accepted_response(c) for c in candidates])
+    orchestrator = _make_orchestrator(resolver=resolver, service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 3, CATEGORY_B: 2}))
     assert len(result.exam.questions) == 5
     category_counts = {}
@@ -199,24 +181,43 @@ def test_multiple_categories_counts_produce_exact_requested_distribution():
     assert category_counts == {CATEGORY_A: 3, CATEGORY_B: 2}
 
 
-def test_producer_receives_correct_category_and_generation_mode():
+def test_service_receives_correct_category_and_generation_mode():
     candidates = [_candidate(question=f"שאלה {i}") for i in range(3)]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_accepted_response(c) for c in candidates])
+    orchestrator = _make_orchestrator(service=service)
     orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 3}))
-    calls = producer.produce_question.call_args_list
-    assert [c.kwargs["category"] for c in calls] == [CATEGORY_A, CATEGORY_A, CATEGORY_A]
-    assert [c.kwargs["generation_mode"] for c in calls] == [
+    calls = service.generate_next.call_args_list
+    requests = [c.args[0] for c in calls]
+    assert [r.category for r in requests] == [CATEGORY_A, CATEGORY_A, CATEGORY_A]
+    assert [r.generation_mode for r in requests] == [
         GenerationMode.STYLE_SIMILAR,
         GenerationMode.INDEPENDENT,
         GenerationMode.STYLE_SIMILAR,
     ]
 
 
+def test_existing_questions_accumulate_within_category_across_calls():
+    # WP-033: the orchestrator threads every question already accepted for
+    # a category so far (as ExamQuestion - the production schema, number
+    # still None at this point) into the next CategoryQuestionSetRequest
+    # for that same category - and never leaks across a different category.
+    candidates_a = [_candidate(question=f"שאלה א {i}", category=CATEGORY_A) for i in range(2)]
+    candidates_b = [_candidate(question=f"שאלה ב {i}", category=CATEGORY_B) for i in range(2)]
+    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
+    service = _service(side_effect=[_accepted_response(c) for c in (*candidates_a, *candidates_b)])
+    orchestrator = _make_orchestrator(resolver=resolver, service=service)
+    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2, CATEGORY_B: 2}))
+    requests = [c.args[0] for c in service.generate_next.call_args_list]
+    assert requests[0].existing_questions == ()
+    assert requests[1].existing_questions == (candidate_to_exam_question(candidates_a[0]),)
+    assert requests[2].existing_questions == ()
+    assert requests[3].existing_questions == (candidate_to_exam_question(candidates_b[0]),)
+
+
 def test_established_candidate_to_exam_conversion_is_used():
     candidate = _candidate(answers=["1", "2", "3", "4"], correct_answer=3)
-    producer = _producer(return_value=_production_result(candidate))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(return_value=_accepted_response(candidate))
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     question = result.exam.questions[0]
     assert question.number == 1
@@ -227,8 +228,8 @@ def test_established_candidate_to_exam_conversion_is_used():
 
 def test_final_exam_ordering_follows_plan_order():
     candidates = [_candidate(question=f"שאלה {i}") for i in range(4)]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_accepted_response(c) for c in candidates])
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 4}))
     assert [q.question for q in result.exam.questions] == [f"שאלה {i}" for i in range(4)]
     assert [q.number for q in result.exam.questions] == [1, 2, 3, 4]
@@ -241,15 +242,25 @@ def test_clean_exam_does_not_expose_internal_validation_metadata():
     assert "generation_mode" not in type(result.exam.questions[0]).model_fields
 
 
+def test_duplicate_replacement_attempts_recorded_from_service_response():
+    service = _service(return_value=_accepted_response(_candidate(), duplicate_replacement_attempts=2))
+    orchestrator = _make_orchestrator(service=service)
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    assert result.productions[0].duplicate_replacement_attempts == 2
+
+
 # ---------------------------------------------------------------------------
 # Question-local failures (WP-023): recorded as FailedPlannedQuestion,
-# orchestration continues rather than aborting the whole run.
+# orchestration continues rather than aborting the whole run. Since
+# WP-032, classifying and catching the underlying exception is
+# CategoryQuestionSetService's job (see test_category_question_set.py) - the
+# orchestrator only ever sees the resulting accepted=False response.
 # ---------------------------------------------------------------------------
 
 
-def test_attempt_exhaustion_is_question_local_and_yields_partial_result():
-    producer = _producer(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=()))
-    orchestrator = _make_orchestrator(producer=producer)
+def test_question_local_failure_response_yields_partial_result():
+    service = _service(return_value=_failed_response(failure_type="QuestionAttemptsExhaustedError"))
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     assert result.status == ExamGenerationStatus.PARTIAL
     assert result.exam is None
@@ -258,8 +269,8 @@ def test_attempt_exhaustion_is_question_local_and_yields_partial_result():
 
 
 def test_failed_question_identifies_planned_question_category_and_mode():
-    producer = _producer(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=()))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(return_value=_failed_response())
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     failed = result.failed_questions[0]
     assert failed.planned.category == CATEGORY_A
@@ -267,7 +278,7 @@ def test_failed_question_identifies_planned_question_category_and_mode():
     assert failed.planned.position == 1
 
 
-def test_failed_question_preserves_attempts_exhausted_context():
+def test_failed_question_preserves_attempts_from_service_response():
     sentinel_attempts = (
         QuestionAttempt(
             attempt_number=1,
@@ -275,19 +286,16 @@ def test_failed_question_preserves_attempts_exhausted_context():
             validations=_production_result(_candidate()).attempts[0].validations,
         ),
     )
-    producer = _producer(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=sentinel_attempts))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(return_value=_failed_response(failure_attempts=sentinel_attempts))
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     assert result.failed_questions[0].attempts == sentinel_attempts
-    assert result.failed_questions[0].duplicate_productions == ()
 
 
 def test_orchestration_continues_past_a_question_local_failure_to_later_questions():
     good_candidate = _candidate(question="שאלה טובה")
-    producer = _producer(
-        side_effect=[QuestionAttemptsExhaustedError("exhausted", attempts=()), _production_result(good_candidate)]
-    )
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_failed_response(), _accepted_response(good_candidate)])
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
     assert result.status == ExamGenerationStatus.PARTIAL
     assert len(result.failed_questions) == 1
@@ -304,15 +312,15 @@ def test_middle_failure_leaves_no_gap_in_final_exam_numbering():
     # must renumber the clean exam 1,2,3 - not 1,3,4 - while each
     # production's original planned position is separately preserved.
     candidates = [_candidate(question=f"שאלה {i}") for i in range(3)]
-    producer = _producer(
+    service = _service(
         side_effect=[
-            _production_result(candidates[0]),
-            QuestionAttemptsExhaustedError("exhausted", attempts=()),
-            _production_result(candidates[1]),
-            _production_result(candidates[2]),
+            _accepted_response(candidates[0]),
+            _failed_response(),
+            _accepted_response(candidates[1]),
+            _accepted_response(candidates[2]),
         ]
     )
-    orchestrator = _make_orchestrator(producer=producer)
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 4}))
     assert result.status == ExamGenerationStatus.PARTIAL
     assert [q.number for q in result.exam.questions] == [1, 2, 3]
@@ -322,10 +330,8 @@ def test_middle_failure_leaves_no_gap_in_final_exam_numbering():
 
 def test_completed_productions_preserved_alongside_a_later_question_local_failure():
     good_candidate = _candidate(question="שאלה טובה")
-    producer = _producer(
-        side_effect=[_production_result(good_candidate), QuestionAttemptsExhaustedError("exhausted", attempts=())]
-    )
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_accepted_response(good_candidate), _failed_response()])
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
     assert result.status == ExamGenerationStatus.PARTIAL
     assert len(result.productions) == 1
@@ -335,8 +341,8 @@ def test_completed_productions_preserved_alongside_a_later_question_local_failur
 
 
 def test_all_planned_questions_failing_yields_partial_with_no_exam():
-    producer = _producer(side_effect=QuestionAttemptsExhaustedError("exhausted", attempts=()))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(return_value=_failed_response())
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
     assert result.status == ExamGenerationStatus.PARTIAL
     assert result.exam is None
@@ -351,24 +357,30 @@ def test_all_accepted_yields_complete_status_and_no_failed_questions():
     assert result.failed_questions == ()
 
 
-def test_grounding_provenance_recovery_exhaustion_is_question_local():
-    producer = _producer(side_effect=InvalidGroundingOutputError("claimed unsupplied evidence"))
-    orchestrator = _make_orchestrator(producer=producer)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
-    assert result.status == ExamGenerationStatus.PARTIAL
-    assert result.failed_questions[0].failure_type == "InvalidGroundingOutputError"
+def test_shortfall_in_one_category_does_not_affect_another_category():
+    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
+    candidates_b = [_candidate(question=f"שאלה ב {i}", category=CATEGORY_B) for i in range(2)]
 
+    def side_effect(request):
+        if request.category == CATEGORY_A:
+            return _failed_response(failure_type="InsufficientDistinctTargetsError")
+        return _accepted_response(candidates_b.pop(0))
 
-def test_textbook_provenance_recovery_exhaustion_is_question_local():
-    producer = _producer(side_effect=InvalidTextbookOutputError("claimed unsupplied evidence"))
-    orchestrator = _make_orchestrator(producer=producer)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
+    service = _service(side_effect=side_effect)
+    orchestrator = _make_orchestrator(resolver=resolver, service=service)
+    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2, CATEGORY_B: 2}))
     assert result.status == ExamGenerationStatus.PARTIAL
-    assert result.failed_questions[0].failure_type == "InvalidTextbookOutputError"
+    assert len(result.failed_questions) == 2
+    assert all(f.planned.category == CATEGORY_A for f in result.failed_questions)
+    assert len(result.productions) == 2
+    assert all(r.planned.category == CATEGORY_B for r in result.productions)
 
 
 # ---------------------------------------------------------------------------
 # System-level failures (WP-023): still abort the whole run immediately.
+# Since WP-032, these propagate uncaught from
+# ``CategoryQuestionSetService.generate_next()`` - the orchestrator's own
+# job is only to catch and contextualize them.
 # ---------------------------------------------------------------------------
 
 
@@ -377,10 +389,8 @@ def test_operational_failure_after_completed_questions_preserves_context():
     # count/cause) must be preserved even when it occurs after one or more
     # questions were already successfully completed.
     good_candidate = _candidate(question="שאלה טובה")
-    producer = _producer(
-        side_effect=[_production_result(good_candidate), LLMProviderError("connection failed")]
-    )
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_accepted_response(good_candidate), LLMProviderError("connection failed")])
+    orchestrator = _make_orchestrator(service=service)
     with pytest.raises(QuestionProductionFailedError) as excinfo:
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
     assert isinstance(excinfo.value.operational_cause, LLMProviderError)
@@ -391,127 +401,37 @@ def test_operational_failure_after_completed_questions_preserves_context():
 
 
 def test_system_level_failure_propagates_immediately():
-    # No retry occurs (producer called exactly once), and the failure is
-    # contextualized (QuestionProductionFailedError) rather than the raw
+    # No retry occurs at the orchestrator level (the service is called
+    # exactly once), and the failure is contextualized
+    # (QuestionProductionFailedError) rather than the raw
     # LLMProviderError propagating unwrapped - the original cause remains
     # inspectable via .operational_cause and exception chaining.
-    producer = _producer(side_effect=LLMProviderError("connection failed"))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=LLMProviderError("connection failed"))
+    orchestrator = _make_orchestrator(service=service)
     with pytest.raises(QuestionProductionFailedError) as excinfo:
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     assert isinstance(excinfo.value.operational_cause, LLMProviderError)
     assert isinstance(excinfo.value.__cause__, LLMProviderError)
-    assert producer.produce_question.call_count == 1
+    assert service.generate_next.call_count == 1
 
 
 def test_unexpected_exception_propagates_uncaught():
-    producer = _producer(side_effect=RuntimeError("genuinely unexpected"))
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=RuntimeError("genuinely unexpected"))
+    orchestrator = _make_orchestrator(service=service)
     with pytest.raises(RuntimeError):
         orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
 
 
-# ---------------------------------------------------------------------------
-# Duplicate protection
-# ---------------------------------------------------------------------------
-
-
-def test_exact_duplicate_accepted_question_is_rejected_and_replaced():
-    duplicate_candidate = _candidate(question=QUESTION_TEXT)
-    unique_candidate = _candidate(question="שאלה שונה לגמרי")
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            _production_result(duplicate_candidate),
-            _production_result(unique_candidate),
-        ]
+def test_failure_in_second_category_preserves_first_categorys_completed_context():
+    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
+    service = _service(
+        side_effect=[_accepted_response(_candidate(category=CATEGORY_A)), LLMProviderError("connection failed")]
     )
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=2)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    questions = [q.question for q in result.exam.questions]
-    assert questions == [QUESTION_TEXT, "שאלה שונה לגמרי"]
-    assert producer.produce_question.call_count == 3
-
-
-def test_normalized_whitespace_case_duplicate_is_detected():
-    original = _candidate(question="Medulla Oblongata תפקוד")
-    padded_variant = _candidate(question="  medulla   oblongata   תפקוד  ")
-    unique = _candidate(question="שאלה שונה")
-    producer = _producer(side_effect=[_production_result(original), _production_result(padded_variant), _production_result(unique)])
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=2)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert [q.question for q in result.exam.questions] == ["Medulla Oblongata תפקוד", "שאלה שונה"]
-
-
-def test_replacement_production_requested_for_same_category_and_mode():
-    duplicate_candidate = _candidate(question=QUESTION_TEXT, category=CATEGORY_A)
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            _production_result(duplicate_candidate),
-            _production_result(_candidate(question="שאלה ייחודית")),
-        ]
-    )
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=2)
-    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    calls = producer.produce_question.call_args_list
-    # First call is for planned position 1; the next two both retry planned
-    # position 2 (same category/mode) after the duplicate.
-    assert calls[1].kwargs["category"] == calls[2].kwargs["category"] == CATEGORY_A
-    assert calls[1].kwargs["generation_mode"] == calls[2].kwargs["generation_mode"]
-
-
-def test_unique_replacement_is_accepted_and_records_replacement_count():
-    duplicate_candidate = _candidate(question=QUESTION_TEXT)
-    unique_candidate = _candidate(question="שאלה ייחודית")
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            _production_result(duplicate_candidate),
-            _production_result(unique_candidate),
-        ]
-    )
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=2)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert result.productions[1].duplicate_replacement_attempts == 1
-    assert result.productions[1].production.candidate == unique_candidate
-
-
-def test_duplicate_replacement_exhaustion_is_question_local():
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            *[_production_result(_candidate(question=QUESTION_TEXT)) for _ in range(3)],
-        ]
-    )
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=2)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert result.status == ExamGenerationStatus.PARTIAL
-    assert len(result.productions) == 1
-    assert len(result.failed_questions) == 1
-    assert result.failed_questions[0].failure_type == "DuplicateReplacementExhausted"
-    # 1 call for the first accepted question + 1 initial + 2 bounded replacement attempts for the second
-    assert producer.produce_question.call_count == 1 + 1 + 2
-
-
-def test_duplicate_exhaustion_records_duplicate_context():
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            *[_production_result(_candidate(question=QUESTION_TEXT)) for _ in range(2)],
-        ]
-    )
-    orchestrator = _make_orchestrator(producer=producer, max_duplicate_replacement_attempts=1)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    failed = result.failed_questions[0]
-    assert len(failed.duplicate_productions) == 2
-    assert failed.attempts == ()
-
-
-def test_no_semantic_or_llm_duplicate_detector_introduced():
-    source = inspect.getsource(orchestrator_module)
-    assert "generate_structured" not in source
-    assert "embed" not in source.lower()
+    orchestrator = _make_orchestrator(resolver=resolver, service=service)
+    with pytest.raises(QuestionProductionFailedError) as excinfo:
+        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
+    assert len(excinfo.value.completed_productions) == 1
+    assert excinfo.value.planned_question.category == CATEGORY_B
 
 
 # ---------------------------------------------------------------------------
@@ -521,8 +441,8 @@ def test_no_semantic_or_llm_duplicate_detector_introduced():
 
 def test_production_history_retained_for_every_accepted_question():
     candidates = [_candidate(question=f"שאלה {i}") for i in range(3)]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(producer=producer)
+    service = _service(side_effect=[_accepted_response(c) for c in candidates])
+    orchestrator = _make_orchestrator(service=service)
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 3}))
     assert len(result.productions) == 3
     for record, candidate in zip(result.productions, candidates):
@@ -535,159 +455,3 @@ def test_plan_retained_on_result():
     result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
     assert len(result.plan) == 1
     assert result.plan[0].category == CATEGORY_A
-
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-
-def test_invalid_max_duplicate_replacement_attempts_is_rejected():
-    with pytest.raises(InvalidOrchestrationConfigurationError):
-        _make_orchestrator(max_duplicate_replacement_attempts=0)
-
-
-def test_negative_max_duplicate_replacement_attempts_is_rejected():
-    with pytest.raises(InvalidOrchestrationConfigurationError):
-        _make_orchestrator(max_duplicate_replacement_attempts=-1)
-
-
-# ---------------------------------------------------------------------------
-# WP-025: target planning integration
-# ---------------------------------------------------------------------------
-
-
-def test_planning_happens_once_per_category_not_per_position():
-    planner = _planner()
-    orchestrator = _make_orchestrator(planner=planner)
-    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 3}))
-    assert planner.plan_targets.call_count == 1
-    assert planner.plan_targets.call_args.kwargs == {"category": CATEGORY_A, "count": 3}
-
-
-def test_planning_happens_once_per_distinct_category():
-    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
-    planner = _planner()
-    candidates = [_candidate(question=f"שאלה {i}", category=CATEGORY_A) for i in range(2)] + [
-        _candidate(question=f"שאלה ב {i}", category=CATEGORY_B) for i in range(2)
-    ]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(resolver=resolver, planner=planner, producer=producer)
-    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2, CATEGORY_B: 2}))
-    assert planner.plan_targets.call_count == 2
-    called_categories = {call.kwargs["category"] for call in planner.plan_targets.call_args_list}
-    assert called_categories == {CATEGORY_A, CATEGORY_B}
-
-
-def test_producer_receives_the_assigned_target_per_position():
-    targets = [_target(category=CATEGORY_A, target_id=1), _target(category=CATEGORY_A, target_id=2)]
-    planner = _planner(side_effect=lambda *, category, count: list(targets))
-    candidates = [_candidate(question="שאלה 1"), _candidate(question="שאלה 2")]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(planner=planner, producer=producer)
-    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    calls = producer.produce_question.call_args_list
-    assert calls[0].kwargs["target"] is targets[0]
-    assert calls[1].kwargs["target"] is targets[1]
-
-
-def test_target_remains_stable_across_duplicate_replacement_retries():
-    # WP-025 section 9: a duplicate-replacement retry must reuse the same
-    # assigned target - it must never re-plan merely because a candidate
-    # was rejected as a duplicate.
-    first_target = _target(category=CATEGORY_A, target_id=1)
-    second_target = _target(category=CATEGORY_A, target_id=2)
-    planner = _planner(side_effect=lambda *, category, count: [first_target, second_target])
-    producer = _producer(
-        side_effect=[
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            _production_result(_candidate(question=QUESTION_TEXT)),
-            _production_result(_candidate(question="שאלה שונה")),
-        ]
-    )
-    orchestrator = _make_orchestrator(planner=planner, producer=producer, max_duplicate_replacement_attempts=2)
-    orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    calls = producer.produce_question.call_args_list
-    assert calls[0].kwargs["target"] is first_target
-    assert calls[1].kwargs["target"] is second_target
-    assert calls[2].kwargs["target"] is second_target
-
-
-def test_planner_shortfall_becomes_insufficient_distinct_targets_failure():
-    planner = _planner(side_effect=lambda *, category, count: [_target(category=category, target_id=1)])
-    orchestrator = _make_orchestrator(planner=planner)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert result.status == ExamGenerationStatus.PARTIAL
-    assert len(result.productions) == 1
-    assert len(result.failed_questions) == 1
-    assert result.failed_questions[0].failure_type == "InsufficientDistinctTargetsError"
-    assert result.failed_questions[0].planned.position == 2
-
-
-def test_planner_zero_targets_fails_every_planned_position_for_that_category():
-    planner = _planner(side_effect=lambda *, category, count: [])
-    producer = _producer()
-    orchestrator = _make_orchestrator(planner=planner, producer=producer)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert result.status == ExamGenerationStatus.PARTIAL
-    assert result.exam is None
-    assert len(result.productions) == 0
-    assert len(result.failed_questions) == 2
-    assert all(f.failure_type == "InsufficientDistinctTargetsError" for f in result.failed_questions)
-    # the producer is never invoked for a planned position with no target -
-    # this is not a candidate-production problem, so it never consumes
-    # WP-013's attempt budget.
-    assert producer.produce_question.call_count == 0
-
-
-def test_shortfall_in_one_category_does_not_affect_another_category():
-    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
-    planner = _planner(
-        side_effect=lambda *, category, count: (
-            [] if category == CATEGORY_A else [_target(category=category, target_id=i) for i in range(1, count + 1)]
-        )
-    )
-    candidates = [_candidate(question="שאלה ב 1", category=CATEGORY_B), _candidate(question="שאלה ב 2", category=CATEGORY_B)]
-    producer = _producer(side_effect=[_production_result(c) for c in candidates])
-    orchestrator = _make_orchestrator(resolver=resolver, planner=planner, producer=producer)
-    result = orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2, CATEGORY_B: 2}))
-    assert result.status == ExamGenerationStatus.PARTIAL
-    assert len(result.failed_questions) == 2
-    assert all(f.planned.category == CATEGORY_A for f in result.failed_questions)
-    assert len(result.productions) == 2
-    assert all(r.planned.category == CATEGORY_B for r in result.productions)
-
-
-def test_planner_system_level_failure_aborts_whole_exam():
-    planner = _planner(side_effect=LLMProviderError("connection failed"))
-    orchestrator = _make_orchestrator(planner=planner)
-    with pytest.raises(QuestionProductionFailedError) as excinfo:
-        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 2}))
-    assert isinstance(excinfo.value.operational_cause, LLMProviderError)
-    assert excinfo.value.planned_question.position == 1
-    assert excinfo.value.planned_question.category == CATEGORY_A
-
-
-def test_planner_missing_evidence_aborts_whole_exam():
-    planner = _planner(side_effect=MissingEvidenceError("no evidence"))
-    orchestrator = _make_orchestrator(planner=planner)
-    with pytest.raises(QuestionProductionFailedError) as excinfo:
-        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1}))
-    assert isinstance(excinfo.value.operational_cause, MissingEvidenceError)
-
-
-def test_planner_failure_after_earlier_category_completed_preserves_context():
-    resolver = CategoryResolver([CATEGORY_A, CATEGORY_B], {})
-    planner = _planner(
-        side_effect=lambda *, category, count: (
-            [_target(category=category, target_id=1)]
-            if category == CATEGORY_A
-            else (_ for _ in ()).throw(LLMProviderError("connection failed"))
-        )
-    )
-    producer = _producer(return_value=_production_result(_candidate(category=CATEGORY_A)))
-    orchestrator = _make_orchestrator(resolver=resolver, planner=planner, producer=producer)
-    with pytest.raises(QuestionProductionFailedError) as excinfo:
-        orchestrator.generate_exam(ExamRequest(categories={CATEGORY_A: 1, CATEGORY_B: 1}))
-    assert len(excinfo.value.completed_productions) == 1
-    assert excinfo.value.planned_question.category == CATEGORY_B

@@ -1,0 +1,54 @@
+[
+  {
+    "round": 1,
+    "existing_questions_count": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "planned_target_topic": "אספקת דם לצרבלום",
+    "planned_target_factual_focus": "עורקים המספקים דם לצרבלום כוללים את Superior Cerebellar Artery, Anterior Inferior Cerebellar Artery (AICA), ו-Posterior Inferior Cerebellar Artery (PICA).",
+    "planned_relationship_type": "SUPPLIES",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהעורקים הבא מספק דם לחלקים העליונים של הצרבלום?",
+    "correct_answer_text": "Superior Cerebellar Artery"
+  },
+  {
+    "round": 2,
+    "existing_questions_count": 1,
+    "generation_mode": "INDEPENDENT",
+    "planned_target_topic": "אספקת דם לצרבלום",
+    "planned_target_factual_focus": "עורקים המספקים דם לצרבלום כולל את ה-Superior Cerebellar Artery, Anterior Inferior Cerebellar Artery (AICA) ו-Posterior Inferior Cerebellar Artery (PICA).",
+    "planned_relationship_type": "SUPPLIES",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+    "correct_answer_text": "Superior Cerebellar Artery"
+  },
+  {
+    "round": 3,
+    "existing_questions_count": 2,
+    "generation_mode": "STYLE_SIMILAR",
+    "planned_target_topic": "אספקת דם לצרבלום",
+    "planned_target_factual_focus": "עורקים המספקים דם לצרבלום כוללים את ה-Superior Cerebellar Artery, Anterior Inferior Cerebellar Artery (AICA) ו-Posterior Inferior Cerebellar Artery (PICA).",
+    "planned_relationship_type": "SUPPLIES",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 2,
+    "question": "איזה עורק מספק דם לחלק העליון של הצרבלום?",
+    "correct_answer_text": "Superior Cerebellar Artery"
+  },
+  {
+    "round": 4,
+    "existing_questions_count": 3,
+    "generation_mode": "INDEPENDENT",
+    "planned_target_topic": "אספקת דם לצרבלום",
+    "planned_target_factual_focus": "עורקים המספקים דם לחלקים השונים של הצרבלום",
+    "planned_relationship_type": "SUPPLIES",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהעורקים מספק דם לחלקים העליונים של הצרבלום?",
+    "correct_answer_text": "Superior Cerebellar Artery"
+  }
+]

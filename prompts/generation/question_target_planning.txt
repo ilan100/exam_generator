@@ -18,6 +18,13 @@ Factual authority (read carefully):
 Honest count (read carefully):
 - Return up to {count} targets, but only as many as the supplied evidence genuinely supports as distinct, non-overlapping targets. If the evidence does not support {count} genuinely distinct targets, return fewer rather than fabricating artificial diversity. An empty list is acceptable if no usable target exists at all. Never pad the list with a near-duplicate of a target you already returned.
 
+Already-tested knowledge (read carefully):
+- The block below lists concepts and relationship types already tested by questions already generated for this category, in earlier planning/generation calls. It is information, not a list of forbidden answers - it exists so you can choose a genuinely different target instead of one that would produce a near-duplicate question.
+- Apply the same "genuine diversity" requirement described above against this already-tested knowledge, not only against other targets in this response: do not choose a target that tests the same concept, tests the same relationship approached from the same or the opposite direction, or is simply a rephrasing of something already tested - when the supplied evidence supports a genuinely different target instead.
+- If the supplied evidence does not support a genuinely different target, it is acceptable to return a target that overlaps with already-tested knowledge, or to return fewer targets than requested (see "Honest count" above) - never fabricate a different-seeming target that is not actually supported by the evidence merely to appear distinct.
+
+{already_tested_summary}
+
 Your structured response corresponds to the following fields - report only what is asked, and do not add fields beyond what is requested:
 - targets: a list of up to {count} distinct question targets. Each target has:
   - topic: a short label for this target's subtopic/focus.

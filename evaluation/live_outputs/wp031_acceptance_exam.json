@@ -1,0 +1,324 @@
+{
+  "questions": [
+    {
+      "number": 1,
+      "question": "איזה מהמבנים הבאים נמצא בתוך התעלה השדרתית?",
+      "answer1": "מוח השדרה",
+      "answer2": "עורקים צוואריים",
+      "answer3": "עצבים סנסוריים",
+      "answer4": "חוליות",
+      "correct_answer": 1,
+      "category": "התעלה השדרתית ותכולתה"
+    },
+    {
+      "number": 2,
+      "question": "איזה מהשכבות בחומר האפור בחוט השדרה מכילה נוירונים מוטוריים?",
+      "answer1": "שכבה 9",
+      "answer2": "שכבה 1",
+      "answer3": "שכבה 3",
+      "answer4": "שכבה 8",
+      "correct_answer": 1,
+      "category": "התעלה השדרתית ותכולתה"
+    },
+    {
+      "number": 3,
+      "question": "מהו התפקיד של הקורטקס המוטורי הראשוני (M1)?",
+      "answer1": "שליחת סיגנלים מוטוריים לחוט השדרה",
+      "answer2": "תכנון תנועות מורכבות",
+      "answer3": "עיבוד מידע תחושתי",
+      "answer4": "סנכרון תנועות עיניים",
+      "correct_answer": 1,
+      "category": "לוקליזציה פונקציונלית"
+    },
+    {
+      "number": 4,
+      "question": "איפה ממוקמת קליפת הטעם הראשונית?",
+      "answer1": "מתחת ל-central sulcus",
+      "answer2": "ב-precentral gyrus",
+      "answer3": "ב-postcentral gyrus",
+      "answer4": "באזור האסוציאטיבי",
+      "correct_answer": 1,
+      "category": "לוקליזציה פונקציונלית"
+    },
+    {
+      "number": 5,
+      "question": "איזה סוג של חומר לבן מחבר בין אזורים קורטיקליים באותה המיספרה?",
+      "answer1": "סיבי אסוסיאציה",
+      "answer2": "סיבי השלכה",
+      "answer3": "סיבים קומיסורליים",
+      "answer4": "סיבי פרוג׳קשן",
+      "correct_answer": 1,
+      "category": "חומר לבן"
+    },
+    {
+      "number": 6,
+      "question": "איזו שכבת חומר לבן ממוקמת בחלק העליון של התלמוס?",
+      "answer1": "Stratum Zonale",
+      "answer2": "External Medullary Lamina",
+      "answer3": "Internal Medullary Lamina",
+      "answer4": "Stratum Reticulare",
+      "correct_answer": 1,
+      "category": "חומר לבן"
+    },
+    {
+      "number": 7,
+      "question": "איזה עצב קרניאלי מתפתח מהטלנצפלון ונכנס ישירות לקליפת המוח מהמאגרים באף?",
+      "answer1": "עצב ההרחה",
+      "answer2": "עצב הראיה",
+      "answer3": "עצב הטרוכליאר",
+      "answer4": "עצב האוקולומוטור",
+      "correct_answer": 1,
+      "category": "עצבים קרניאליים"
+    },
+    {
+      "number": 8,
+      "question": "מהו המקור ההתפתחותי של עצב הראייה (Optic Nerve)?",
+      "answer1": "מתפתח מהדיאנצפלון ונכנס ישירות לתלמוס",
+      "answer2": "מתפתח מהפונס ונכנס לגזע המוח",
+      "answer3": "מתפתח מהגזע ונכנס לתלמוס",
+      "answer4": "מתפתח מהטלאנצפלון ונכנס לקליפת המוח",
+      "correct_answer": 1,
+      "category": "עצבים קרניאליים"
+    },
+    {
+      "number": 9,
+      "question": "מהו היתרון של אולטרסאונד בהשוואה ל-CT בדימות מוחי?",
+      "answer1": "אולטרסאונד הוא שיטה לא פולשנית ואינה חשופה לקרינה מייננת.",
+      "answer2": "CT מספקת דימות באיכות גבוהה יותר מ-אולטרסאונד.",
+      "answer3": "MRI מתבצעת במהירות גבוהה יותר מ-אולטרסאונד.",
+      "answer4": "PET משמשת לדימות מוחי בזמן אמת.",
+      "correct_answer": 1,
+      "category": "מיפוי ודימות מוחי"
+    },
+    {
+      "number": 10,
+      "question": "איזו שכבת נאוקורטקס כוללת בעיקר סינפסות של תאי עצב מרמות אחרות?",
+      "answer1": "שכבת מולקולרית",
+      "answer2": "שכבה גרנולרית",
+      "answer3": "שכבת ביניים",
+      "answer4": "שכבת פלט",
+      "correct_answer": 1,
+      "category": "היסטולוגיה"
+    },
+    {
+      "number": 11,
+      "question": "מהו המדע שהוקם בזכות פיתוח המיקרוסקופ במאה ה-17 ועוסק בחקר הרקמות?",
+      "answer1": "היסטולוגיה",
+      "answer2": "אנטומיה",
+      "answer3": "ביולוגיה",
+      "answer4": "פיזיולוגיה",
+      "correct_answer": 1,
+      "category": "היסטולוגיה"
+    },
+    {
+      "number": 12,
+      "question": "מהו המקור ממנו מתפתחת המערכת הלימבית?",
+      "answer1": "Rhinencephalon",
+      "answer2": "האמיגדלה",
+      "answer3": "ההיפוקמפוס",
+      "answer4": "החומר הלבן",
+      "correct_answer": 1,
+      "category": "המערכת הלימבית"
+    },
+    {
+      "number": 13,
+      "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+      "answer1": "Superior Cerebellar Artery",
+      "answer2": "Anterior Inferior Cerebellar Artery (AICA)",
+      "answer3": "Posterior Cerebellar Artery",
+      "answer4": "Posterior Inferior Cerebellar Artery (PICA)",
+      "correct_answer": 1,
+      "category": "אספקת דם"
+    },
+    {
+      "number": 14,
+      "question": "איזה מהעורקים מספק דם לחוט השדרה?",
+      "answer1": "Anterior Spinal Artery",
+      "answer2": "Middle Cerebral Artery",
+      "answer3": "Internal Carotid Artery",
+      "answer4": "Anterior Choroidal Artery",
+      "correct_answer": 1,
+      "category": "אספקת דם"
+    },
+    {
+      "number": 15,
+      "question": "מהו הסינוס הדוראלי?",
+      "answer1": "חלל בין שתי שכבות הדורה המלא בדם ורידי",
+      "answer2": "שטף דם סאב-דורלי",
+      "answer3": "סינוס פריאוסטאלי",
+      "answer4": "וורידים במערכת הדם של המוח",
+      "correct_answer": 1,
+      "category": "קרומים וסינוסים דוראליים"
+    },
+    {
+      "number": 16,
+      "question": "איזה מהתפקודים הבאים נשלט על ידי גזע המוח?",
+      "answer1": "נשימה",
+      "answer2": "תהליכי עיכול",
+      "answer3": "ראיה",
+      "answer4": "תהליכים קוגניטיביים",
+      "correct_answer": 1,
+      "category": "גזע המוח"
+    },
+    {
+      "number": 17,
+      "question": "איזו מסילה עצבית מעבירה תחושות כאב וטמפרטורה מהפריפריה לתלמוס?",
+      "answer1": "Spinothalamic Tract",
+      "answer2": "Medial Lemniscus Tract",
+      "answer3": "Corticobulbar Tract",
+      "answer4": "Corticospinal Tract",
+      "correct_answer": 1,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 18,
+      "question": "איזו מסילה עצבית מעבירה תחושות של מגע עדין ופרופריוספציה מהפריפריה לתלמוס?",
+      "answer1": "Medial Lemniscus Tract",
+      "answer2": "Spinothalamic Tract",
+      "answer3": "Corticobulbar Tract",
+      "answer4": "Ascending Tracts",
+      "correct_answer": 1,
+      "category": "מסילות עצביות"
+    },
+    {
+      "number": 19,
+      "question": "מהו תפקידם המרכזי של גרעיני הבסיס בהוצאה לפועל של תנועה מוטורית?",
+      "answer1": "ויסות התנועה על ידי הפעלת התלמוס",
+      "answer2": "הפעלת התנועה על ידי ויסות דיכוי התלמוס",
+      "answer3": "תכנון התנועה בלבד ללא הוצאה לפועל",
+      "answer4": "הפחתת התנועה באמצעות דיכוי גרעיני הבסיס",
+      "correct_answer": 1,
+      "category": "גרעיני הבסיס"
+    },
+    {
+      "number": 20,
+      "question": "איזה מסלול של גרעיני הבסיס מפעיל את התנועה על ידי הפסקת דיכוי התלמוס?",
+      "answer1": "מסלול ישיר",
+      "answer2": "מסלול עקיף",
+      "answer3": "סטריאטום",
+      "answer4": "מערכת אקסטרה-פירמידלית",
+      "correct_answer": 1,
+      "category": "גרעיני הבסיס"
+    },
+    {
+      "number": 21,
+      "question": "מהו תפקיד המוח הקטן (צרבלום) במערכת העצבים?",
+      "answer1": "המוח הקטן ממלא תפקיד מרכזי בקואורדינציה של תנועות הגוף.",
+      "answer2": "גרעיני הבסיס שולטים בקואורדינציה של תנועות הגוף.",
+      "answer3": "המוח הגדול אחראי על קואורדינציה של תנועות הגוף.",
+      "answer4": "המוח הקטן אינו קשור למערכת אקסטרה-פירמידלית.",
+      "correct_answer": 1,
+      "category": "המוח הקטן"
+    },
+    {
+      "number": 22,
+      "question": "איזה מבנה אנטומי מתאר את הארגון של המוח הקטן?",
+      "answer1": "חומר אפור בחוץ וחומר לבן בפנים",
+      "answer2": "חומר לבן בחוץ וחומר אפור בפנים",
+      "answer3": "חומר אפור בפנים בלבד",
+      "answer4": "חומר לבן בלבד",
+      "correct_answer": 1,
+      "category": "המוח הקטן"
+    },
+    {
+      "number": 23,
+      "question": "מהי התגובה של המערכת הסימפתטית במצבי לחץ?",
+      "answer1": "Fight or Flight",
+      "answer2": "Rest and Digest",
+      "answer3": "Relaxation Response",
+      "answer4": "Homeostasis",
+      "correct_answer": 1,
+      "category": "מערכת העצבים ההיקפית"
+    },
+    {
+      "number": 24,
+      "question": "איזה מבנה נמצא בדיאנצפלון ומוכר כמבנה המרכזי ביותר בו?",
+      "answer1": "התלמוס",
+      "answer2": "ההיפותלמוס",
+      "answer3": "האפיתלמוס",
+      "answer4": "הסאב-תלמוס",
+      "correct_answer": 1,
+      "category": "דיאנצפלון"
+    },
+    {
+      "number": 25,
+      "question": "מהו המבנה הנקרא דיסק דו שכבתי במהלך התפתחות העובר?",
+      "answer1": "Bilaminar Disk",
+      "answer2": "Blastocyst",
+      "answer3": "Hypoblast",
+      "answer4": "Epiblast",
+      "correct_answer": 1,
+      "category": "אמבריולוגיה"
+    },
+    {
+      "number": 26,
+      "question": "מהו התהליך שבו הדיסק הדו שכבתי מתפתח לדיסק תלת שכבתי?",
+      "answer1": "גסטרולציה",
+      "answer2": "התחלקות תאים",
+      "answer3": "היווצרות בלסטוציסט",
+      "answer4": "התמיינות תאים",
+      "correct_answer": 1,
+      "category": "אמבריולוגיה"
+    },
+    {
+      "number": 27,
+      "question": "איזו מהאונות הבאות היא האונה האוקסיפיטלית?",
+      "answer1": "האונה הפרונטלית",
+      "answer2": "האונה הטמפורלית",
+      "answer3": "האונה הפריאטלית",
+      "answer4": "האונה האוקסיפיטלית",
+      "correct_answer": 4,
+      "category": "טופוגרפיה של ההמיספרות"
+    },
+    {
+      "number": 28,
+      "question": "מהי הצורה של החדרים הלטרליים במוח במהלך ההתפתחות?",
+      "answer1": "בצורת האות C עם צמיחת האונות הטמפורליות",
+      "answer2": "בצורת האות V עם צמיחת האונות הקדמיות",
+      "answer3": "בצורה עגולה עם התפתחות החומר הלבן",
+      "answer4": "בצורת האות T עם התפתחות החדר הרביעי",
+      "correct_answer": 1,
+      "category": "חדרי המוח"
+    },
+    {
+      "number": 29,
+      "question": "איזה חדר במוח מחובר לחדרים הלטרליים דרך פתחים הנקראים Interventricular foramen?",
+      "answer1": "החדר השלישי",
+      "answer2": "החדר הרביעי",
+      "answer3": "החדר הראשון",
+      "answer4": "החדר השני",
+      "correct_answer": 1,
+      "category": "חדרי המוח"
+    },
+    {
+      "number": 30,
+      "question": "איזה תפקיד יש לתאי המיקרוגליה במערכת העצבים המרכזית?",
+      "answer1": "הרס סינפסות לא רלוונטיות",
+      "answer2": "הפקת נוזלים מחדרי המוח",
+      "answer3": "תמיכה במבנה תאי העצב",
+      "answer4": "העברת אותות בין תאי עצב",
+      "correct_answer": 1,
+      "category": "תאי מערכת העצבים"
+    },
+    {
+      "number": 31,
+      "question": "מהו תפקידם של תאי האפנדימה במערכת העצבים המרכזית?",
+      "answer1": "הם מצפים את צינור העצבים ומאפשרים מעבר של נוזלים.",
+      "answer2": "הם מהווים את רכיב החיסון של מערכת העצבים המרכזית.",
+      "answer3": "הם מצפים אקסונים במערכת העצבים המרכזית.",
+      "answer4": "הם תומכים בתפקוד של תאי עצב אחרים.",
+      "correct_answer": 1,
+      "category": "תאי מערכת העצבים"
+    },
+    {
+      "number": 32,
+      "question": "מה מהבאים מתאר את הקשר בין פגיעות מוחיות לפונקציות מוחיות כפי שתיאר גלן?",
+      "answer1": "פגיעות מוחיות לא משפיעות על תפקודים במוח.",
+      "answer2": "פגיעות מוחיות גורמות לשינוי במבנה המוח בלבד.",
+      "answer3": "פגיעות מוחיות משפיעות על תפקודים שונים במוח, כמו חוסר יכולת לדבר לאחר פגיעה בראש.",
+      "answer4": "פגיעות מוחיות משפרות את תפקוד המוח על ידי תהליכים חלופיים.",
+      "correct_answer": 3,
+      "category": "מבוא"
+    }
+  ]
+}

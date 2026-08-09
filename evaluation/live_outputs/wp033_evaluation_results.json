@@ -1,0 +1,74 @@
+[
+  {
+    "scenario": "A",
+    "existing_questions_count": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question_number_is_none": true,
+    "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Posterior Inferior Cerebellar Artery (PICA)",
+      "Basilar artery"
+    ],
+    "correct_answer": 1,
+    "category": "אספקת דם"
+  },
+  {
+    "scenario": "B",
+    "existing_questions_count": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question_number_is_none": true,
+    "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Posterior Inferior Cerebellar Artery (PICA)",
+      "Basilar Artery"
+    ],
+    "correct_answer": 1,
+    "category": "אספקת דם"
+  },
+  {
+    "scenario": "C",
+    "existing_questions_count": 2,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question_number_is_none": true,
+    "question": "איזה עורק מספק דם לאזור העליון של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Posterior Inferior Cerebellar Artery (PICA)",
+      "Basilar Artery"
+    ],
+    "correct_answer": 1,
+    "category": "אספקת דם"
+  },
+  {
+    "scenario": "D",
+    "existing_questions_count": 3,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question_number_is_none": true,
+    "question": "איזה מהעורקים הבאים מספק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Posterior Inferior Cerebellar Artery (PICA)",
+      "Basilar Artery"
+    ],
+    "correct_answer": 1,
+    "category": "אספקת דם"
+  }
+]

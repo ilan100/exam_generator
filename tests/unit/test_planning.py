@@ -338,3 +338,52 @@ def test_no_course_book_retrieval_dependency_exists():
 
     parameters = inspect.signature(QuestionTargetPlanner.__init__).parameters
     assert not any("course_book" in name for name in parameters)
+
+
+# ---------------------------------------------------------------------------
+# WP-034: coverage-aware planning
+# ---------------------------------------------------------------------------
+
+
+def test_plan_targets_without_coverage_still_works_unchanged():
+    # Every pre-WP-034 caller (omitting coverage entirely) must behave
+    # identically - default is an empty CategoryCoverage.
+    planner = _make_planner()
+    targets = planner.plan_targets(category=CATEGORY, count=1)
+    assert len(targets) == 1
+
+
+def test_coverage_is_rendered_into_the_planning_prompt():
+    from exam_generator.models import CategoryCoverage
+
+    distinctive_concept = "עורק בזילרי ייחודי לבדיקה"
+    provider = _provider()
+    planner = _make_planner(provider=provider)
+    planner.plan_targets(
+        category=CATEGORY, count=1, coverage=CategoryCoverage(tested_concepts=(distinctive_concept,))
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    user_message = next(m for m in sent_messages if m.role == MessageRole.USER)
+    assert distinctive_concept in user_message.content
+
+
+def test_no_coverage_renders_an_honest_nothing_tested_sentinel():
+    provider = _provider()
+    planner = _make_planner(provider=provider)
+    planner.plan_targets(category=CATEGORY, count=1)
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    user_message = next(m for m in sent_messages if m.role == MessageRole.USER)
+    assert "No questions have been generated for this category yet" in user_message.content
+
+
+def test_coverage_never_triggers_a_retry_or_second_llm_call():
+    # WP-034 section 6: coverage does NOT become another validator - it
+    # must never cause planning to retry or make more than one LLM call.
+    from exam_generator.models import CategoryCoverage
+
+    provider = _provider()
+    planner = _make_planner(provider=provider)
+    planner.plan_targets(
+        category=CATEGORY, count=1, coverage=CategoryCoverage(tested_concepts=("כל דבר",))
+    )
+    assert provider.generate_structured.call_count == 1

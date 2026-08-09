@@ -20,11 +20,6 @@ class ExamOrchestrationError(Exception):
     """Base class for all exam-orchestration-layer failures."""
 
 
-class InvalidOrchestrationConfigurationError(ExamOrchestrationError):
-    """The configured/supplied ``max_duplicate_replacement_attempts`` is
-    invalid (must be >= 1)."""
-
-
 class QuestionProductionFailedError(ExamOrchestrationError):
     """A system-level failure aborted exam generation entirely - the run
     could not safely continue at all, so no partial result is returned.

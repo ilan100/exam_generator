@@ -20,6 +20,7 @@ from typing import Sequence
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from exam_generator.category_generation import CategoryQuestionSetService
 from exam_generator.config.models import LLMConfig, LLMGenerationParams, LLMValidationParams
 from exam_generator.generation import InvalidGeneratedOutputError, QuestionGenerator
 from exam_generator.historical import HistoricalQuestionRepository
@@ -285,31 +286,37 @@ def _build_pipeline(
         prompt_repository=prompt_repository,
         llm_provider=fake_provider,
     )
-    orchestrator = ExamOrchestrator(
+    category_question_set_service = CategoryQuestionSetService(
         category_resolver=category_resolver,
         target_planner=target_planner,
         producer=producer,
         max_duplicate_replacement_attempts=max_duplicate_replacement_attempts,
     )
+    orchestrator = ExamOrchestrator(
+        category_resolver=category_resolver,
+        category_question_set_service=category_question_set_service,
+    )
     return orchestrator, fake_provider
 
 
 def _queue_target_plans(fake_provider: FakeLLMProvider, categories: dict) -> None:
-    """Queue one WP-025 target-planning response per category - as many
-    targets as questions requested for that category, each citing no
-    evidence (``evidence_refs=[]``) since these integration tests exercise
-    generation/validation/orchestration behavior, not planning-provenance
-    resolution itself (see ``test_planning.py`` for that)."""
+    """Queue one WP-025 target-planning response per *planned question*
+    (WP-032: ``CategoryGenerationService`` calls ``plan_targets(count=1)``
+    once per question, not once per category with the full count), each
+    citing no evidence (``evidence_refs=[]``) since these integration
+    tests exercise generation/validation/orchestration behavior, not
+    planning-provenance resolution itself (see ``test_planning.py`` for
+    that)."""
     for category, count in categories.items():
-        fake_provider.queue(
-            QuestionTargetPlanningResponse,
-            QuestionTargetPlanningResponse(
-                targets=[
-                    PlannedQuestionTargetResponse(topic=f"topic {i}", factual_focus=f"focus {i}", evidence_refs=[])
-                    for i in range(1, count + 1)
-                ]
-            ),
-        )
+        for i in range(1, count + 1):
+            fake_provider.queue(
+                QuestionTargetPlanningResponse,
+                QuestionTargetPlanningResponse(
+                    targets=[
+                        PlannedQuestionTargetResponse(topic=f"topic {i}", factual_focus=f"focus {i}", evidence_refs=[])
+                    ]
+                ),
+            )
 
 
 def _queue_passing_attempt(
@@ -1131,10 +1138,12 @@ def test_generation_local_reference_never_leaks_downstream():
 
 
 def test_two_distinct_planned_targets_reach_two_distinct_generation_prompts():
-    # WP-025 end-to-end: real ExamOrchestrator, real QuestionTargetPlanner,
-    # real QuestionGenerator - two targets planned once for the category
-    # must be the ones actually assigned to the two generation calls, in
-    # plan order, each producing genuinely different prompt content.
+    # WP-025 end-to-end (WP-032: target planning now happens once per
+    # question rather than once per category): real ExamOrchestrator,
+    # real QuestionTargetPlanner, real QuestionGenerator - the two targets
+    # planned, one per CategoryGenerationService call, must be the ones
+    # actually assigned to the two generation calls, in plan order, each
+    # producing genuinely different prompt content.
     orchestrator, fake_provider = _build_pipeline(
         student_summary_corpus=_student_summary_corpus(),
         course_book_corpus=_course_book_corpus_no_overlap(),
@@ -1148,6 +1157,13 @@ def test_two_distinct_planned_targets_reach_two_distinct_generation_prompts():
                 PlannedQuestionTargetResponse(
                     topic="target one distinct topic", factual_focus="target one distinct focus", evidence_refs=[]
                 ),
+            ]
+        ),
+    )
+    fake_provider.queue(
+        QuestionTargetPlanningResponse,
+        QuestionTargetPlanningResponse(
+            targets=[
                 PlannedQuestionTargetResponse(
                     topic="target two distinct topic", factual_focus="target two distinct focus", evidence_refs=[]
                 ),

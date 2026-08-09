@@ -34,6 +34,7 @@ from exam_generator.config import load_llm_config
 from exam_generator.generation import InvalidGeneratedOutputError, MissingEvidenceError
 from exam_generator.llm import LLMProfile, LLMProvider, build_llm_provider
 from exam_generator.models import (
+    CategoryCoverage,
     PlannedQuestionTargetResponse,
     QuestionTarget,
     QuestionTargetPlanningResponse,
@@ -136,7 +137,9 @@ class QuestionTargetPlanner:
         existing retry-event observability pattern."""
         return tuple(self._plan_history)
 
-    def plan_targets(self, *, category: str, count: int) -> list[QuestionTarget]:
+    def plan_targets(
+        self, *, category: str, count: int, coverage: CategoryCoverage | None = None
+    ) -> list[QuestionTarget]:
         """Identify up to ``count`` distinct, evidence-supported question
         targets for ``category``.
 
@@ -150,6 +153,17 @@ class QuestionTargetPlanner:
         stochastic per-call reliability issue that degrades to "zero
         usable targets from this attempt" rather than aborting the whole
         exam or being silently repaired). Never fabricates a target.
+
+        Since WP-034, ``coverage`` (a deterministic summary of what the
+        category's already-generated questions have already tested - see
+        ``exam_generator.planning.coverage.extract_category_coverage()``)
+        is threaded into the planning prompt as information, never a
+        rejection mechanism: it may influence which target the LLM
+        chooses, but a target overlapping with already-tested knowledge is
+        never itself rejected or retried here - that would reintroduce the
+        hidden retry loop WP-025 section 10 already forbids. Defaults to
+        an empty ``CategoryCoverage()`` ("nothing tested yet") when omitted,
+        so every pre-WP-034 caller continues to behave identically.
 
         Raises ``MissingEvidenceError`` (reused from
         ``exam_generator.generation`` - the identical condition, at the
@@ -171,7 +185,10 @@ class QuestionTargetPlanner:
             )
 
         context = QuestionTargetPlanningPromptContext(
-            category=canonical_category, count=count, source_evidence=source_evidence
+            category=canonical_category,
+            count=count,
+            source_evidence=source_evidence,
+            coverage=coverage if coverage is not None else CategoryCoverage(),
         )
         messages = build_prompt_messages(
             system_template=self._prompt_repository.get(PromptId.SYSTEM),

@@ -15,6 +15,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from exam_generator.category_generation import CategoryQuestionSetService
 from exam_generator.config.models import LLMGenerationParams, LLMValidationParams
 from exam_generator.generation import QuestionGenerator
 from exam_generator.llm import LLMProfile, LLMStructuredOutputError, OpenAIProvider
@@ -237,11 +238,15 @@ def _build_real_pipeline(*, sdk_client: _QueuedSdkClient, structured_output_retr
         prompt_repository=prompt_repository,
         llm_provider=provider,
     )
-    orchestrator = ExamOrchestrator(
+    category_question_set_service = CategoryQuestionSetService(
         category_resolver=category_resolver,
         target_planner=target_planner,
         producer=producer,
         max_duplicate_replacement_attempts=2,
+    )
+    orchestrator = ExamOrchestrator(
+        category_resolver=category_resolver,
+        category_question_set_service=category_question_set_service,
     )
     return orchestrator
 

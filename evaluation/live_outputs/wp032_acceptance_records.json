@@ -1,0 +1,1526 @@
+[
+  {
+    "category": "התעלה השדרתית ותכולתה",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהסגמנטים של חוט השדרה הינו הראשון שמתחבר לחוט השדרה?",
+    "answers": [
+      "C1",
+      "C2",
+      "L1",
+      "T1"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "התעלה השדרתית ותכולתה",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו שכבת חומר אפור בחוט השדרה מכילה נוירונים מוטוריים?",
+    "answers": [
+      "שכבה 1",
+      "שכבה 2",
+      "שכבה 3",
+      "שכבה 9"
+    ],
+    "correct_answer": 4,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": false,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "לוקליזציה פונקציונלית",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "באיזה אזור ממוקם הקורטקס המוטורי הראשוני (BA4)?",
+    "answers": [
+      "precentral gyrus",
+      "postcentral gyrus",
+      "premotor cortex",
+      "visual cortex"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "לוקליזציה פונקציונלית",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה אזור בברודמן מייצג את הקורטקס המוטורי הראשוני?",
+    "answers": [
+      "BA 4",
+      "BA 6",
+      "BA 8",
+      "BA 3"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "חומר לבן",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה סוג של סיבי חומר לבן מקשרים בין אזורים קורטיקליים באותה ההמיספרה?",
+    "answers": [
+      "סיבי אסוסיאציה",
+      "סיבי השלכה",
+      "סיבים קומיסורליים",
+      "סיבי פרוג׳קשן"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "חומר לבן",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה סוג של סיבי חומר לבן מחבר את הקורטקס עם אזורים שאינם קורטיקליים?",
+    "answers": [
+      "סיבי שלכה",
+      "סיבי אסוציאציה",
+      "סיבים קומיסורליים",
+      "סיבים קצרים"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "עצבים קרניאליים",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהמבנים הבאים מתפתח מהטלנצפלון ואינו עובר דרך גזע המוח?",
+    "answers": [
+      "עצב ההרחה",
+      "עצב הראיה",
+      "עצב הפנים",
+      "עצב האוקולומוטור"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "עצבים קרניאליים",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה עצב קרניאלי מתפתח מהטלנצפלון ואינו נכנס או יוצא מגזע המוח?",
+    "answers": [
+      "עצב ההרחה (Olfactory Nerve)",
+      "עצב הראייה (Optic Nerve)",
+      "עצב הטרוכלארי (Trochlear Nerve)",
+      "עצב האוקולומוטור (Oculomotor Nerve)"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "מיפוי ודימות מוחי",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו ההבדל העיקרי בין אולטרסאונד ל-CT בהדמיית מוח?",
+    "answers": [
+      "CT מספקת תמונה ברורה יותר של מבני המוח.",
+      "אולטרסאונד משמש בעיקר לדימות זרימת דם במוח.",
+      "שני השיטות טובות לדימות מוחי של מבוגרים.",
+      "אולטרסאונד מספק תמונה תלת-ממדית של המוח."
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מיפוי ודימות מוחי",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו אחד החסרונות של שיטת הדימות CT במיפוי מוחי?",
+    "answers": [
+      "לא ניתן לזהות גידולים במוח",
+      "הניגודיות בין החומר האפור לחומר הלבן אינה גבוהה",
+      "היא אינה זמינה במקרים דחופים",
+      "היא מספקת תמונות באיכות גבוהה מאוד"
+    ],
+    "correct_answer": 2,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "POTENTIAL_CONFLICT"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "היסטולוגיה",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו שכבת נאוקורטקס אחראית להעברת מידע לחוט השדרה ומאופיינת בעובי גדול במיוחד?",
+    "answers": [
+      "שכבה 5",
+      "שכבה 4",
+      "שכבה 3",
+      "שכבה 6"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "היסטולוגיה",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 2,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהבאים מתאר את השכבה הראשונה בנאוקורטקס?",
+    "answers": [
+      "שכבת מולקולרית",
+      "שכבת גרנולרית",
+      "שכבת תאי עצב",
+      "שכבת שולחת"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": false,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "המערכת הלימבית",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מבנה מהמערכת הלימבית כולל את ההיפוקמפוס והאמיגדלה?",
+    "answers": [
+      "המערכת הלימבית",
+      "ההיפותלמוס",
+      "הספטל אריה",
+      "הדנטייט גיירוס"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "המערכת הלימבית",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 2,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו תפקיד ההיפוקמפוס במערכת הלימבית?",
+    "answers": [
+      "עיבוד וזיכרון של מידע חדש",
+      "עיבוד רגשות וזיכרון רגשי",
+      "העברת מידע חושי למערכת העצבים",
+      "קישור בין מבנים במערכת ההרחה"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "אספקת דם",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 2,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Posterior Inferior Cerebellar Artery (PICA)",
+      "Posterior Cerebral Artery"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": false,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "אספקת דם",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהעורקים הבאים מספק דם למשטח העליון של הצרבלום?",
+    "answers": [
+      "עורק סופריורי לצרבלום (Superior Cerebellar Artery)",
+      "עורק תחתון קדמי לצרבלום (Anterior Inferior Cerebellar Artery)",
+      "עורק תחתון אחורי לצרבלום (Posterior Inferior Cerebellar Artery)",
+      "עורק בסיסי (Basilar Artery)"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "קרומים וסינוסים דוראליים",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו תהליך היווצרות הסינוסים הדוראליים?",
+    "answers": [
+      "הסינוסים הדוראליים נוצרים מהפרדה בין השכבות החיצוניות והפנימיות של הדורה.",
+      "הסינוסים הדוראליים נובעים מהצטברות דם בין השכבות של הדורה.",
+      "שטף דם נוצר מהפרדת השכבות של הדורה.",
+      "הסינוסים הדוראליים נובעים מהקריעה של כלי דם וורידיים."
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "קרומים וסינוסים דוראליים",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו סינוס דוראלי?",
+    "answers": [
+      "חלל בין שתי שכבות הדורה המלא בדם ורידי",
+      "סינוס פיתולי במוח",
+      "סינוס מחוץ לדורה",
+      "סינוס שנמצא בתוך הארכנואיד"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "גזע המוח",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": false,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "failure_type": "QuestionAttemptsExhaustedError",
+    "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "גזע המוח",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו אחד התפקידים הבסיסיים של גזע המוח?",
+    "answers": [
+      "נשימה",
+      "תכנון תנועות",
+      "קבלת החלטות",
+      "עיבוד מידע חושי"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מסילות עצביות",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו מהמסילות העולות מעבירה תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+    "answers": [
+      "המסילה הספינותלמית",
+      "המסילה המדיאלית",
+      "מסילה מוטורית",
+      "מסילה פריפריאלית"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מסילות עצביות",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו מסילה עצבית מעבירה תחושות כאב וטמפרטורה מהפריפריה לתלמוס?",
+    "answers": [
+      "מסילה ספינותלמית",
+      "מסילה מידיאלית",
+      "מסילה מוטורית",
+      "מסילה טמפרטורית"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "גרעיני הבסיס",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": false,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "failure_type": "QuestionAttemptsExhaustedError",
+    "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "גרעיני הבסיס",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו תפקידם המרכזי של גרעיני הבסיס במערכת התנועה?",
+    "answers": [
+      "הם אחראים על הוצאת תנועה מוטורית לפועל",
+      "הם עוצרים תנועה מוטורית",
+      "הם משפרים את תנועות הגוף",
+      "הם אחראים על הפקת דופמין"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "המוח הקטן",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו תפקידו המרכזי של המוח הקטן (צרבלום) בפעולות מוטוריות?",
+    "answers": [
+      "קואורדינציה של תנועות מוטוריות",
+      "ביצוע תהליכים קוגניטיביים",
+      "שחזור תנועות",
+      "חיזוק זיכרון לטווח ארוך"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "המוח הקטן",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה תפקיד מרכזי המוח הקטן (צרבלום) ממלא במערכת העצבים?",
+    "answers": [
+      "קואורדינציה ותפקודים מוטוריים",
+      "ויסות רגשות",
+      "עיבוד מידע קוגניטיבי",
+      "תפקודים שפתיים"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": false,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "failure_type": "QuestionAttemptsExhaustedError",
+    "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": false,
+        "category_valid": false,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": false,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": false,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "failure_type": "QuestionAttemptsExhaustedError",
+    "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": false,
+        "category_valid": false,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "דיאנצפלון",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהמבנים הבאים מהווה חלק מרכזי בתהליכים רגשיים ולמידה בזיכרון בדיאנצפלון?",
+    "answers": [
+      "תלמוס",
+      "היפותלמוס",
+      "טלנצפלון",
+      "סאב-תלמוס"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "דיאנצפלון",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מבנה נחשב לחלק המרכזי של הדיאנצפלון?",
+    "answers": [
+      "התלמוס",
+      "ההיפותלמוס",
+      "אפיתלמוס",
+      "סאב-תלמוס"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "אמבריולוגיה",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו התהליך שבו תאי האפיבלסט מתמיינים לשכבות האמבריונליות במהלך הגסטרולציה?",
+    "answers": [
+      "גסטרולציה",
+      "היווצרות בלסטוציסט",
+      "היווצרות שלב דו שכבתי",
+      "התפתחות האקטודרם בלבד"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "אמבריולוגיה",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו התהליך שבו תאי האפיבלסט נכנסים פנימה ומשנים את הדיסק הדו שכבתי לדיסק תלת שכבתי?",
+    "answers": [
+      "גסטרולציה",
+      "מופע שלב הבלסטוציסט",
+      "יצירת ה-Morula",
+      "התפתחות העובר"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "טופוגרפיה של ההמיספרות",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה מהמבנים הבאים נמצא באונה הפריאטלית ומהווה את הקורטקס הסומטוסנסורי הראשוני?",
+    "answers": [
+      "Postcentral Gyrus",
+      "Angular Gyrus",
+      "Supramarginal Gyrus",
+      "Superior Parietal Lobule"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "טופוגרפיה של ההמיספרות",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 2,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו אונה במוח אחראית על עיבוד הראיה?",
+    "answers": [
+      "אונה אוקסיפיטלית",
+      "אונה פרונטלית",
+      "אונה טמפורלית",
+      "אונה פריאטלית"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "חדרי המוח",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 2,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזו צורה מקבלים החדרים הלטרליים במוח במהלך ההתפתחות העוברית?",
+    "answers": [
+      "צורת האות C",
+      "צורת האות O",
+      "צורת האות T",
+      "צורת האות X"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "חדרי המוח",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה חדר במוח נוצר כתוצאה מהקיפול של ה-pontine flexure באזור ה-metencephalon וה-myelenchephalon?",
+    "answers": [
+      "החדר הרביעי",
+      "החדר השלישי",
+      "החדרים הלטרליים",
+      "ה-hypothalamus"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": false,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": false,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": false,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "CONSISTENT"
+      }
+    ]
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מהו תפקידם של תאי המיקרוגליה במערכת העצבים המרכזית?",
+    "answers": [
+      "ביצוע פאגוציטוזה והרס סינפסות לא רלוונטיות",
+      "הפקת מיאלין במערכת העצבים המרכזית",
+      "תמיכה בתפקוד של הנוירונים",
+      "ציפוי צינור העצבים"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "איזה תפקיד תאי המיקרוגליה ממלאים במערכת העצבים המרכזית?",
+    "answers": [
+      "תאי המיקרוגליה מבצעים פאגוציטוזה ומסייעים במערכת החיסון.",
+      "תאי אפנדימה מצפים את צינור העצבים.",
+      "תאי אוליגודנדרוציטים מייצרים מיאלין.",
+      "תאי גליה מספקים לתאי העצב חומרי מזון."
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מבוא",
+    "round": 0,
+    "generation_mode": "STYLE_SIMILAR",
+    "accepted": true,
+    "attempts": 3,
+    "duplicate_replacement_attempts": 0,
+    "question": "מי מהדמויות הבאות היה הראשון שהבין את הקשר בין פגיעות מוחיות לתסמינים שונים?",
+    "answers": [
+      "סנטיאגו רמון קחל",
+      "גלן",
+      "אנדריאה וסאליוס",
+      "קורביניאן ברודמן"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 2,
+        "is_generation_contract_failure": false,
+        "accepted": false,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": false,
+        "textbook_status": "NOT_FOUND"
+      },
+      {
+        "attempt_number": 3,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  },
+  {
+    "category": "מבוא",
+    "round": 1,
+    "generation_mode": "INDEPENDENT",
+    "accepted": true,
+    "attempts": 1,
+    "duplicate_replacement_attempts": 0,
+    "question": "מי מהדמויות הבאות הקים את תיאטרון הדיסקציות והביא למהפכה בלימוד האנטומיה?",
+    "answers": [
+      "אנדראס וסאליוס",
+      "גלן",
+      "קורביניאן ברודמן",
+      "סנטיאגו רמון קחל"
+    ],
+    "correct_answer": 1,
+    "attempt_history": [
+      {
+        "attempt_number": 1,
+        "is_generation_contract_failure": false,
+        "accepted": true,
+        "grounding_passed": true,
+        "correct_answer_supported": true,
+        "other_answers_not_equally_correct": true,
+        "mcq_valid": true,
+        "category_valid": true,
+        "quality_valid": true,
+        "textbook_status": "NOT_FOUND"
+      }
+    ]
+  }
+]

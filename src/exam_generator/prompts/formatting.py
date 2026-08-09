@@ -12,6 +12,8 @@ from typing import Sequence
 
 from exam_generator.models import (
     CandidateQuestion,
+    CategoryCoverage,
+    CompetitorCandidate,
     ExamQuestion,
     HistoricalStyleReference,
     QuestionTarget,
@@ -33,6 +35,18 @@ NO_HISTORICAL_REFERENCE_TEXT = "No historical style reference is supplied for th
 
 QUESTION_TARGET_BEGIN = "--- BEGIN ASSIGNED QUESTION TARGET (REQUIRED FOCUS) ---"
 QUESTION_TARGET_END = "--- END ASSIGNED QUESTION TARGET (REQUIRED FOCUS) ---"
+
+COMPETITOR_CONCEPTS_BEGIN = "--- BEGIN POSSIBLE COMPETING CONCEPTS (INFORMATION ONLY) ---"
+COMPETITOR_CONCEPTS_END = "--- END POSSIBLE COMPETING CONCEPTS (INFORMATION ONLY) ---"
+NO_COMPETITOR_CONCEPTS_TEXT = (
+    "No candidate competing concepts were found in the supplied evidence besides the assigned target's own."
+)
+
+ALREADY_TESTED_BEGIN = "--- BEGIN ALREADY-TESTED KNOWLEDGE IN THIS CATEGORY (INFORMATION ONLY) ---"
+ALREADY_TESTED_END = "--- END ALREADY-TESTED KNOWLEDGE IN THIS CATEGORY (INFORMATION ONLY) ---"
+NO_ALREADY_TESTED_TEXT = (
+    "No questions have been generated for this category yet - there is nothing to avoid overlapping with."
+)
 
 
 def _format_answers(answers: Sequence[str]) -> str:
@@ -155,6 +169,28 @@ def format_question_target(target: QuestionTarget) -> str:
     return f"{QUESTION_TARGET_BEGIN}\n{body}\n{QUESTION_TARGET_END}"
 
 
+def format_competitors(competitors: Sequence[CompetitorCandidate]) -> str:
+    """Deterministically format WP-031's deterministically-discovered
+    competitor candidates for the generation prompt.
+
+    Caller-supplied order is preserved exactly (already the discovery
+    function's own deterministic ranking - see
+    ``exam_generator.generation.competitors.discover_competitors()``).
+    An empty sequence is explicitly allowed and renders an honest
+    "none found" sentinel rather than omitting the section - the same
+    fail-honest pattern already used for historical references and
+    course-book evidence.
+    """
+    if not competitors:
+        return f"{COMPETITOR_CONCEPTS_BEGIN}\n{NO_COMPETITOR_CONCEPTS_TEXT}\n{COMPETITOR_CONCEPTS_END}"
+
+    entries = "\n".join(
+        f"[Competitor {position}] (relationship: {competitor.relationship_relevance}) {competitor.concept}"
+        for position, competitor in enumerate(competitors, start=1)
+    )
+    return f"{COMPETITOR_CONCEPTS_BEGIN}\n{entries}\n{COMPETITOR_CONCEPTS_END}"
+
+
 def format_candidate_question(candidate: CandidateQuestion) -> str:
     """Deterministically format a ``CandidateQuestion`` for validator prompts.
 
@@ -168,6 +204,33 @@ def format_candidate_question(candidate: CandidateQuestion) -> str:
         f"Category: {candidate.category}\n"
         f"Generation Mode: {candidate.generation_mode.value}"
     )
+
+
+def format_category_coverage(coverage: CategoryCoverage) -> str:
+    """Deterministically format WP-034's ``CategoryCoverage`` for the
+    target-planning prompt - information only, never an instruction to
+    reject anything (WP-034 section 6: "coverage does NOT become another
+    validator").
+
+    An empty coverage (no existing questions yet, or no coverage could be
+    determined) renders an honest "nothing tested yet" sentinel rather
+    than omitting the section - the same fail-honest pattern already used
+    for historical references, course-book evidence, and competitor
+    concepts.
+    """
+    if not coverage.tested_concepts and not coverage.tested_relationship_types:
+        return f"{ALREADY_TESTED_BEGIN}\n{NO_ALREADY_TESTED_TEXT}\n{ALREADY_TESTED_END}"
+
+    lines: list[str] = []
+    if coverage.tested_concepts:
+        lines.append("Already-tested concepts (the correct answer of each question already generated for this category):")
+        lines.extend(f"- {concept}" for concept in coverage.tested_concepts)
+    if coverage.tested_relationship_types:
+        lines.append("Already-tested relationship types:")
+        lines.extend(f"- {relationship_type}" for relationship_type in coverage.tested_relationship_types)
+
+    body = "\n".join(lines)
+    return f"{ALREADY_TESTED_BEGIN}\n{body}\n{ALREADY_TESTED_END}"
 
 
 def format_exam_question(question: ExamQuestion) -> str:

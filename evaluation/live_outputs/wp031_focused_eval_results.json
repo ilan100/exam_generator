@@ -1,0 +1,136 @@
+[
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "מערכת העצבים ההיקפית - חלוקתה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "exhausted",
+    "attempts_made": 3,
+    "attempt_reasons": [
+      {
+        "question": "מהן שתי המערכות העיקריות שמחלקות את מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת עצבים אוטונומית ומערכת עצבים סומטית",
+          "מערכת עצבים סומטית ומערכת סימפתטית",
+          "מערכת עצבים אוטונומית ומערכת סימפתטית",
+          "מערכת עצבים סומטית ומערכת מרכזית"
+        ],
+        "reasons": [
+          "quality:The question is clear and unambiguous, but the answer choices contain inaccuracies regarding the classification of the peripheral nervous system. The correct classification should include the 'מערכת עצבים אוטונומית' and 'מערכת עצבים סומטית', but the other options introduce confusion by mixing terms that do not accurately represent the two main divisions of the peripheral nervous system. Additionally, the question could benefit from specifying that it is asking for the two main divisions, as the phrasing 'שתי המערכות העיקריות' may lead to ambiguity in interpretation."
+        ]
+      },
+      {
+        "question": "איזו מהמערכות הבאות היא אחת משתי המערכות העיקריות של מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת עצבים אוטונומית",
+          "מערכת עצבים סומטית",
+          "מערכת עצבים סימפתטית",
+          "מערכת עצבים מרכזית"
+        ],
+        "reasons": [
+          "grounding(correct_supported=True,others_not_equal=False):The question is grounded in the evidence, which states that the peripheral nervous system is divided into the autonomic and somatic nervous systems. Both Answer 1 and Answer 2 are supported as correct answers, while Answers 3 and 4 are not supported as they do not correctly answer the question about the two main systems of the peripheral nervous system."
+        ]
+      },
+      {
+        "question": "איזה מהבאות היא אחת משתי המערכות העיקריות של מערכת העצבים ההיקפית?",
+        "answers": [
+          "מערכת עצבים אוטונומית",
+          "מערכת עצבים מרכזית",
+          "מערכת עצבים סימפתטית",
+          "מערכת עצבים פראסימפתטית"
+        ],
+        "reasons": [
+          "grounding(correct_supported=True,others_not_equal=False):The question is grounded in the evidence, which clearly states that the peripheral nervous system consists of the autonomic nervous system and the somatic nervous system, with the autonomic nervous system further divided into sympathetic and parasympathetic systems. Therefore, the question's premise is supported. Additionally, multiple answer choices (1, 3, and 4) are factually correct, as they all relate to the components of the peripheral nervous system as described in the evidence."
+        ]
+      }
+    ]
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "מערכת העצבים ההיקפית - תאי גליה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה תפקיד ממלאים תאי שוואן במערכת העצבים ההיקפית?",
+    "answers": [
+      "מייצרים מיילין לאקסונים",
+      "מייצרים דופק חשמלי",
+      "מפרישים נוירוטרנסמיטרים",
+      "תומכים בתפקוד של תאי עצב"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לצרבלום",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה מהעורקים הבאים מספק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Anterior Inferior Cerebellar Artery (AICA)",
+      "Basilar Artery",
+      "Posterior Inferior Cerebellar Artery (PICA)"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לחוט השדרה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 3,
+    "question": "איזה מהעורקים מספק דם לחוט השדרה?",
+    "answers": [
+      "ה-Anterior Spinal Artery וה-Posterior Spinal Arteries",
+      "ה-Posterior Cerebral Artery",
+      "ה-Anterior Inferior Cerebellar Artery",
+      "ה-Superior Cerebellar Artery"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": [
+      {
+        "correct_supported": true,
+        "others_not_equal": false
+      },
+      {
+        "correct_supported": true,
+        "others_not_equal": false
+      }
+    ]
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "תאי מיקרוגליה",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקיד המיקרוגליה במערכת העצבים המרכזית?",
+    "answers": [
+      "ביצוע פאגוציטוזה והשפעה על סינפסות לא רלוונטיות",
+      "ייצור מעטפת מיאלין",
+      "הפרשת הורמונים של מערכת החיסון",
+      "הציפוי של חדרי המוח"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "תאי אפנדימה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 3,
+    "question": "מהו תפקידם של תאי האפנדימה במערכת העצבים המרכזית?",
+    "answers": [
+      "לספק רקמה בררנית המאפשרת מעבר של נוזלים",
+      "לייצר מיאלין עבור האקסונים",
+      "לפרק תהליכים חיסוניים במערכת העצבים",
+      "לייצר תאי עצב חדשים"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  }
+]

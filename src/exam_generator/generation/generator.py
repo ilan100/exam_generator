@@ -29,6 +29,8 @@ from exam_generator.generation.errors import (
     MissingEvidenceError,
     MissingHistoricalReferenceError,
 )
+from exam_generator.generation.competitors import discover_competitors
+from exam_generator.generation.relationship import extract_relationship
 from exam_generator.historical import HistoricalQuestionRepository
 from exam_generator.llm import LLMProfile, LLMProvider, build_llm_provider
 from exam_generator.models import (
@@ -204,11 +206,14 @@ class QuestionGenerator:
                 self._historical_repository, canonical_category
             )
 
+        relationship = extract_relationship(target)
         context = GenerationPromptContext(
             category=canonical_category,
             generation_mode=generation_mode,
             source_evidence=source_evidence,
             target=target,
+            relationship=relationship,
+            competitors=discover_competitors(target=target, relationship=relationship, source_evidence=source_evidence),
             historical_reference=historical_reference,
         )
 

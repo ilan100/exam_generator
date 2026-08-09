@@ -14,14 +14,19 @@ from dataclasses import dataclass
 
 from exam_generator.models import (
     CandidateQuestion,
+    CategoryCoverage,
+    CompetitorCandidate,
     GenerationMode,
     HistoricalStyleReference,
+    QuestionRelationship,
     QuestionTarget,
     SourceEvidenceChunk,
 )
 from exam_generator.prompts.errors import PromptContextError
 from exam_generator.prompts.formatting import (
     format_candidate_question,
+    format_category_coverage,
+    format_competitors,
     format_historical_reference,
     format_question_target,
     format_student_summary_evidence,
@@ -39,12 +44,26 @@ class GenerationPromptContext:
     Since WP-025, every generation call is assigned a ``target`` planned
     before generation begins - enforced here to belong to the same
     category, never silently substituted or broadened.
+
+    Since WP-030, every generation call also carries the ``target``'s
+    deterministically-classified ``relationship`` (never produced by an
+    LLM - see ``exam_generator.generation.relationship.extract_relationship()``),
+    so generation can be told explicitly what relationship type it is
+    testing rather than inferring it implicitly from free text alone.
+
+    Since WP-031, every generation call also carries ``competitors`` -
+    other evidence-supported concepts deterministically discovered to
+    share the same relationship (see
+    ``exam_generator.generation.competitors.discover_competitors()``) -
+    information, never a generation decision; may legitimately be empty.
     """
 
     category: str
     generation_mode: GenerationMode
     source_evidence: tuple[SourceEvidenceChunk, ...]
     target: QuestionTarget
+    relationship: QuestionRelationship
+    competitors: tuple[CompetitorCandidate, ...]
     historical_reference: HistoricalStyleReference | None = None
 
     def __post_init__(self) -> None:
@@ -65,6 +84,11 @@ class GenerationPromptContext:
                 f"target.category {self.target.category!r} does not match the requested "
                 f"category {self.category!r}"
             )
+        if self.relationship.statement != self.target.factual_focus:
+            raise PromptContextError(
+                "relationship.statement does not match target.factual_focus - relationship "
+                "must be extracted from this exact target, never substituted or reused across targets"
+            )
 
     def render_variables(self) -> dict[str, str]:
         """The exact variable set the production generation prompt
@@ -75,16 +99,29 @@ class GenerationPromptContext:
             "source_evidence": format_student_summary_evidence(self.source_evidence),
             "historical_reference": format_historical_reference(self.historical_reference),
             "question_target": format_question_target(self.target),
+            "relationship_type": self.relationship.relationship_type,
+            "competitor_concepts": format_competitors(self.competitors),
         }
 
 
 @dataclass(frozen=True)
 class QuestionTargetPlanningPromptContext:
-    """Validated inputs for one WP-025 target-planning prompt render."""
+    """Validated inputs for one WP-025 target-planning prompt render.
+
+    Since WP-034, every planning call also carries ``coverage`` - a
+    deterministic summary of what the category's already-generated
+    questions have already tested (see
+    ``exam_generator.planning.coverage.extract_category_coverage()``) -
+    information only, never a rejection mechanism (WP-034 section 6:
+    "coverage does NOT become another validator"). Defaults to an empty
+    ``CategoryCoverage()`` ("nothing tested yet"), so every pre-WP-034
+    caller/test continues to work unchanged.
+    """
 
     category: str
     count: int
     source_evidence: tuple[SourceEvidenceChunk, ...]
+    coverage: CategoryCoverage = CategoryCoverage()
 
     def __post_init__(self) -> None:
         if not self.category or not self.category.strip():
@@ -101,6 +138,7 @@ class QuestionTargetPlanningPromptContext:
             "category": self.category,
             "count": str(self.count),
             "source_evidence": format_student_summary_evidence(self.source_evidence),
+            "already_tested_summary": format_category_coverage(self.coverage),
         }
 
 

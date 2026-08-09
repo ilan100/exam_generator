@@ -15,6 +15,15 @@ Assigned question target (read carefully):
 - You may narrow the target to one specific, evidence-supported relationship contained within it (for example: one member of a list, one distinguishing property, one function, one location, one alternate name) when that produces a clearer question. This is narrowing WITHIN the target, and it is required whenever the target as literally stated would not support a clean one-best-answer question (see "Testing enumeration or classification targets" below).
 - Narrowing within the target is not the same as switching away from it. Do not silently switch to a different, easier, or more familiar fact from the evidence that is not part of the assigned target. Do not broaden the target into unrelated category material merely to make the question easier to write.
 
+Tested relationship (read carefully):
+- Below, right before the assigned question target, you are given a tested relationship type - a coarse label (for example SUPPLIES, CONNECTS, CONTAINS, LOCATED_IN) deterministically derived from the target's factual focus, or UNSPECIFIED if no such label could be automatically determined. It is not a substitute for reading the factual focus itself, and an UNSPECIFIED value does not relax any requirement stated elsewhere in this prompt - rely on the factual focus and evidence exactly as you otherwise would.
+- Use it to reinforce a mindset: when constructing the correct answer and each distractor, ask "does this specific answer satisfy the stated relationship" rather than "does this answer merely look plausible." Apply this the same way to every distractor - a distractor may be a real, true fact, but it must not itself satisfy the tested relationship for the exact question you have worded, exactly as already required below under "Every distractor must be false for the exact question asked."
+
+Possible competing concepts (read carefully):
+- Below, after the assigned question target, you are shown a list of possible competing concepts - short passages found elsewhere in the supplied evidence (never from your assigned target's own supporting evidence) that were deterministically identified as sharing the same tested relationship type. If none were found, this is stated explicitly rather than omitted.
+- This list is information, not an instruction. It does not tell you which distractors to use, and it is not itself evidence for a different question - your assigned target above remains the only knowledge you are testing. Its purpose is narrower: before finalizing your answer choices, check whether any listed competing concept would also correctly answer your exact question as worded, using the same evidence-based check already required below. If one would, do not use it as a distractor, and consider whether it reveals that your question needs to be worded more specifically to exclude it.
+- An empty list does not mean no competing concept exists - it only means none was found by this deterministic check within the currently supplied evidence. Continue to apply the same distractor-correctness requirements below regardless of what this list does or does not contain.
+
 Testing enumeration or classification targets (read carefully):
 - Some targets themselves name multiple items - for example "X consists of A, B, and C", "X is divided into A and B", "X includes structures A, B, C", or a target naming several layers, types, or components. Recognize when your assigned target has this shape.
 - For such a target, do NOT ask the student to recall the complete list or enumeration (for example "which answer lists the types of X" or "how many parts does X have and what characterizes each"). A question like this makes several partially-overlapping answer choices simultaneously defensible, which violates the single-best-answer requirement above.
@@ -60,8 +69,13 @@ Self-validation boundary:
 Category: {category}
 Generation mode: {generation_mode}
 
+Tested relationship type: {relationship_type}
+
 Assigned question target:
 {question_target}
+
+Possible competing concepts:
+{competitor_concepts}
 
 Factual evidence:
 {source_evidence}

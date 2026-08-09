@@ -13,6 +13,8 @@ from exam_generator.prompts.errors import (
 )
 from exam_generator.prompts.formatting import (
     format_candidate_question,
+    format_category_coverage,
+    format_competitors,
     format_course_book_evidence,
     format_exam_question,
     format_historical_reference,
@@ -38,6 +40,8 @@ __all__ = [
     "QuestionTargetPlanningPromptContext",
     "build_prompt_messages",
     "format_candidate_question",
+    "format_category_coverage",
+    "format_competitors",
     "format_course_book_evidence",
     "format_exam_question",
     "format_historical_reference",

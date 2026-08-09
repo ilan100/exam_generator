@@ -1,8 +1,4 @@
-from exam_generator.orchestration.errors import (
-    ExamOrchestrationError,
-    InvalidOrchestrationConfigurationError,
-    QuestionProductionFailedError,
-)
+from exam_generator.orchestration.errors import ExamOrchestrationError, QuestionProductionFailedError
 from exam_generator.orchestration.models import (
     ExamGenerationResult,
     FailedPlannedQuestion,
@@ -16,7 +12,6 @@ __all__ = [
     "ExamOrchestrationError",
     "ExamOrchestrator",
     "FailedPlannedQuestion",
-    "InvalidOrchestrationConfigurationError",
     "PlannedQuestion",
     "QuestionProductionFailedError",
     "QuestionProductionRecord",

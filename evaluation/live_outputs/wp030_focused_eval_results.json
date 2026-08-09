@@ -1,0 +1,98 @@
+[
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "מערכת העצבים האוטונומית",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקיד המערכת הסימפתטית במערכת העצבים האוטונומית?",
+    "answers": [
+      "אחראית על תגובות חירום והגברת פעילות פיזיולוגית",
+      "אחראית על רגולציה ושמירה על פעילות רגועה",
+      "מעורבת בהפחתת קצב הלב",
+      "אחראית על עידוד שינה"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "מערכת העצבים ההיקפית",
+    "topic": "תאי שוואן",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "מהו תפקידם של תאי שוואן במערכת העצבים ההיקפית?",
+    "answers": [
+      "מייצרים את המיילין באקסונים במערכת העצבים ההיקפית",
+      "מייצרים את המיילין באקסונים במערכת העצבים המרכזית",
+      "עוזרים לחדש את התאים הפגועים במערכת העצבים ההיקפית",
+      "תומכים בתפקוד התאי של תאי הגליה האחרים"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לצרבלום",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+    "answers": [
+      "Superior Cerebellar Artery",
+      "Posterior Cerebral Artery",
+      "Inferior Cerebellar Artery (PICA)",
+      "Anterior Inferior Cerebellar Artery (AICA)"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "אספקת דם",
+    "topic": "אספקת דם לחוט השדרה",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה עורק מספק דם ישירות לחוט השדרה?",
+    "answers": [
+      "עורק ספינלי קדמי",
+      "עורק אמצעי מוחי",
+      "עורק אחורי מוחי",
+      "עורק עורפי"
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "תאי מיקרוגליה - תפקידים",
+    "generation_mode": "STYLE_SIMILAR",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה תפקיד יש למיקרוגליה במערכת העצבים המרכזית?",
+    "answers": [
+      "מבצעים פאגוציטוזה ומסייעים בסילוק מזיקים.",
+      "מייצרים מיאלין במערכת העצבים ההיקפית.",
+      "מצפים את צינור העצבים ומסייעים במעבר נוזלים.",
+      "מהווים תאים גליאליים שאינם מבצעים פאגוציטוזה."
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  },
+  {
+    "category": "תאי מערכת העצבים",
+    "topic": "תאי אפנדימה - מבנה ותפקיד",
+    "generation_mode": "INDEPENDENT",
+    "outcome": "accepted",
+    "attempt_number": 1,
+    "question": "איזה תפקיד יש לתאי אפנדימה במערכת העצבים?",
+    "answers": [
+      "הם מצפים את צינור העצבים ומפרידים בין חוט השדרה ל-CSF.",
+      "הם מייצרים מיאלין במערכת העצבים ההיקפית.",
+      "הם מהווים חלק מהמערכת החיסונית של מערכת העצבים.",
+      "הם מעורבים בהעברת מידע בין נוירונים."
+    ],
+    "correct_answer": 1,
+    "prior_grounding_rejections": []
+  }
+]

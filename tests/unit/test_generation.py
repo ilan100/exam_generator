@@ -579,6 +579,41 @@ def test_generation_prompt_contains_assigned_target_topic_and_focus():
     assert "מוקד עובדתי ייחודי לבדיקה זו" in user_message.content
 
 
+# ---------------------------------------------------------------------------
+# WP-030: tested relationship is extracted deterministically and threaded
+# into the generation prompt - no additional LLM call
+# ---------------------------------------------------------------------------
+
+
+def test_generator_threads_classified_relationship_type_into_prompt():
+    target = _target(factual_focus="העורק מספק דם לצרבלום")
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    user_message = next(m for m in sent_messages if m.role == MessageRole.USER)
+    assert "Tested relationship type: SUPPLIES" in user_message.content
+
+
+def test_generator_threads_unspecified_relationship_type_honestly():
+    target = _target(factual_focus="עובדה כלשהי ללא מילת מפתח מוכרת כלל")
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    user_message = next(m for m in sent_messages if m.role == MessageRole.USER)
+    assert "Tested relationship type: UNSPECIFIED" in user_message.content
+
+
+def test_relationship_extraction_adds_no_llm_call():
+    # WP-030 section 4/10: relationship extraction is pure application
+    # logic - generation still makes exactly one LLM call.
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=_target())
+    assert provider.generate_structured.call_count == 1
+
+
 def test_different_targets_produce_different_prompt_content():
     provider = _provider()
     generator = _make_generator(provider=provider)

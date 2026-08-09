@@ -23,16 +23,27 @@ class GenerationMode(str, Enum):
 
 
 class ExamQuestion(BaseModel):
-    """The authoritative, externally-facing exam question contract.
+    """The authoritative, externally-facing exam question contract - also
+    the WP-033 "production question" contract reused (never duplicated)
+    by ``exam_generator.category_generation``'s ``CategoryQuestionSet``
+    API for both ``existing_questions`` and the freshly-generated question.
 
     Contains only clean question content - no source, grounding, validation,
     historical-reference, generation-mode, model, confidence, or other audit
     information. See ``exam_generator.models.audit.QuestionAudit`` for that.
+
+    ``number`` is optional (WP-033) - a freshly-generated question does not
+    yet have a runtime identifier assigned (``CategoryQuestionSetService``
+    is "responsible only for the question content" per WP-033 section 4);
+    the orchestration layer assigns ``number`` when it is not already
+    available. A question actually inserted into ``ExamOutput.questions``
+    must always carry a real, contiguous number - ``ExamOutput``'s own
+    validator enforces this unconditionally and was not relaxed.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    number: PositiveIntStrict
+    number: PositiveIntStrict | None = None
     question: NonBlankStr
     answer1: NonBlankStr
     answer2: NonBlankStr
@@ -229,12 +240,16 @@ class GeneratedQuestionResponse(BaseModel):
     )
 
 
-def candidate_to_exam_question(candidate: CandidateQuestion, number: int) -> ExamQuestion:
+def candidate_to_exam_question(candidate: CandidateQuestion, number: int | None = None) -> ExamQuestion:
     """Deterministically convert an already-accepted candidate to a clean ExamQuestion.
 
     Performs no LLM call, grounding decision, factual validation, translation,
     answer shuffling, rewriting, or category mapping. The caller is
     responsible for supplying only a candidate that has already been accepted.
+
+    ``number`` defaults to ``None`` (WP-033) - generation itself never
+    assigns a runtime identifier; a caller that owns exam-wide numbering
+    (``ExamOrchestrator``) still always supplies a real number explicitly.
     """
     return ExamQuestion(
         number=number,

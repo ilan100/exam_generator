@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from exam_generator.generation import discover_competitors, extract_relationship
 from exam_generator.llm.models import LLMMessage, MessageRole
 from exam_generator.models import (
     CandidateQuestion,
@@ -409,6 +410,8 @@ def test_blank_category_rejected_by_generation_context_even_though_generic_rende
             generation_mode=GenerationMode.INDEPENDENT,
             source_evidence=(_chunk(),),
             target=_target(),
+            relationship=extract_relationship(_target()),
+            competitors=(),
         )
 
 
@@ -647,10 +650,13 @@ def test_candidate_and_exam_question_share_answer_formatting_style():
 # ---------------------------------------------------------------------------
 
 
-def _rendered_target_planning_prompt(production_repository: PromptRepository, *, count: int = 2, evidence=None) -> str:
-    context = QuestionTargetPlanningPromptContext(
-        category="גזע המוח", count=count, source_evidence=evidence or (_chunk(),)
-    )
+def _rendered_target_planning_prompt(
+    production_repository: PromptRepository, *, count: int = 2, evidence=None, coverage=None
+) -> str:
+    kwargs = dict(category="גזע המוח", count=count, source_evidence=evidence or (_chunk(),))
+    if coverage is not None:
+        kwargs["coverage"] = coverage
+    context = QuestionTargetPlanningPromptContext(**kwargs)
     template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
     return render_prompt(template, **context.render_variables())
 
@@ -734,6 +740,42 @@ def test_planning_context_rejects_negative_count():
 
 
 # ---------------------------------------------------------------------------
+# WP-034: coverage-aware planning prompt section
+# ---------------------------------------------------------------------------
+
+
+def test_planning_template_requires_already_tested_summary(production_repository):
+    template = production_repository.get(PromptId.QUESTION_TARGET_PLANNING)
+    assert "already_tested_summary" in template.required_variables
+
+
+def test_planning_prompt_defaults_to_honest_nothing_tested_sentinel(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "No questions have been generated for this category yet" in rendered
+
+
+def test_planning_prompt_renders_supplied_coverage(production_repository):
+    from exam_generator.models import CategoryCoverage
+
+    rendered = _rendered_target_planning_prompt(
+        production_repository, coverage=CategoryCoverage(tested_concepts=("עורק ייחודי לבדיקה זו",))
+    )
+    assert "עורק ייחודי לבדיקה זו" in rendered
+
+
+def test_planning_prompt_frames_coverage_as_information_not_instruction(production_repository):
+    rendered = _rendered_target_planning_prompt(production_repository)
+    assert "INFORMATION ONLY" in rendered
+
+
+def test_planning_context_default_coverage_is_empty():
+    context = QuestionTargetPlanningPromptContext(category="c", count=1, source_evidence=(_chunk(),))
+    from exam_generator.models import CategoryCoverage
+
+    assert context.coverage == CategoryCoverage()
+
+
+# ---------------------------------------------------------------------------
 # Generation prompt policy (production prompt)
 # ---------------------------------------------------------------------------
 
@@ -751,11 +793,18 @@ def _rendered_generation_prompt(
     evidence=None,
     target=None,
 ) -> str:
+    resolved_target = target or _target()
+    resolved_evidence = evidence or (_chunk(),)
+    resolved_relationship = extract_relationship(resolved_target)
     context = GenerationPromptContext(
         category="גזע המוח",
         generation_mode=mode,
-        source_evidence=evidence or (_chunk(),),
-        target=target or _target(),
+        source_evidence=resolved_evidence,
+        target=resolved_target,
+        relationship=resolved_relationship,
+        competitors=discover_competitors(
+            target=resolved_target, relationship=resolved_relationship, source_evidence=resolved_evidence
+        ),
         historical_reference=historical_reference,
     )
     template = production_repository.get(PromptId.QUESTION_GENERATION)
@@ -923,6 +972,87 @@ def test_generation_prompt_true_fact_is_not_sufficient_to_be_a_valid_distractor(
 
 
 # ---------------------------------------------------------------------------
+# WP-030: tested relationship (deterministically classified, application-owned)
+# ---------------------------------------------------------------------------
+
+
+def test_generation_prompt_receives_relationship_type_variable(production_repository):
+    template = production_repository.get(PromptId.QUESTION_GENERATION)
+    assert "relationship_type" in template.required_variables
+
+
+def test_generation_prompt_renders_classified_relationship_type(production_repository):
+    target = _target(factual_focus="העורק מספק דם לצרבלום")
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "Tested relationship type: SUPPLIES" in rendered
+
+
+def test_generation_prompt_renders_unspecified_relationship_type_honestly(production_repository):
+    target = _target(factual_focus="עובדה כלשהי ללא מילת מפתח מוכרת כלל")
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "Tested relationship type: UNSPECIFIED" in rendered
+
+
+def test_generation_prompt_explains_relationship_type_is_not_a_substitute_for_factual_focus(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "It is not a substitute for reading the factual focus itself" in rendered
+    assert "an UNSPECIFIED value does not relax any requirement stated elsewhere in this prompt" in rendered
+
+
+def test_generation_prompt_frames_relationship_satisfaction_over_plausibility(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert 'does this specific answer satisfy the stated relationship' in rendered
+    assert 'does this answer merely look plausible' in rendered
+
+
+def test_generation_prompt_ties_relationship_framing_to_existing_distractor_rule(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "Every distractor must be false for the exact question asked" in rendered
+    assert "exactly as already required below" in rendered
+
+
+# ---------------------------------------------------------------------------
+# WP-031: possible competing concepts (deterministically discovered, informational only)
+# ---------------------------------------------------------------------------
+
+
+def test_generation_prompt_receives_competitor_concepts_variable(production_repository):
+    template = production_repository.get(PromptId.QUESTION_GENERATION)
+    assert "competitor_concepts" in template.required_variables
+
+
+def test_generation_prompt_renders_honest_empty_competitor_list(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "No candidate competing concepts were found in the supplied evidence besides the assigned target's own." in rendered
+
+
+def test_generation_prompt_renders_discovered_competitor(production_repository):
+    target = _target(factual_focus="עורק זה מספק דם לצרבלום")
+    evidence = (
+        _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0001:0001", text="עורק זה מספק דם לצרבלום"),
+        _chunk(chunk_id="STUDENT_SUMMARY:s1.pdf:0002:0001", text="עורק אחר מספק דם לחוט השדרה"),
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target, evidence=evidence)
+    assert "עורק אחר מספק דם לחוט השדרה" in rendered
+    assert "[Competitor 1]" in rendered
+
+
+def test_generation_prompt_frames_competitors_as_information_not_instruction(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "This list is information, not an instruction. It does not tell you which distractors to use" in rendered
+
+
+def test_generation_prompt_explains_empty_competitor_list_is_not_a_guarantee(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "An empty list does not mean no competing concept exists" in rendered
+
+
+def test_generation_prompt_ties_competitors_to_existing_evidence_check(production_repository):
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT)
+    assert "using the same evidence-based check already required below" in rendered
+
+
+# ---------------------------------------------------------------------------
 # WP-028: internal question blueprint (prompt content)
 # ---------------------------------------------------------------------------
 
@@ -1043,6 +1173,8 @@ def test_style_similar_context_requires_historical_reference():
             generation_mode=GenerationMode.STYLE_SIMILAR,
             source_evidence=(_chunk(),),
             target=_target(category="c"),
+            relationship=extract_relationship(_target(category="c")),
+            competitors=(),
             historical_reference=None,
         )
 
@@ -1061,6 +1193,8 @@ def test_style_similar_keeps_historical_material_separate_from_factual_evidence(
         generation_mode=GenerationMode.STYLE_SIMILAR,
         source_evidence=(_chunk(text="factual passage"),),
         target=_target(category="c"),
+        relationship=extract_relationship(_target(category="c")),
+        competitors=(),
         historical_reference=_historical_reference(question="historical passage"),
     )
     variables = context.render_variables()
@@ -1074,6 +1208,8 @@ def test_independent_accepts_no_historical_reference():
         generation_mode=GenerationMode.INDEPENDENT,
         source_evidence=(_chunk(),),
         target=_target(category="c"),
+        relationship=extract_relationship(_target(category="c")),
+        competitors=(),
         historical_reference=None,
     )
     assert context.historical_reference is None
@@ -1092,6 +1228,8 @@ def test_invalid_mode_reference_combination_fails_independent_with_reference():
             generation_mode=GenerationMode.INDEPENDENT,
             source_evidence=(_chunk(),),
             target=_target(category="c"),
+            relationship=extract_relationship(_target(category="c")),
+            competitors=(),
             historical_reference=_historical_reference(),
         )
 
@@ -1102,6 +1240,8 @@ def test_existing_generation_mode_enum_is_reused():
         generation_mode=GenerationMode.INDEPENDENT,
         source_evidence=(_chunk(),),
         target=_target(category="c"),
+        relationship=extract_relationship(_target(category="c")),
+        competitors=(),
     )
     assert isinstance(context.generation_mode, GenerationMode)
 
