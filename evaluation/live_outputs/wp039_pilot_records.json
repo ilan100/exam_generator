@@ -1,0 +1,216 @@
+{
+  "אספקת דם": {
+    "raw_inventory_size": 47,
+    "refined_inventory_size": 44,
+    "trailing_truncation_repairs": [],
+    "rounds": [
+      {
+        "round": 1,
+        "existing_questions_count": 0,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Superior cerebellar artery",
+        "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+        "correct_answer_text": "Superior cerebellar artery",
+        "deterministic_alignment_preclassification": "ALIGNED"
+      },
+      {
+        "round": 2,
+        "existing_questions_count": 1,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Basillar artery",
+        "anchored_factual_focus": "o\n מקור :\nBasillar artery\no\n אזור אספקת דם :המשטח העליון של הצרבלום, גרעיני הצרבלום, ו-\nsuperior cerebellar peduncles",
+        "accepted": true,
+        "attempts": 3,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+        "correct_answer_text": "Superior Cerebellar Artery",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      },
+      {
+        "round": 3,
+        "existing_questions_count": 2,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Basillar artery",
+        "anchored_factual_focus": "o\n מקור :\nBasillar artery\no\n אזור אספקת דם :המשטח העליון של הצרבלום, גרעיני הצרבלום, ו-\nsuperior cerebellar peduncles",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזה עורק מספק דם למשטח העליון של הצרבלום ולגרעיני הצרבלום?",
+        "correct_answer_text": "עורק הצרבלר העליון",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      },
+      {
+        "round": 4,
+        "existing_questions_count": 3,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Basillar artery",
+        "anchored_factual_focus": "o\n מקור :\nBasillar artery\no\n אזור אספקת דם :המשטח העליון של הצרבלום, גרעיני הצרבלום, ו-\nsuperior cerebellar peduncles",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזה עורק מספק דם למשטח העליון של הצרבלום, גרעיני הצרבלום, ו-superior cerebellar peduncles?",
+        "correct_answer_text": "Superior Cerebellar Artery",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      }
+    ]
+  },
+  "גרעיני הבסיס": {
+    "raw_inventory_size": 63,
+    "refined_inventory_size": 53,
+    "trailing_truncation_repairs": [
+      {
+        "final": "Corpos Striatum",
+        "reason": "standalone capitalized ASCII line (2 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Globus Pallidus Externus",
+        "reason": "standalone capitalized ASCII line (1 word) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Pars Reticulata",
+        "reason": "standalone capitalized ASCII line (2 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Internal",
+        "reason": "standalone capitalized ASCII line (1 word) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Putamen",
+        "reason": "standalone capitalized ASCII line (1 word) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Deep Brain Stimulatino D(SB.)",
+        "reason": "standalone capitalized ASCII line (3 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      }
+    ],
+    "rounds": [
+      {
+        "round": 1,
+        "existing_questions_count": 0,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Corpos Striatum",
+        "anchored_factual_focus": "Corpos Striatum",
+        "accepted": false,
+        "attempts": 3,
+        "duplicate_replacement_attempts": 0,
+        "failure_type": "QuestionAttemptsExhaustedError",
+        "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+      },
+      {
+        "round": 2,
+        "existing_questions_count": 0,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Corpos Striatum",
+        "anchored_factual_focus": "Corpos Striatum",
+        "accepted": true,
+        "attempts": 2,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזה תפקיד יש לקורפוס סטריאטום במערכת העצבים המרכזית?",
+        "correct_answer_text": "הוא מעורב בהוצאה לפועל של תנועות מוטוריות מתוכננות.",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      },
+      {
+        "round": 3,
+        "existing_questions_count": 1,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Corpos Striatum",
+        "anchored_factual_focus": "Corpos Striatum",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "מהו תפקידו המרכזי של הקורפוס סטריאטום בגרעיני הבסיס?",
+        "correct_answer_text": "מאפשר ייצור תנועה מתואמת ומתוכננת",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      },
+      {
+        "round": 4,
+        "existing_questions_count": 2,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Corpos Striatum",
+        "anchored_factual_focus": "Corpos Striatum",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "מהו המבנה שמקיף את גרעיני הבסיס וכולל את הCaudate Nucleus והPutamen?",
+        "correct_answer_text": "Corpos Striatum",
+        "deterministic_alignment_preclassification": "ALIGNED"
+      }
+    ]
+  },
+  "מסילות עצביות": {
+    "raw_inventory_size": 31,
+    "refined_inventory_size": 25,
+    "trailing_truncation_repairs": [
+      {
+        "final": "Anterior Corticospinal Tract",
+        "reason": "standalone capitalized ASCII line (3 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Upper Motor Neuron",
+        "reason": "standalone capitalized ASCII line (3 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      },
+      {
+        "final": "Neuromuscular Junction",
+        "reason": "standalone capitalized ASCII line (2 words) - structural list-item signal (WP-039: trailing fragment(s) restored from adjacent continuation line(s) - unambiguous local reconstruction)"
+      }
+    ],
+    "rounds": [
+      {
+        "round": 1,
+        "existing_questions_count": 0,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Spinothalamic Tract",
+        "anchored_factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזו מסילה מעבירה תחושות כאב וטמפרטורה?",
+        "correct_answer_text": "Spinothalamic Tract",
+        "deterministic_alignment_preclassification": "ALIGNED"
+      },
+      {
+        "round": 2,
+        "existing_questions_count": 1,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Medial Lemniscus Tract",
+        "anchored_factual_focus": "Medial Lemniscus Tract",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזו סוג תחושה מעבירה מסילת ה-Medial Lemniscus?",
+        "correct_answer_text": "תחושות מתקדמות",
+        "deterministic_alignment_preclassification": "NOT_ALIGNED"
+      },
+      {
+        "round": 3,
+        "existing_questions_count": 2,
+        "generation_mode": "STYLE_SIMILAR",
+        "selected_concept": "Medial Lemniscus Tract",
+        "anchored_factual_focus": "Medial Lemniscus Tract",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזו מהמסילות העצביות הבאות אחראית להעברת תחושות מתקדמות כמו מגע עדין ורעידות?",
+        "correct_answer_text": "Medial Lemniscus Tract",
+        "deterministic_alignment_preclassification": "ALIGNED"
+      },
+      {
+        "round": 4,
+        "existing_questions_count": 3,
+        "generation_mode": "INDEPENDENT",
+        "selected_concept": "Anterior Corticospinal Tract",
+        "anchored_factual_focus": "Anterior Corticospinal Tract",
+        "accepted": true,
+        "attempts": 1,
+        "duplicate_replacement_attempts": 0,
+        "question": "איזו מסילה אחראית על העצבוב של שרירים פרוקסימליים בחוט השדרה?",
+        "correct_answer_text": "Anterior Corticospinal Tract",
+        "deterministic_alignment_preclassification": "ALIGNED"
+      }
+    ]
+  }
+}

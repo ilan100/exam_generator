@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from exam_generator.models._common import NonBlankStr, PositiveIntStrict
+from exam_generator.models._common import NonBlankStr, PositiveIntStrict, StrictBool
 
 
 class QuestionTarget(BaseModel):
@@ -20,6 +20,21 @@ class QuestionTarget(BaseModel):
     ``SourceEvidenceChunk.chunk_id`` values, already resolved from the
     planner's call-local ``evidence_refs`` (WP-022/WP-024's proven
     local-reference pattern) - never a raw LLM claim.
+
+    ``named_entity_target`` (WP-040) is ``True`` only when ``topic`` is
+    known, by construction, to be a specific named entity (an artery,
+    tract, nucleus, or similar) rather than a free-text subtopic label -
+    currently set only by the pilot-category deterministic planning path
+    (``planning.planner._plan_targets_from_concept_inventory()``), where
+    every ``topic`` is exactly a concept-inventory concept's own
+    structurally-extracted text (WP-035/036's own "named entity" signal),
+    never an LLM-authored description. Defaults to ``False`` - the
+    LLM-based planning path (every non-pilot category) never sets this,
+    since its own ``topic`` field is free-text and not reliably a named
+    entity. This is internal-only information for the generation prompt
+    (see ``prompts.formatting.format_target_answer_requirement()``) -
+    never itself validated or scored, and never part of any public
+    request/response contract.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -29,6 +44,7 @@ class QuestionTarget(BaseModel):
     topic: NonBlankStr
     factual_focus: NonBlankStr
     supporting_evidence_chunk_ids: tuple[NonBlankStr, ...] = ()
+    named_entity_target: StrictBool = False
 
 
 class PlannedQuestionTargetResponse(BaseModel):

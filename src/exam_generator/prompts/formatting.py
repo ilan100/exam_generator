@@ -169,6 +169,50 @@ def format_question_target(target: QuestionTarget) -> str:
     return f"{QUESTION_TARGET_BEGIN}\n{body}\n{QUESTION_TARGET_END}"
 
 
+_NO_NAMED_ENTITY_REQUIREMENT_TEXT = (
+    "No additional answer-identity requirement applies to this target - the correct answer "
+    "may describe any evidence-supported aspect of it (its function, a property, a "
+    "relationship, or the entity itself), exactly per the general instructions above."
+)
+
+
+def format_target_answer_requirement(target: QuestionTarget) -> str:
+    """WP-040: deterministically format the answer-identity requirement
+    for ``target``, based only on ``target.named_entity_target`` -
+    information already decided by planning (never re-derived here, never
+    an LLM judgment). Honestly renders
+    ``_NO_NAMED_ENTITY_REQUIREMENT_TEXT`` (never silently omits the
+    section) when ``target`` is not known to be a named entity - matching
+    this project's established fail-honest-sentinel convention (e.g.
+    ``format_category_coverage()``'s "nothing tested yet").
+
+    When ``target.named_entity_target`` is true, states the target
+    concept's own text as the required answer identity and explicitly
+    prohibits the specific substitution shapes WP-039's live pilot
+    actually observed (a functional description, a property, a related
+    or sibling structure, a neighboring entity, or the broader system/
+    category) - never a language requirement of any kind (WP-040 section
+    16: "the key requirement is identity of the target, not a particular
+    language" - the correct answer may be phrased in whichever language
+    generation judges natural, exactly as before this WP).
+    """
+    if not target.named_entity_target:
+        return _NO_NAMED_ENTITY_REQUIREMENT_TEXT
+
+    topic = target.topic
+    return (
+        f"TARGET CONCEPT = {topic}\n\n"
+        f"The correct answer must identify TARGET CONCEPT ({topic}) itself - not merely "
+        "describe it. Do not use, as the correct answer, a description of its function, an "
+        "effect it causes, a property it has, a related or sibling structure, a neighboring "
+        "anatomical entity, or the broader system/category it belongs to - even if that "
+        "description is itself factually true and evidence-supported.\n"
+        f"The question may still test any evidence-supported aspect of {topic} (its role, "
+        "location, connections, or distinguishing characteristics) - the requirement is only "
+        f"that the correct ANSWER choice itself names {topic}, not a description of it."
+    )
+
+
 def format_competitors(competitors: Sequence[CompetitorCandidate]) -> str:
     """Deterministically format WP-031's deterministically-discovered
     competitor candidates for the generation prompt.

@@ -321,7 +321,15 @@ class QuestionTargetPlanner:
            concept's own genuine source chunk id (stronger, more direct
            provenance than the LLM-planning path's self-reported
            ``evidence_refs``, since it is never a claim to verify - it is
-           the exact chunk the concept was mechanically found in).
+           the exact chunk the concept was mechanically found in);
+           ``named_entity_target=True`` (WP-040) - every concept reaching
+           this path is, by construction, a named entity (this is exactly
+           what ``extract_concept_inventory()``'s own structural filter
+           extracts - WP-035/036's own "named entity" signal), so this is
+           never a new judgment call, only surfacing a fact already
+           established by extraction. The LLM-based planning path below
+           never sets this (defaults to ``False``), since its own
+           self-authored ``topic`` text is not reliably a named entity.
 
         Returns fewer than ``count`` targets - possibly zero - if the
         inventory (after refinement and coverage exclusion) does not
@@ -351,6 +359,7 @@ class QuestionTargetPlanner:
                     chunk_text=chunk_text_by_id[concept.evidence_chunk_id], concept=concept.concept
                 ),
                 supporting_evidence_chunk_ids=(concept.evidence_chunk_id,),
+                named_entity_target=True,
             )
             for target_id, concept in enumerate(selected, start=1)
         ]

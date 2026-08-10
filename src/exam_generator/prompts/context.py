@@ -30,6 +30,7 @@ from exam_generator.prompts.formatting import (
     format_historical_reference,
     format_question_target,
     format_student_summary_evidence,
+    format_target_answer_requirement,
 )
 
 
@@ -56,6 +57,13 @@ class GenerationPromptContext:
     share the same relationship (see
     ``exam_generator.generation.competitors.discover_competitors()``) -
     information, never a generation decision; may legitimately be empty.
+
+    Since WP-040, ``render_variables()`` also renders
+    ``target.named_entity_target`` into an explicit answer-identity
+    requirement (see
+    ``exam_generator.prompts.formatting.format_target_answer_requirement()``) -
+    derived purely from information the target already carries, never a
+    new field on this context itself.
     """
 
     category: str
@@ -99,6 +107,7 @@ class GenerationPromptContext:
             "source_evidence": format_student_summary_evidence(self.source_evidence),
             "historical_reference": format_historical_reference(self.historical_reference),
             "question_target": format_question_target(self.target),
+            "target_answer_requirement": format_target_answer_requirement(self.target),
             "relationship_type": self.relationship.relationship_type,
             "competitor_concepts": format_competitors(self.competitors),
         }

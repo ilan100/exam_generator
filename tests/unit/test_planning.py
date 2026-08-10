@@ -583,3 +583,20 @@ def test_pilot_category_coverage_exclusion_is_still_case_and_whitespace_tolerant
     coverage = CategoryCoverage(tested_concepts=("  superior   cerebellar ARTERY  ",))
     targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
     assert targets[0].topic == "Basilar Artery"
+
+
+# ---------------------------------------------------------------------------
+# WP-040: pilot-category targets are marked as named-entity targets
+# ---------------------------------------------------------------------------
+
+
+def test_pilot_category_target_is_marked_a_named_entity_target():
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert targets[0].named_entity_target is True
+
+
+def test_non_pilot_category_target_is_not_marked_a_named_entity_target():
+    planner = _make_planner()
+    targets = planner.plan_targets(category=CATEGORY, count=1)
+    assert targets[0].named_entity_target is False

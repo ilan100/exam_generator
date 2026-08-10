@@ -1234,6 +1234,76 @@ def test_invalid_mode_reference_combination_fails_independent_with_reference():
         )
 
 
+# ---------------------------------------------------------------------------
+# WP-040: target-aware generation for named-entity targets
+# ---------------------------------------------------------------------------
+
+
+def test_named_entity_target_prompt_states_the_target_concept_explicitly(production_repository):
+    target = _target(
+        category="גזע המוח", topic="Corpos Striatum", named_entity_target=True
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "TARGET CONCEPT = Corpos Striatum" in rendered
+    assert "must identify TARGET CONCEPT (Corpos Striatum) itself" in rendered
+
+
+def test_named_entity_target_prompt_prohibits_function_only_answer(production_repository):
+    target = _target(topic="Medial Lemniscus Tract", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    # The exact real live-observed misalignment shapes WP-037/039 found -
+    # a semantically meaningful check, not merely "target concept" appearing.
+    assert "a description of its function" in rendered
+    assert "a property it has" in rendered
+
+
+def test_named_entity_target_prompt_prohibits_related_and_neighboring_substitution(production_repository):
+    target = _target(topic="Superior cerebellar artery", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "a related or sibling structure" in rendered
+    assert "a neighboring anatomical entity" in rendered
+    assert "the broader system/category" in rendered
+
+
+def test_named_entity_target_prompt_still_permits_testing_other_aspects(production_repository):
+    # Section 8: the question itself may still test role/location/
+    # connections/distinguishing characteristics - only the ANSWER is
+    # constrained to identify the target.
+    target = _target(topic="Anterior Corticospinal Tract", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "its role, location, connections, or distinguishing characteristics" in rendered
+
+
+def test_non_named_entity_target_prompt_renders_the_honest_no_requirement_sentinel(production_repository):
+    target = _target()  # named_entity_target defaults to False
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "No additional answer-identity requirement applies to this target" in rendered
+    assert "TARGET CONCEPT =" not in rendered
+
+
+def test_target_answer_requirement_never_forces_a_specific_language(production_repository):
+    # WP-040 section 16: identity of the target, never a particular
+    # language - the requirement text must never mention English/Hebrew.
+    for named in (True, False):
+        target = _target(topic="Corpos Striatum", named_entity_target=named)
+        rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+        requirement_section = rendered.split("Answer-identity requirement:")[1].split("Possible competing concepts:")[0]
+        assert "English" not in requirement_section
+        assert "Hebrew" not in requirement_section
+        assert "עברית" not in requirement_section
+        assert "אנגלית" not in requirement_section
+
+
+def test_format_target_answer_requirement_is_a_pure_deterministic_function():
+    from exam_generator.prompts.formatting import format_target_answer_requirement
+
+    named = _target(topic="Putamen", named_entity_target=True)
+    unnamed = _target(named_entity_target=False)
+    assert format_target_answer_requirement(named) == format_target_answer_requirement(named)
+    assert "Putamen" in format_target_answer_requirement(named)
+    assert format_target_answer_requirement(unnamed) == format_target_answer_requirement(_target())
+
+
 def test_existing_generation_mode_enum_is_reused():
     context = GenerationPromptContext(
         category="c",

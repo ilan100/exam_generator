@@ -195,3 +195,214 @@ def test_no_llm_or_embedding_call_in_concept_anchor_module():
     source = inspect.getsource(concept_anchor_module)
     assert "generate_structured" not in source
     assert "vector" not in source.lower()
+
+
+# ---------------------------------------------------------------------------
+# WP-039: trailing-fragment truncation recovery
+#
+# Every test in this section reproduces the actual multi-line structural
+# shape observed in the real corpus (WP-039 section 5: "do not merely add
+# tests that call a repair function with two strings... test the actual
+# extraction path") - each runs the real evidence text through
+# refine_concept_inventory() end-to-end, exactly as production does.
+# ---------------------------------------------------------------------------
+
+
+def test_clean_concept_is_never_touched_by_trailing_repair():
+    chunk = _chunk("Caudate Nucleus\n \nNucleus Accumbens")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Caudate Nucleus" in concepts
+    assert not any("WP-039" in c.extraction_reason for c in refined if c.concept == "Caudate Nucleus")
+
+
+def test_real_corpus_case_corpos_str_reconstructs_to_corpos_striatum():
+    # The exact live WP-036/037/038 shape: bidi text extraction placed
+    # the word's trailing fragments on the two lines immediately before
+    # the truncated concept's own line.
+    chunk = _chunk(
+        " גרעיני הבסיס:מכילים מספר תתי מבנים \n"
+        "\n \ntum\nia\nCorpos Str\n \no\n \nCaudate Nucleus"
+    )
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Corpos Striatum" in concepts
+    assert "Corpos Str" not in concepts
+    repaired = next(c for c in refined if c.concept == "Corpos Striatum")
+    assert "WP-039" in repaired.extraction_reason
+
+
+def test_real_corpus_case_anterior_corticospinal_t_reconstructs_to_tract():
+    # The exact live WP-038 shape: a single trailing fragment ("ract") on
+    # the line immediately before the truncated concept's own line.
+    chunk = _chunk("מסילות יורדות  :\n      \n \nract\nAnterior Corticospinal T\n                     ")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Anterior Corticospinal Tract" in concepts
+    assert "Anterior Corticospinal T" not in concepts
+
+
+def test_real_corpus_case_forward_direction_single_letter_suffix():
+    # "Interna" + "l" = "Internal" - the completing fragment is on the
+    # line AFTER the concept, not before (real corpus shape, mirroring
+    # WP-037's own leading-truncation check of both directions).
+    chunk = _chunk(" Y\n Interna\nl\n Medullary Lamin")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Internal" in concepts
+    assert "Interna" not in concepts
+
+
+def test_sibling_chain_shares_single_letter_boundary_lines_correctly():
+    # The real corpus "Globus Pallidu"/"Putame"/"Lentifor" chain: three
+    # separate truncated concepts, each completed by exactly the one
+    # single-letter line between it and its neighbor. This is the test
+    # that exercises consumed-line tracking across concepts.
+    chunk = _chunk(
+        ",מראה,\nGlobus Pallidu\ns\nPutame\nn\n Lentifor\nm\n.\nחלוקה שמתאימה יותר"
+    )
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Globus Pallidus" in concepts
+    assert "Putamen" in concepts
+    assert "Lentiform" in concepts
+    assert "Globus Pallidu" not in concepts
+    assert "Putame" not in concepts
+    assert "Lentifor" not in concepts
+
+
+def test_consumed_boundary_line_is_not_reused_by_a_different_concept():
+    # Regression test for a real bug found during WP-039 development:
+    # when a reconstruction attempt discovers fragment lines but fails
+    # (ambiguous/malformed), those lines must still be marked consumed -
+    # otherwise a different, unrelated concept can wrongly absorb them
+    # into an equally invalid, differently-ordered "reconstruction." This
+    # reproduces the real corpus case: "Substantia Nigra P"'s own
+    # (correctly rejected) attempt discovers "a" and "rs Reticulata (";
+    # without consuming them, "NSp.)" would wrongly absorb both.
+    chunk = _chunk(
+        "ת \nSubstantia Nigra P\na\nrs Reticulata (\nNSp.)\nם"
+    )
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Substantia Nigra P" not in concepts
+    # "NSp.)" may legitimately remain unrepaired (its only neighbor
+    # fragment was consumed by "Substantia Nigra P"'s own failed
+    # attempt) - the invariant under test is that it is never wrongly
+    # merged with that neighbor's own discarded fragments.
+    assert "NSp.)rs Reticulata (a" not in concepts
+    assert not any(c.startswith("Substantia Nigra P") and c != "Substantia Nigra P" for c in concepts)
+
+
+def test_unbalanced_parentheses_after_reconstruction_is_excluded():
+    # A reconstruction that stops mid-parenthetical is untrustworthy -
+    # never used partially.
+    chunk = _chunk("ת \nSubstantia Nigra P\na\nrs Reticulata (\nNSp.)")
+    refined = refine_concept_inventory((chunk,))
+    assert not any(c.concept.startswith("Substantia Nigra Pars") for c in refined)
+
+
+def test_ambiguous_both_directions_have_fragments_is_excluded():
+    chunk = _chunk(", globus pallidus \ninetnrus \n(GiP )\nrN .\nאמנם ")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "(GiP )" not in concepts
+    assert not any("GiP" in c for c in concepts)  # no partial repair either
+
+
+def test_no_adjacent_evidence_leaves_a_genuinely_unrecoverable_fragment_unchanged():
+    # "Medullary Lamin" has no safely-usable adjacent evidence (its only
+    # neighbor fragment is consumed by "Interna", and its forward
+    # neighbor is Hebrew-fused) - it must be left unchanged, never
+    # excluded, since absence of evidence is not evidence of exclusion.
+    chunk = _chunk(" Y\n Interna\nl\n Medullary Lamin\na. ,לטרליי")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Medullary Lamin" in concepts
+
+
+def test_fragment_fused_with_hebrew_text_is_never_used_as_a_continuation():
+    # A line mixing a lowercase-starting fragment with Hebrew prose on
+    # the same physical line must never be treated as pure continuation
+    # text (WP-039 section 11: no general text correction).
+    chunk = _chunk(" נקראים גםlia\nThe Basal Gang\n , אך מושג זה שגוי")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "The Basal Ganglia" not in concepts
+
+
+def test_trailing_period_is_stripped_from_a_reconstructed_concept():
+    chunk = _chunk(",המוטורית,\nNeuromuscular Junctio\nn.")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Neuromuscular Junction" in concepts
+    assert "Neuromuscular Junction." not in concepts
+
+
+def test_reconstructed_duplicate_of_an_already_complete_concept_is_deduplicated():
+    # "Neurom" (backward: "u" + "scular Junction") reconstructs to the
+    # same normalized text as an already-complete "Neuromuscular
+    # Junction" extracted elsewhere in the same evidence - only one
+    # survives (first occurrence wins, the established convention).
+    chunk = _chunk(
+        "Neuromuscular Junction\n \nscular Junction\nu\nNeurom\n –\ninal Common Pathway \nF"
+    )
+    refined = refine_concept_inventory((chunk,))
+    normalized = [c.concept.strip().lower() for c in refined]
+    assert normalized.count("neuromuscular junction") == 1
+
+
+def test_short_legitimate_abbreviation_is_not_arbitrarily_expanded():
+    # False-positive protection: a genuine short abbreviation surrounded
+    # by ordinary Hebrew prose (no adjacent continuation-fragment shape)
+    # must not be "expanded" into anything.
+    chunk = _chunk("חלק מהתלמוס נקרא \nVL\n ומכיל תאים")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "VL" in concepts
+
+
+def test_related_concepts_are_never_merged_by_trailing_repair():
+    # False-positive protection: two genuinely distinct, already-complete
+    # concepts on adjacent lines must never be merged into one.
+    chunk = _chunk("Anterior Spinal Artery\n \nPosterior Spinal Arteries")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Anterior Spinal Artery" in concepts
+    assert "Posterior Spinal Arteries" in concepts
+    assert "Anterior Spinal ArteryPosterior Spinal Arteries" not in concepts
+
+
+def test_two_possible_completions_is_ambiguous_and_excludes():
+    # Synthetic: a concept genuinely has a plausible completion in BOTH
+    # directions - WP-039's own explicit ambiguity test requirement
+    # (section 17: "two possible completions").
+    chunk = _chunk("tail\nAmbiguous Concep\nture")
+    refined = refine_concept_inventory((chunk,))
+    concepts = [c.concept for c in refined]
+    assert "Ambiguous Concep" not in concepts
+    assert "Ambiguous Conceptail" not in concepts
+    assert "Ambiguous Concepture" not in concepts
+
+
+def test_reconstructed_concept_via_trailing_repair_preserves_genuine_evidence_chunk_id():
+    chunk = _chunk("ract\nAnterior Corticospinal T", chunk_id="STUDENT_SUMMARY:s2.pdf:0106:0001")
+    refined = refine_concept_inventory((chunk,))
+    repaired = next(c for c in refined if c.concept == "Anterior Corticospinal Tract")
+    assert repaired.evidence_chunk_id == "STUDENT_SUMMARY:s2.pdf:0106:0001"
+
+
+def test_malformed_and_blank_heavy_evidence_does_not_crash_trailing_repair():
+    chunk = _chunk("\n\n\n   \nCorpos Str\n\n\n")
+    refine_concept_inventory((chunk,))  # must not raise
+
+
+def test_no_llm_or_embedding_call_in_trailing_repair_functions():
+    import inspect
+
+    import exam_generator.planning.concept_anchor as concept_anchor_module
+
+    source = inspect.getsource(concept_anchor_module._repair_trailing_truncations)
+    source += inspect.getsource(concept_anchor_module._attempt_trailing_reconstruction)
+    assert "generate_structured" not in source
+    assert "embedding" not in source.lower()

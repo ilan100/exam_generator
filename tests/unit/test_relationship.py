@@ -129,14 +129,17 @@ def test_question_relationship_statement_cannot_be_blank():
 
 def test_question_target_gained_no_new_field():
     # WP-030 section 3: extend QuestionTarget only where necessary - it
-    # turned out not to be necessary at all. The relationship is computed
-    # transiently by generation, never stored on the target.
+    # turned out not to be necessary at all for WP-030 itself. The
+    # relationship is computed transiently by generation, never stored on
+    # the target. WP-040 later added named_entity_target, so this guard
+    # now reflects that field set, not zero fields since WP-025.
     assert set(QuestionTarget.model_fields) == {
         "target_id",
         "category",
         "topic",
         "factual_focus",
         "supporting_evidence_chunk_ids",
+        "named_entity_target",
     }
 
 

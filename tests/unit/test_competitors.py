@@ -169,12 +169,15 @@ def test_competitor_candidate_concept_cannot_be_blank():
 
 
 def test_question_target_still_gained_no_new_field():
+    # WP-031 itself added no field - WP-040 later added named_entity_target,
+    # so this guard now reflects that field set, not zero fields since WP-025.
     assert set(QuestionTarget.model_fields) == {
         "target_id",
         "category",
         "topic",
         "factual_focus",
         "supporting_evidence_chunk_ids",
+        "named_entity_target",
     }
 
 

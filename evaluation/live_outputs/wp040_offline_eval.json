@@ -1,0 +1,58 @@
+[
+  {
+    "category": "גרעיני הבסיס",
+    "target_topic": "Corpos Striatum",
+    "anchored_factual_focus": "Corpos Striatum",
+    "question": "מהו Corpos Striatum?",
+    "answers": [
+      "Corpos Striatum",
+      "Globus Pallidus",
+      "Caudate Nucleus",
+      "Substantia Nigra"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Corpos Striatum"
+  },
+  {
+    "category": "מסילות עצביות",
+    "target_topic": "Medial Lemniscus Tract",
+    "anchored_factual_focus": "Medial Lemniscus Tract",
+    "question": "איזו מהמסילות הבאות היא המסילה המוליכה מידע תחושתי מתקדם מהגוף אל הקורטקס?",
+    "answers": [
+      "Medial Lemniscus Tract",
+      "Spinothalamic Tract",
+      "Corticobulbar Tract",
+      "Corticospinal Tract"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Medial Lemniscus Tract"
+  },
+  {
+    "category": "אספקת דם",
+    "target_topic": "Superior cerebellar artery",
+    "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+    "question": "איזה מתאר את העורק המספק דם לחלקים העליונים של הצרבלום?",
+    "answers": [
+      "עורק סופריור צרבלרי",
+      "עורק קדמי תחתון צרבלרי",
+      "עורק תחתון אחורי צרבלרי",
+      "עורק פוסטריורי צרבלרי"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "עורק סופריור צרבלרי"
+  },
+  {
+    "category": "מסילות עצביות",
+    "target_topic": "Anterior Corticospinal Tract",
+    "anchored_factual_focus": "Anterior Corticospinal Tract",
+    "question": "איזו מסילה אחראית על עצבוב שרירים פרוקסימליים בגוף?",
+    "answers": [
+      "מסילה קדמית של הקורטיקוספינלית",
+      "מסילה לטרלית של הקורטיקוספינלית",
+      "מסילה קורטיקובולברית",
+      "מסילה ספינותלמית"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "מסילה קדמית של הקורטיקוספינלית"
+  }
+]
