@@ -1,0 +1,232 @@
+{
+  "אספקת דם": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "concept_normalized_forms": [
+        "superior cerebellar artery"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+      "correct_answer_text": "עורק סופריאורי צרבלרי",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "concept_normalized_forms": [
+        "superior cerebellar artery"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+      "correct_answer_text": "עורק צרבלרי עליון",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "concept_normalized_forms": [
+        "superior cerebellar artery"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 2,
+      "question": "איזה עורק מספק דם לחלקים העליונים והאחוריים של הצרבלום?",
+      "correct_answer_text": "עורק סופריור צרבלרי",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "concept_normalized_forms": [
+        "superior cerebellar artery"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לחלק העליון של הצרבלום?",
+      "correct_answer_text": "עורק סופריאורי צרבלרי",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    }
+  ],
+  "גרעיני הבסיס": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "concept_normalized_forms": [
+        "corpos str"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": true,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה תפקיד יש ל-Corpus Striatum במסלול התנועה של גרעיני הבסיס?",
+      "correct_answer_text": "מאפשר הפעלת תנועה על ידי הפסקת דיכוי התלמוס",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "concept_normalized_forms": [
+        "corpos str"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה מהמבנים הבאים מהווה חלק מהקורפוס סטריאטום?",
+      "correct_answer_text": "Caudate Nucleus",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "concept_normalized_forms": [
+        "corpos str"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": false,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "concept_normalized_forms": [
+        "corpos str"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": false,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+    }
+  ],
+  "מסילות עצביות": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Spinothalamic Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "concept_normalized_forms": [
+        "spinothalamic tract"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה עולות אחראית להעברת תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+      "correct_answer_text": "Spinothalamic Tract",
+      "identity_recognized_generated_answer": true,
+      "deterministic_alignment_preclassification": "ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Medial Lemniscus Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "concept_normalized_forms": [
+        "medial lemniscus tract"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "Medial Lemniscus Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהי המסילה העצבית שאחראית להעברת תחושות מתקדמות מהפריפריה אל הקורטקס?",
+      "correct_answer_text": "Medial Lemniscus Tract",
+      "identity_recognized_generated_answer": true,
+      "deterministic_alignment_preclassification": "ALIGNED"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Anterior Corticospinal T",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0106:0001",
+      "concept_normalized_forms": [
+        "anterior corticospinal t"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "ract\nAnterior Corticospinal T",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה בחוט השדרה אחראית על עצבוב השרירים הפרוקסימליים?",
+      "correct_answer_text": "Anterior Corticospinal Tract",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "ALIGNED"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Anterior Corticospinal T",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0106:0001",
+      "concept_normalized_forms": [
+        "anterior corticospinal t"
+      ],
+      "concept_explicitly_supported_language_forms": [],
+      "anchored_factual_focus": "ract\nAnterior Corticospinal T",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה מוטורית אחראית על עצבוב שרירים פרוקסימליים (קרובים לקו האמצע)?",
+      "correct_answer_text": "Anterior Corticospinal Tract",
+      "identity_recognized_generated_answer": false,
+      "deterministic_alignment_preclassification": "ALIGNED"
+    }
+  ]
+}

@@ -73,8 +73,10 @@ def _provider(response: QuestionTargetPlanningResponse | None = None) -> MagicMo
 PRODUCTION_PROMPT_REPOSITORY = PromptRepository.from_default_location()
 
 
-def _make_planner(*, resolver=None, index=None, prompt_repository=None, provider=None) -> QuestionTargetPlanner:
-    return QuestionTargetPlanner(
+def _make_planner(
+    *, resolver=None, index=None, prompt_repository=None, provider=None, pilot_categories=None
+) -> QuestionTargetPlanner:
+    kwargs = dict(
         category_resolver=resolver or _resolver(),
         student_summary_index=index
         if index is not None
@@ -82,6 +84,9 @@ def _make_planner(*, resolver=None, index=None, prompt_repository=None, provider
         prompt_repository=prompt_repository or PRODUCTION_PROMPT_REPOSITORY,
         llm_provider=provider or _provider(),
     )
+    if pilot_categories is not None:
+        kwargs["pilot_categories"] = pilot_categories
+    return QuestionTargetPlanner(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -387,3 +392,194 @@ def test_coverage_never_triggers_a_retry_or_second_llm_call():
         category=CATEGORY, count=1, coverage=CategoryCoverage(tested_concepts=("כל דבר",))
     )
     assert provider.generate_structured.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# WP-036: concept-inventory-constrained planning for pilot categories only
+# ---------------------------------------------------------------------------
+
+PILOT_CATEGORY = "אספקת דם"
+
+
+def _pilot_planner(*, provider=None, index=None, pilot_categories=None):
+    resolver = _resolver(categories=(PILOT_CATEGORY,))
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0128:0001",
+        text="אספקת הדם:\nSuperior Cerebellar Artery\nמקור:\nBasilar Artery",
+    )
+    return _make_planner(
+        resolver=resolver,
+        index=index if index is not None else _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)),
+        provider=provider,
+        pilot_categories=pilot_categories,
+    )
+
+
+def test_pilot_category_makes_zero_llm_calls():
+    provider = _provider()
+    planner = _pilot_planner(provider=provider)
+    planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert provider.generate_structured.call_count == 0
+
+
+def test_pilot_category_returns_a_target_built_from_the_concept_inventory():
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert len(targets) == 1
+    assert targets[0].topic == "Superior Cerebellar Artery"
+    assert targets[0].category == PILOT_CATEGORY
+
+
+def test_pilot_category_target_carries_genuine_evidence_chunk_id():
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert targets[0].supporting_evidence_chunk_ids == ("STUDENT_SUMMARY:s1.pdf:0128:0001",)
+
+
+def test_pilot_category_respects_coverage_exclusion():
+    from exam_generator.models import CategoryCoverage
+
+    planner = _pilot_planner()
+    coverage = CategoryCoverage(tested_concepts=("Superior Cerebellar Artery",))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert len(targets) == 1
+    assert targets[0].topic == "Basilar Artery"
+
+
+def test_pilot_category_exhaustion_yields_empty_list_not_llm_fallback():
+    from exam_generator.models import CategoryCoverage
+
+    provider = _provider()
+    planner = _pilot_planner(provider=provider)
+    coverage = CategoryCoverage(tested_concepts=("Superior Cerebellar Artery", "Basilar Artery"))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert targets == []
+    # Exhaustion must never silently fall back to the LLM-based path -
+    # WP-036 section 11: "report it honestly, do not invent concepts."
+    assert provider.generate_structured.call_count == 0
+
+
+def test_pilot_category_with_no_extractable_concepts_yields_empty_list():
+    chunk = _chunk(text="זהו טקסט עברי בלבד ללא שום מבנה הניתן לחילוץ באנגלית.")
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert targets == []
+
+
+def test_non_pilot_category_behavior_is_completely_unchanged():
+    # CATEGORY ("גזע המוח") is deliberately not in the pilot set - every
+    # pre-existing test in this file already exercises it through the
+    # unchanged LLM path; this test makes that guarantee explicit.
+    provider = _provider()
+    planner = _make_planner(provider=provider)
+    targets = planner.plan_targets(category=CATEGORY, count=1)
+    assert provider.generate_structured.call_count == 1
+    assert len(targets) == 1
+
+
+def test_pilot_categories_constructor_default_is_the_real_wp036_set():
+    from exam_generator.planning.concept_inventory import PILOT_CATEGORIES
+
+    planner = _make_planner()
+    assert planner._pilot_categories == PILOT_CATEGORIES
+
+
+def test_injected_empty_pilot_set_disables_the_deterministic_path_entirely():
+    # Confirms the pilot set is genuinely configurable, not hard-coded
+    # deep inside plan_targets() - a category that IS one of the real
+    # pilot categories still takes the LLM path if the injected pilot set
+    # does not include it.
+    provider = _provider()
+    planner = _pilot_planner(provider=provider, pilot_categories=frozenset())
+    planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert provider.generate_structured.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# WP-037: concept-anchored evidence for pilot-category targets
+# ---------------------------------------------------------------------------
+
+
+def test_pilot_category_target_uses_narrow_anchored_evidence_not_the_wide_window():
+    # The exact WP-036 live-pilot failure this WP addresses: a competing,
+    # more salient neighboring entity must not appear in the assigned
+    # target's own factual_focus.
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0128:0001",
+        text="Superior Cerebellar Artery\nמקור:\nBasilar Artery\nאזור:\nהמשטח העליון",
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    from exam_generator.models import CategoryCoverage
+
+    coverage = CategoryCoverage(tested_concepts=("Superior Cerebellar Artery",))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert targets[0].topic == "Basilar Artery"
+    assert "Superior Cerebellar Artery" not in targets[0].factual_focus
+
+
+def test_pilot_category_excludes_a_category_self_restatement_concept():
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0036:0001",
+        text=(
+            "גרעיני הבסיס נקראים גם\nThe Basal Ganglia\n"
+            "אך מושג זה שגוי משום שגנגליה מתאר צבר גופי תאים במערכת העצבים ההיקפית\n"
+            "גרעיני הבסיס מכילים מספר תתי מבנים\n\nCaudate Nucleus"
+        ),
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert targets[0].topic == "Caudate Nucleus"
+
+
+# ---------------------------------------------------------------------------
+# WP-038: deterministic concept identity for pilot-category coverage exclusion
+# ---------------------------------------------------------------------------
+
+
+def test_pilot_category_excludes_a_concept_via_its_evidence_derived_hebrew_form():
+    # Evidence explicitly pairs the concept with a Hebrew form via an
+    # adjacent parenthetical - WP-038's "evidence-derived identity"
+    # mechanism must recognize the concept as tested when coverage's
+    # tested_concepts carries that exact Hebrew form, even though it never
+    # matches the concept's own (English) text.
+    from exam_generator.models import CategoryCoverage
+
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0128:0001",
+        text=(
+            "Superior Cerebellar Artery (עורק צרבלרי עליון)\n"
+            "מקור:\nBasilar Artery"
+        ),
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    coverage = CategoryCoverage(tested_concepts=("עורק צרבלרי עליון",))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert targets[0].topic == "Basilar Artery"
+
+
+def test_pilot_category_does_not_exclude_on_an_unsupported_alternate_representation():
+    # The real, live-observed WP-037 regression, reproduced deterministically:
+    # no evidence-derived pairing exists in this chunk (the exact real
+    # corpus shape - see concept_identity's module docstring), so a
+    # differently-scripted answer must honestly NOT be recognized as
+    # covering the concept - WP-038 never guesses a match it cannot prove
+    # from evidence.
+    from exam_generator.models import CategoryCoverage
+
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0128:0001",
+        text="Superior Cerebellar Artery\nמקור:\nBasilar Artery",
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    coverage = CategoryCoverage(tested_concepts=("עורק סופריור צרבלרי",))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert targets[0].topic == "Superior Cerebellar Artery"
+
+
+def test_pilot_category_coverage_exclusion_is_still_case_and_whitespace_tolerant():
+    from exam_generator.models import CategoryCoverage
+
+    planner = _pilot_planner()
+    coverage = CategoryCoverage(tested_concepts=("  superior   cerebellar ARTERY  ",))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1, coverage=coverage)
+    assert targets[0].topic == "Basilar Artery"

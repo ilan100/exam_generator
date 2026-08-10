@@ -1,0 +1,140 @@
+{
+  "אספקת דם": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Superior cerebellar artery",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+      "correct_answer_text": "Superior Cerebellar Artery"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Basillar artery",
+      "accepted": true,
+      "attempts": 2,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לחלק העליון של הצרבלום?",
+      "correct_answer_text": "Superior Cerebellar Artery"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Basillar artery",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+      "correct_answer_text": "Superior Cerebellar Artery"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Basillar artery",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהו מקור העורק המספק דם למשטח העליון של הצרבלום?",
+      "correct_answer_text": "Superior Cerebellar Artery"
+    }
+  ],
+  "גרעיני הבסיס": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "The Basal Gang",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "האם גרעיני הבסיס הם חלק ממערכת העצבים המרכזית או מההיקפית?",
+      "correct_answer_text": "חלק ממערכת העצבים המרכזית"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "The Basal Gang",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהי ההגדרה הנכונה של גרעיני הבסיס במערכת העצבים?",
+      "correct_answer_text": "צבר של תאי עצב במערכת העצבים המרכזית"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "The Basal Gang",
+      "accepted": false,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "The Basal Gang",
+      "accepted": true,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהו התפקיד המרכזי של גרעיני הבסיס במערכת העצבים המרכזית?",
+      "correct_answer_text": "הוצאה לפועל של תנועה מוטורית"
+    }
+  ],
+  "מסילות עצביות": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Spinothalamic Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה תחושתית מעבירה מידע על כאב וטמפרטורה מהפריפריה לתלמוס?",
+      "correct_answer_text": "Spinothalamic Tract"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "edial Lemniscus Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מהמסילות הבאות מעבירה תחושות מתקדמות מהפריפריה לתלמוס?",
+      "correct_answer_text": "Medial Lemniscus Tract"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "edial Lemniscus Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה תחושתית מעבירה תחושות מתקדמות מהגוף אל המוח?",
+      "correct_answer_text": "Medial Lemniscus Tract"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "edial Lemniscus Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה עולות (תחושתית) מעבירה תחושות מתקדמות אל הקורטקס?",
+      "correct_answer_text": "medial lemniscus tract"
+    }
+  ]
+}

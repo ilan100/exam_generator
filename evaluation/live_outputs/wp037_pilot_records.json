@@ -1,0 +1,172 @@
+{
+  "אספקת דם": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לחלקים העליונים של הצרבלום?",
+      "correct_answer_text": "עורק סופריור צרבלרי",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 1,
+      "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+      "correct_answer_text": "עורק סופריור צרבלרי",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": false,
+      "attempts": 0,
+      "duplicate_replacement_attempts": 3,
+      "failure_type": "DuplicateReplacementExhausted",
+      "failure_message": "exhausted 2 duplicate-replacement attempt(s) - every produced candidate duplicated a question already supplied as an existing question"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Superior cerebellar artery",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0128:0001",
+      "anchored_factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": false,
+      "attempts": 0,
+      "duplicate_replacement_attempts": 3,
+      "failure_type": "DuplicateReplacementExhausted",
+      "failure_message": "exhausted 2 duplicate-replacement attempt(s) - every produced candidate duplicated a question already supplied as an existing question"
+    }
+  ],
+  "גרעיני הבסיס": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": true,
+      "attempts": 2,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהו החלק המרכזי בתכנון והוצאה לפועל של תנועה מוטורית בגרעיני הבסיס?",
+      "correct_answer_text": "קורפוס סטריאטום",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": false,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 1,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "מהו תפקידו של הקורפוס סטריאטום במעגלי גרעיני הבסיס?",
+      "correct_answer_text": "להגביר תנועה על ידי הפעלת מסלולי תנועה",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Corpos Str",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0036:0001",
+      "anchored_factual_focus": "\ntum\nia\nCorpos Str\no",
+      "accepted": false,
+      "attempts": 3,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)"
+    }
+  ],
+  "מסילות עצביות": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Spinothalamic Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "anchored_factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה אחראית להעברת תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+      "correct_answer_text": "מסילה ספינותלמית",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Spinothalamic Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "anchored_factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה עצבית מעבירה תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+      "correct_answer_text": "מסילה ספינתלמית",
+      "deterministic_alignment_preclassification": "NOT_ALIGNED"
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "selected_concept": "Spinothalamic Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "anchored_factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה עולות מהחוט השדרה אל התלמוס ומעבירה תחושות כאב וטמפרטורה?",
+      "correct_answer_text": "Spinothalamic Tract",
+      "deterministic_alignment_preclassification": "ALIGNED"
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "selected_concept": "Medial Lemniscus Tract",
+      "concept_evidence_chunk_id": "STUDENT_SUMMARY:student_summary_2.pdf:0108:0001",
+      "anchored_factual_focus": "Medial Lemniscus Tract",
+      "accepted": true,
+      "attempts": 1,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה במערכת העצבים אחראית להעברת תחושות מתקדמות מהפריפריה אל הקורטקס?",
+      "correct_answer_text": "Medial Lemniscus Tract",
+      "deterministic_alignment_preclassification": "ALIGNED"
+    }
+  ]
+}

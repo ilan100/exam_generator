@@ -40,6 +40,9 @@ from exam_generator.models import (
     QuestionTargetPlanningResponse,
     SourceEvidenceChunk,
 )
+from exam_generator.planning.concept_anchor import anchor_concept_evidence, refine_concept_inventory
+from exam_generator.planning.concept_identity import concept_identities_for_inventory, concept_identity_matches_text
+from exam_generator.planning.concept_inventory import PILOT_CATEGORIES, InventoryConcept
 from exam_generator.prompts import PromptId, PromptRepository, QuestionTargetPlanningPromptContext, build_prompt_messages
 from exam_generator.retrieval import (
     CategoryResolver,
@@ -48,6 +51,42 @@ from exam_generator.retrieval import (
     build_student_summary_retrieval_index,
     retrieve_for_category,
 )
+
+
+def _select_remaining_concepts(
+    inventory: tuple[InventoryConcept, ...],
+    *,
+    coverage: CategoryCoverage,
+    count: int,
+    chunk_text_by_id: dict[str, str],
+) -> list[InventoryConcept]:
+    """Deterministically exclude every inventory concept already tested,
+    then return up to ``count`` of whatever remains, in the inventory's
+    own (first-occurrence, retrieval-rank) order. Never reorders, never
+    re-ranks, never guesses at a substitute when fewer than ``count``
+    remain.
+
+    Since WP-038, "already tested" is decided by each concept's
+    ``ConceptIdentity`` (``planning/concept_identity.py``) - its own text
+    plus deterministic normalizations plus any genuinely evidence-derived
+    alternate-language form - rather than WP-034/036's plain exact-text
+    comparison. This still performs exact matching only (WP-036 section 6:
+    "use exact matching only... do not implement synonym handling") -
+    WP-038 does not introduce fuzzy/semantic matching, it only widens the
+    set of forms a concept's own identity legitimately includes, and only
+    when that widening is itself derived from real, adjacent evidence
+    rather than guessed.
+    """
+    identities = concept_identities_for_inventory(inventory, chunk_text_by_id=chunk_text_by_id)
+    remaining = [
+        concept
+        for concept in inventory
+        if not any(
+            concept_identity_matches_text(identities[concept.concept], tested_concept)
+            for tested_concept in coverage.tested_concepts
+        )
+    ]
+    return remaining[:count]
 
 
 def _resolve_planned_targets(
@@ -106,21 +145,27 @@ class QuestionTargetPlanner:
         student_summary_index: FactualRetrievalIndex,
         prompt_repository: PromptRepository,
         llm_provider: LLMProvider,
+        pilot_categories: frozenset[str] = PILOT_CATEGORIES,
     ) -> None:
         self._category_resolver = category_resolver
         self._student_summary_index = student_summary_index
         self._prompt_repository = prompt_repository
         self._llm_provider = llm_provider
+        self._pilot_categories = pilot_categories
         self._plan_history: list[tuple[str, tuple[QuestionTarget, ...]]] = []
 
     @classmethod
     def from_default_configuration(cls) -> "QuestionTargetPlanner":
         """Construct the normal application wiring: the real category
         resolver, the real student-summary retrieval index, the real
-        production prompt repository, and the configured OpenAI provider.
+        production prompt repository, the configured OpenAI provider, and
+        WP-036's real ``PILOT_CATEGORIES`` set.
 
         Requires ``OPENAI_API_KEY`` to be set (resolved by
-        ``build_llm_provider`` at this point, not earlier).
+        ``build_llm_provider`` at this point, not earlier) - note this is
+        still required even though pilot categories never call the LLM
+        for planning, since non-pilot categories (the large majority)
+        still do.
         """
         return cls(
             category_resolver=build_category_resolver(),
@@ -165,6 +210,16 @@ class QuestionTargetPlanner:
         an empty ``CategoryCoverage()`` ("nothing tested yet") when omitted,
         so every pre-WP-034 caller continues to behave identically.
 
+        Since WP-036, for the three categories in ``self._pilot_categories``
+        only, this method takes an entirely different, LLM-free path: see
+        ``_plan_targets_from_concept_inventory()``. ``coverage`` is reused
+        there too, but to *filter a deterministic candidate list* rather
+        than to inform an LLM prompt - the mechanism WP-034/035 concluded
+        is necessary for coverage-awareness to actually constrain
+        selection rather than merely describe it. Every category outside
+        the pilot set is completely unaffected - the exact same LLM-based
+        path documented above, byte-for-byte.
+
         Raises ``MissingEvidenceError`` (reused from
         ``exam_generator.generation`` - the identical condition, at the
         identical retrieval step, generation itself already treats as
@@ -184,11 +239,23 @@ class QuestionTargetPlanner:
                 f"No student-summary evidence retrieved for category {canonical_category!r}"
             )
 
+        resolved_coverage = coverage if coverage is not None else CategoryCoverage()
+
+        if canonical_category in self._pilot_categories:
+            targets = self._plan_targets_from_concept_inventory(
+                canonical_category=canonical_category,
+                count=count,
+                source_evidence=source_evidence,
+                coverage=resolved_coverage,
+            )
+            self._plan_history.append((canonical_category, tuple(targets)))
+            return targets
+
         context = QuestionTargetPlanningPromptContext(
             category=canonical_category,
             count=count,
             source_evidence=source_evidence,
-            coverage=coverage if coverage is not None else CategoryCoverage(),
+            coverage=resolved_coverage,
         )
         messages = build_prompt_messages(
             system_template=self._prompt_repository.get(PromptId.SYSTEM),
@@ -211,4 +278,80 @@ class QuestionTargetPlanner:
 
         targets = targets[:count]
         self._plan_history.append((canonical_category, tuple(targets)))
+        return targets
+
+    def _plan_targets_from_concept_inventory(
+        self,
+        *,
+        canonical_category: str,
+        count: int,
+        source_evidence: tuple[SourceEvidenceChunk, ...],
+        coverage: CategoryCoverage,
+    ) -> list[QuestionTarget]:
+        """WP-036/037 pilot: deterministically construct up to ``count``
+        targets directly from a concept inventory - **zero LLM calls**.
+
+        1. Extract and refine a concept inventory from ``source_evidence``
+           (``refine_concept_inventory()``, ``planning/concept_anchor.py``
+           - WP-036's structure-first, marker-based, honest-fallback
+           extraction, plus WP-037's additive extraction-artifact and
+           category-self-restatement policies: never guesses a repair,
+           excludes what it cannot safely repair or distinguish from the
+           category's own name).
+        2. Exclude every concept whose ``ConceptIdentity`` matches any of
+           ``coverage.tested_concepts`` (WP-034/038, exact text match
+           only, against a concept's own text plus its deterministic
+           normalizations plus any genuinely evidence-derived alternate-
+           language form - see ``planning/concept_identity.py``; WP-036
+           section 6 still forbids synonym/semantic matching, and WP-038
+           does not relax that - it only widens what a concept's own
+           identity legitimately includes).
+        3. Take up to ``count`` of whatever concepts remain, in the
+           inventory's own deterministic (first-occurrence) order - never
+           re-ranked, never chosen by any judgment call.
+        4. Build one ``QuestionTarget`` per selected concept directly:
+           ``topic`` from the concept's own deterministic extraction
+           (never LLM-authored); ``factual_focus`` from WP-037's
+           ``anchor_concept_evidence()`` - a narrow, line-bounded context
+           around the concept's own occurrence, replacing WP-036's wide
+           fixed-character window specifically to avoid pulling in a more
+           salient neighboring fact (WP-036's live pilot showed this is
+           what caused generation to repeatedly drift away from the
+           assigned concept); ``supporting_evidence_chunk_ids`` the
+           concept's own genuine source chunk id (stronger, more direct
+           provenance than the LLM-planning path's self-reported
+           ``evidence_refs``, since it is never a claim to verify - it is
+           the exact chunk the concept was mechanically found in).
+
+        Returns fewer than ``count`` targets - possibly zero - if the
+        inventory (after refinement and coverage exclusion) does not
+        contain enough remaining concepts (WP-036 section 11: "if the
+        inventory becomes exhausted, report it honestly; do not invent
+        concepts"). The caller (``_run_generation_cycle()``,
+        ``category_generation/service.py``) already treats an empty
+        target list as ``InsufficientDistinctTargetsError`` - the same
+        honest, question-local failure category-inventory exhaustion
+        belongs to; WP-036/037 deliberately reuse this existing failure
+        type rather than inventing a new one for what is, from every
+        caller's perspective, the same observable outcome ("no further
+        distinct target available").
+        """
+        inventory = refine_concept_inventory(source_evidence)
+        chunk_text_by_id = {chunk.chunk_id: chunk.text for chunk in source_evidence}
+        selected = _select_remaining_concepts(
+            inventory, coverage=coverage, count=count, chunk_text_by_id=chunk_text_by_id
+        )
+
+        targets = [
+            QuestionTarget(
+                target_id=target_id,
+                category=canonical_category,
+                topic=concept.concept,
+                factual_focus=anchor_concept_evidence(
+                    chunk_text=chunk_text_by_id[concept.evidence_chunk_id], concept=concept.concept
+                ),
+                supporting_evidence_chunk_ids=(concept.evidence_chunk_id,),
+            )
+            for target_id, concept in enumerate(selected, start=1)
+        ]
         return targets
