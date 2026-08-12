@@ -1,0 +1,137 @@
+{
+  "גרעיני הבסיס/Corpos Striatum": {
+    "outcome": "ACCEPTED",
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": false,
+        "question": "איזה מהמבנים הבאים הוא חלק מהCorpos Striatum?",
+        "correct_answer_text": "Corpos Striatum",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": false,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": false,
+        "grounding_other_answers_not_equally_correct": false,
+        "grounding_reason": "The question is grounded in the evidence as it accurately asks about a component of the 'Corpos Striatum', which is supported by the evidence that lists its parts. Both 'Caudate Nucleus' and 'Nucleus Accumbens' are confirmed as parts of the 'Corpos Striatum', while 'Corpos Striatum' itself and 'גרעיני הבסיס' do not correctly answer the question as posed.",
+        "mcq_valid": false,
+        "mcq_reason": "While the candidate has exactly four answer choices, there are multiple issues. The intended correct answer (Corpos Striatum) is not a valid option as it is the name of the structure being asked about, not a part of it. Additionally, both the Caudate Nucleus and Nucleus Accumbens are parts of the Corpos Striatum, making it unclear which is the single best answer. The distractor 'גרעיני הבסיס' is also a broader term that includes the other structures, further complicating the determination of a single best answer.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to the structures that are part of the גרעיני הבסיס (basal ganglia), specifically asking about the Corpos Striatum, which is a component of this category.",
+        "quality_valid": false,
+        "quality_reason": "The question contains a mix of Hebrew and English anatomical terminology, which may confuse students. Additionally, the intended correct answer position is incorrectly marked as 1, as 'Corpos Striatum' is not a distinct structure but rather a term that encompasses the other options. This misalignment could lead to ambiguity in answering.",
+        "textbook_status": "CONSISTENT",
+        "first_failing_validator": "grounding"
+      },
+      {
+        "attempt_number": 2,
+        "accepted": true,
+        "question": "איזה מהמבנים הבאים הוא הגרעין המרכזי במערכת גרעיני הבסיס?",
+        "correct_answer_text": "Corpos Striatum",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": true,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": true,
+        "grounding_other_answers_not_equally_correct": true,
+        "grounding_reason": "The question is grounded in the evidence as it accurately asks about the central nucleus of the basal ganglia, which is identified as the Corpos Striatum in the provided evidence. The assessments of the answer choices show that only the Corpos Striatum is supported as the correct answer, while the others do not fulfill the specific criteria of being the central nucleus.",
+        "mcq_valid": true,
+        "mcq_reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. Only one answer, 'Corpos Striatum', is unambiguously the single best answer as it refers to the central nucleus in the basal ganglia system. The other options are valid distractors but do not serve as the central nucleus, ensuring clarity in the correct answer.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to the structures within the basal ganglia, specifically asking for the central nucleus among them, which aligns perfectly with the requested category.",
+        "quality_valid": true,
+        "quality_reason": "The question is clearly worded and unambiguous, asking specifically for the central nucleus in the basal ganglia. A knowledgeable student could answer it based on the question as written. It follows a natural multiple-choice format, with appropriate phrasing and structure. The Hebrew is grammatically sound, and the anatomical terminology is used correctly and consistently. There is no unnecessary ambiguity in the question or answer choices.",
+        "textbook_status": "CONSISTENT",
+        "first_failing_validator": null
+      }
+    ]
+  },
+  "אספקת דם/Basillar artery": {
+    "outcome": "EXHAUSTED",
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": false,
+        "question": "מהו אזור אספקת הדם של ה-Basillar artery?",
+        "correct_answer_text": "Basillar artery",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": false,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": false,
+        "grounding_other_answers_not_equally_correct": false,
+        "grounding_reason": "The question is grounded as it accurately asks about the blood supply area of the Basillar artery, which is supported by the evidence. The AICA is correctly identified as supplying part of this area, while the other options do not correctly answer the question based on the evidence provided.",
+        "mcq_valid": false,
+        "mcq_reason": "The question asks for the blood supply area of the Basillar artery, but the provided answers include the Basillar artery itself as an option, which is not a plausible answer to the question. Additionally, the distractors (AICA, PICA, and Superior Cerebellar Artery) are all plausible but do not clearly indicate a single best answer, as they are all branches related to the cerebellum and could be considered relevant. Therefore, there is no unambiguous single best answer.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to the blood supply area of the Basillar artery, which fits the requested category of אספקת דם.",
+        "quality_valid": false,
+        "quality_reason": "The question is unclear and ambiguous because it asks for the blood supply area of the 'Basillar artery' but lists the artery itself as one of the answer choices, which is misleading. Additionally, the intended correct answer position is not logically consistent with the question, as the Basillar artery does not supply itself. The phrasing could confuse students, making it difficult to answer correctly based on the question as written.",
+        "textbook_status": "NOT_FOUND",
+        "first_failing_validator": "grounding"
+      },
+      {
+        "attempt_number": 2,
+        "accepted": false,
+        "question": "איזה עורק מספק דם למשטח העליון של הצרבלום, גרעיני הצרבלום ו-superior cerebellar peduncles?",
+        "correct_answer_text": "Basillar artery",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": false,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": false,
+        "grounding_other_answers_not_equally_correct": false,
+        "grounding_reason": "The question is grounded in the evidence, which clearly states that the Superior Cerebellar Artery supplies blood to the areas mentioned in the question. The other answer choices do not correctly answer the question based on the provided evidence.",
+        "mcq_valid": true,
+        "mcq_reason": "The candidate question has exactly four answer choices, and only one of them, the Superior Cerebellar Artery, is the unambiguous best answer for the question regarding blood supply to the specified areas of the cerebellum. The distractors are plausible and relevant to the topic, making them reasonable choices. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to the blood supply to specific brain structures, which fits the requested category of אספקת דם.",
+        "quality_valid": true,
+        "quality_reason": "The question is clearly worded and unambiguous, asking specifically about the artery supplying blood to certain brain structures. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew is natural and grammatically sound, with correct anatomical terminology used consistently. There is no unnecessary ambiguity in the question or answer choices.",
+        "textbook_status": "CONSISTENT",
+        "first_failing_validator": "grounding"
+      },
+      {
+        "attempt_number": 3,
+        "accepted": false,
+        "question": "איזה עורק מספק דם למשטח העליון של הצרבלום, לגרעיני הצרבלום ול-superior cerebellar peduncles?",
+        "correct_answer_text": "Basillar artery",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": false,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": false,
+        "grounding_other_answers_not_equally_correct": false,
+        "grounding_reason": "The question is grounded in the evidence, which clearly states that the Superior Cerebellar Artery supplies blood to the specified areas of the cerebellum. The assessments of the answer choices show that only the Superior Cerebellar Artery correctly answers the question, while the others do not provide the correct relationship as asked.",
+        "mcq_valid": true,
+        "mcq_reason": "The candidate question has exactly four answer choices, and only one of them, the Superior Cerebellar Artery, is the unambiguously correct answer for supplying blood to the specified areas of the cerebellum. The distractors are plausible and relevant to the topic, making them reasonable choices. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to the blood supply to specific brain structures, which fits the requested category of אספקת דם.",
+        "quality_valid": true,
+        "quality_reason": "The question is clearly worded and unambiguous, asking specifically about the artery supplying blood to the upper surface of the cerebellum and related structures. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices.",
+        "textbook_status": "CONSISTENT",
+        "first_failing_validator": "grounding"
+      }
+    ]
+  },
+  "מסילות עצביות/Medial Lemniscus Tract": {
+    "outcome": "ACCEPTED",
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": true,
+        "question": "איזו מסילה אחראית להעברת תחושות מתקדמות מהפריפריה אל הקורטקס?",
+        "correct_answer_text": "Medial Lemniscus Tract",
+        "correct_answer_is_ascii_english": true,
+        "grounding_passed": true,
+        "grounding_grounded": true,
+        "grounding_correct_answer_supported": true,
+        "grounding_other_answers_not_equally_correct": true,
+        "grounding_reason": "The question is grounded in the evidence, which clearly distinguishes between the functions of the Medial Lemniscus Tract and the Spinothalamic Tract. The assessments of the answer choices confirm that only the Medial Lemniscus Tract correctly answers the question regarding advanced sensations.",
+        "mcq_valid": true,
+        "mcq_reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about sensory pathways. Only one answer, the Medial Lemniscus Tract, is unambiguously the single best answer for transmitting advanced sensations to the cortex, while the other options are distractors that do not serve this specific function. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another.",
+        "category_valid": true,
+        "category_reason": "The candidate question directly pertains to neural tracts responsible for sensory transmission, which fits the requested category of 'מסילות עצביות'.",
+        "quality_valid": true,
+        "quality_reason": "The question is clearly worded and unambiguous, asking specifically about the tract responsible for transmitting advanced sensations from the periphery to the cortex. A knowledgeable student could answer it based on the question as written. The multiple-choice format is appropriate for an exam, and the Hebrew used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices.",
+        "textbook_status": "CONSISTENT",
+        "first_failing_validator": null
+      }
+    ]
+  }
+}

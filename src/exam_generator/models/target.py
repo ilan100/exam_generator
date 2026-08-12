@@ -35,6 +35,52 @@ class QuestionTarget(BaseModel):
     (see ``prompts.formatting.format_target_answer_requirement()``) -
     never itself validated or scored, and never part of any public
     request/response contract.
+
+    ``is_source_role`` (WP-043 Part B) is ``True`` only when the target's
+    own evidence positions it as the **source** of another, more salient
+    described entity (e.g. a labeled "source:" value for a different
+    artery) rather than as the subject of its own descriptive sentence -
+    detected deterministically by
+    ``planning.target_role.detect_source_evidence_role()``. Defaults to
+    ``False`` (the ordinary case for the overwhelming majority of
+    targets). Internal-only, same precedent as ``named_entity_target``.
+
+    ``source_relationship_entity`` (WP-044 Part B) - only ever non-``None``
+    when ``is_source_role`` is ``True`` - is the deterministically-
+    identified name of the *other*, downstream entity the target's
+    evidence positions it as the source/origin of (e.g. ``"Superior
+    cerebellar artery"`` for the target ``"Basillar artery"``), extracted
+    by ``planning.target_role.extract_source_relationship_entity()``. This
+    is the concrete "tested relationship" WP-044 section 6 asks the
+    existing blueprint to represent, reusing ``is_source_role`` rather than
+    introducing a new relationship abstraction: a structured fact
+    (deterministically read from the evidence itself, never LLM-inferred)
+    that both strengthens the generation prompt's evidence-role note (see
+    ``prompts.formatting.format_target_evidence_role()``) and backs a
+    deterministic post-generation consistency check (see
+    ``generation.generator._validate_target_role_consistency()``) that
+    rejects a candidate whose correct answer names this downstream entity
+    instead of the target itself. ``None`` when ``is_source_role`` is
+    ``False``, or when it is ``True`` but no downstream entity could be
+    identified within the bounded backward scan (never guessed).
+
+    ``is_enumeration_member`` (WP-044 Part A) is ``True`` only when the
+    target's own anchored ``factual_focus`` has enumeration shape - an
+    enumeration-introduction cue phrase (e.g. "contains several sub-
+    structures") appears immediately before the target's own occurrence -
+    detected deterministically by
+    ``planning.concept_anchor.detect_enumeration_member_shape()``. A
+    target reaching this field as ``True`` has already been confirmed
+    (``planning.concept_anchor.is_enumeration_evidence_insufficient()``)
+    to carry genuine member-specific distinguishing content beyond the
+    shared enumeration intro - a target whose enumeration evidence carries
+    no such content is skipped entirely during planning and never becomes
+    a ``QuestionTarget`` at all. Used only to add an explicit, target-
+    specific reinforcement of the existing general "testing enumeration or
+    classification targets" prompt guidance (see
+    ``prompts.formatting.format_target_enumeration_requirement()``).
+    Defaults to ``False`` (the ordinary, non-enumeration case). Internal-
+    only, same precedent as ``named_entity_target``/``is_source_role``.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -45,6 +91,9 @@ class QuestionTarget(BaseModel):
     factual_focus: NonBlankStr
     supporting_evidence_chunk_ids: tuple[NonBlankStr, ...] = ()
     named_entity_target: StrictBool = False
+    is_source_role: StrictBool = False
+    source_relationship_entity: NonBlankStr | None = None
+    is_enumeration_member: StrictBool = False
 
 
 class PlannedQuestionTargetResponse(BaseModel):

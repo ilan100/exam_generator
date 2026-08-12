@@ -40,9 +40,16 @@ from exam_generator.models import (
     QuestionTargetPlanningResponse,
     SourceEvidenceChunk,
 )
-from exam_generator.planning.concept_anchor import anchor_concept_evidence, refine_concept_inventory
+from exam_generator.planning.concept_anchor import (
+    anchor_concept_evidence,
+    detect_enumeration_member_shape,
+    is_enumeration_evidence_insufficient,
+    is_factual_focus_sufficient,
+    refine_concept_inventory,
+)
 from exam_generator.planning.concept_identity import concept_identities_for_inventory, concept_identity_matches_text
 from exam_generator.planning.concept_inventory import PILOT_CATEGORIES, InventoryConcept
+from exam_generator.planning.target_role import detect_source_evidence_role, extract_source_relationship_entity
 from exam_generator.prompts import PromptId, PromptRepository, QuestionTargetPlanningPromptContext, build_prompt_messages
 from exam_generator.retrieval import (
     CategoryResolver,
@@ -335,7 +342,11 @@ class QuestionTargetPlanner:
         inventory (after refinement and coverage exclusion) does not
         contain enough remaining concepts (WP-036 section 11: "if the
         inventory becomes exhausted, report it honestly; do not invent
-        concepts"). The caller (``_run_generation_cycle()``,
+        concepts"), **or** (WP-043) if a remaining concept's evidence
+        turns out to be insufficient even after the broader deterministic
+        fallback (see below) - such a concept is skipped entirely, never
+        used to build a target that could only produce an unsupported
+        question. The caller (``_run_generation_cycle()``,
         ``category_generation/service.py``) already treats an empty
         target list as ``InsufficientDistinctTargetsError`` - the same
         honest, question-local failure category-inventory exhaustion
@@ -343,24 +354,103 @@ class QuestionTargetPlanner:
         type rather than inventing a new one for what is, from every
         caller's perspective, the same observable outcome ("no further
         distinct target available").
+
+        WP-043 evidence-sufficiency and target-role handling: for each
+        remaining concept, in order, until ``count`` targets are built or
+        the remaining list is exhausted:
+
+        1. Build the narrow ``factual_focus`` via ``anchor_concept_evidence()``,
+           passing the concept's own ``source_line_indices`` when present
+           (WP-039 trailing-reconstructed concepts - see that function's
+           own docstring for the root-cause this fixes).
+        2. If ``is_factual_focus_sufficient()`` finds only the concept's
+           bare name (no surrounding context at all), retry with
+           ``anchor_concept_evidence(..., broad=True)`` - a wider, but
+           still same-source-evidence and still paragraph-bounded,
+           deterministic fallback (WP-043 Part A).
+        3. If still insufficient after the broader fallback, this concept
+           is skipped entirely for this round - never used to build a
+           target that could only produce an unsupported question (WP-043
+           section 10: "do not invent context... conclude insufficient
+           evidence"). The next remaining concept is tried instead.
+        4. ``is_source_role`` (WP-043 Part B) is set via
+           ``detect_source_evidence_role()`` - a narrow, deterministic
+           keyword-proximity check (never a general relationship
+           extractor) for whether the concept's own evidence positions it
+           as the source of a different, more salient described entity
+           (the real corpus ``Basillar artery`` shape WP-042's diagnostic
+           investigation found). When set, ``source_relationship_entity``
+           (WP-044 Part B) is also populated via
+           ``extract_source_relationship_entity()`` - the deterministically
+           -identified name of that other, downstream entity, when one can
+           be found.
+        5. ``is_enumeration_member`` (WP-044 Part A) is set via
+           ``detect_enumeration_member_shape()`` once the final
+           ``factual_focus`` has already passed
+           ``is_enumeration_evidence_insufficient()`` below (i.e. this
+           concept's evidence has enumeration shape but genuinely does
+           carry member-specific distinguishing content, not merely the
+           shared list intro).
+
+        WP-044 additionally skips a concept entirely (like the WP-043
+        insufficiency check above) when its final ``factual_focus`` has
+        enumeration shape but provides no member-specific distinguishing
+        content beyond the shared enumeration-introduction sentence (see
+        ``is_enumeration_evidence_insufficient()`` - the real corpus
+        ``Corpos Striatum`` shape WP-043's live pilot surfaced: evidence
+        that is only ever "the basal nuclei contain several sub-
+        structures," identical for every sibling in the same list, never
+        genuinely distinguishing this one member). WP-044 section 11:
+        "prefer missing over wrong" - such a concept could only produce a
+        known-ambiguous generic membership question, so it is skipped
+        rather than built into a target at all.
         """
         inventory = refine_concept_inventory(source_evidence)
         chunk_text_by_id = {chunk.chunk_id: chunk.text for chunk in source_evidence}
-        selected = _select_remaining_concepts(
-            inventory, coverage=coverage, count=count, chunk_text_by_id=chunk_text_by_id
+        remaining = _select_remaining_concepts(
+            inventory, coverage=coverage, count=len(inventory), chunk_text_by_id=chunk_text_by_id
         )
 
-        targets = [
-            QuestionTarget(
-                target_id=target_id,
-                category=canonical_category,
-                topic=concept.concept,
-                factual_focus=anchor_concept_evidence(
-                    chunk_text=chunk_text_by_id[concept.evidence_chunk_id], concept=concept.concept
-                ),
-                supporting_evidence_chunk_ids=(concept.evidence_chunk_id,),
-                named_entity_target=True,
+        targets: list[QuestionTarget] = []
+        for concept in remaining:
+            if len(targets) >= count:
+                break
+
+            chunk_text = chunk_text_by_id[concept.evidence_chunk_id]
+            factual_focus = anchor_concept_evidence(
+                chunk_text=chunk_text, concept=concept.concept, source_line_indices=concept.source_line_indices
             )
-            for target_id, concept in enumerate(selected, start=1)
-        ]
+            if not is_factual_focus_sufficient(factual_focus=factual_focus, concept=concept.concept):
+                factual_focus = anchor_concept_evidence(
+                    chunk_text=chunk_text,
+                    concept=concept.concept,
+                    source_line_indices=concept.source_line_indices,
+                    broad=True,
+                )
+                if not is_factual_focus_sufficient(factual_focus=factual_focus, concept=concept.concept):
+                    continue  # insufficient evidence even after fallback - skip, never force
+
+            if is_enumeration_evidence_insufficient(factual_focus=factual_focus, concept=concept.concept):
+                continue  # WP-044 Part A: shared enumeration intro only - skip, never force
+
+            is_source_role = detect_source_evidence_role(chunk_text, concept.concept)
+            source_relationship_entity = (
+                extract_source_relationship_entity(chunk_text, concept.concept) if is_source_role else None
+            )
+
+            targets.append(
+                QuestionTarget(
+                    target_id=len(targets) + 1,
+                    category=canonical_category,
+                    topic=concept.concept,
+                    factual_focus=factual_focus,
+                    supporting_evidence_chunk_ids=(concept.evidence_chunk_id,),
+                    named_entity_target=True,
+                    is_source_role=is_source_role,
+                    source_relationship_entity=source_relationship_entity,
+                    is_enumeration_member=detect_enumeration_member_shape(
+                        factual_focus=factual_focus, concept=concept.concept
+                    ),
+                )
+            )
         return targets

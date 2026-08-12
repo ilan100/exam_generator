@@ -169,8 +169,10 @@ def test_competitor_candidate_concept_cannot_be_blank():
 
 
 def test_question_target_still_gained_no_new_field():
-    # WP-031 itself added no field - WP-040 later added named_entity_target,
-    # so this guard now reflects that field set, not zero fields since WP-025.
+    # WP-031 itself added no field - WP-040 added named_entity_target,
+    # WP-043 added is_source_role, and WP-044 added
+    # source_relationship_entity and is_enumeration_member, so this guard
+    # now reflects that field set, not zero fields since WP-025.
     assert set(QuestionTarget.model_fields) == {
         "target_id",
         "category",
@@ -178,6 +180,9 @@ def test_question_target_still_gained_no_new_field():
         "factual_focus",
         "supporting_evidence_chunk_ids",
         "named_entity_target",
+        "is_source_role",
+        "source_relationship_entity",
+        "is_enumeration_member",
     }
 
 

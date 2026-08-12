@@ -749,3 +749,192 @@ def test_all_distractor_archetypes_are_constructible():
     # not merely one example value.
     for archetype in DistractorArchetype:
         _distractor(archetype=archetype)
+
+
+# ---------------------------------------------------------------------------
+# WP-044 Part B: deterministic target-role consistency check
+# ---------------------------------------------------------------------------
+
+
+def test_source_role_target_rejected_when_answer_names_the_downstream_entity():
+    # WP-044 section 25's first required test: target = Basillar artery,
+    # required_answer = Basillar artery, but the candidate's own correct
+    # answer names the downstream entity instead - the exact structural
+    # inconsistency this check exists to catch.
+    target = _target(
+        topic="Basillar artery", is_source_role=True, source_relationship_entity="Superior cerebellar artery"
+    )
+    response = _generated_response(
+        answers=["Superior cerebellar artery", "תשובה ב", "תשובה ג", "תשובה ד"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_source_role_target_accepted_when_answer_names_the_target_itself():
+    # WP-044 section 25's second required test: target = Basillar artery,
+    # required_answer = Basillar artery, tested relationship = source/
+    # origin - a genuinely consistent candidate must not be rejected.
+    target = _target(
+        topic="Basillar artery", is_source_role=True, source_relationship_entity="Superior cerebellar artery"
+    )
+    response = _generated_response(answers=["Basillar artery", "תשובה ב", "תשובה ג", "תשובה ד"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_non_source_role_target_never_triggers_the_consistency_check():
+    target = _target(topic="Putamen", is_source_role=False)
+    response = _generated_response(answers=["Some other structure", "תשובה ב", "תשובה ג", "תשובה ד"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_source_role_target_without_known_downstream_entity_never_triggers_the_check():
+    # is_source_role True but source_relationship_entity None (extraction
+    # failed to find one) - nothing to check against, never guessed.
+    target = _target(topic="Basillar artery", is_source_role=True, source_relationship_entity=None)
+    response = _generated_response(answers=["Anything at all", "תשובה ב", "תשובה ג", "תשובה ד"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_target_role_consistency_check_never_consumes_a_second_llm_call():
+    target = _target(
+        topic="Basillar artery", is_source_role=True, source_relationship_entity="Superior cerebellar artery"
+    )
+    provider = _provider(_generated_response(answers=["Basillar artery", "ב", "ג", "ד"], correct_answer=1))
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    assert provider.generate_structured.call_count == 1
+
+
+def test_target_role_consistency_check_is_deterministic_never_an_llm_validator():
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_target_role_consistency)
+    assert "generate_structured" not in source
+    assert "LLMProvider" not in source
+
+
+# ---------------------------------------------------------------------------
+# WP-046: deterministic distractor-containment consistency check
+# ---------------------------------------------------------------------------
+
+
+def test_distractor_containing_correct_answer_is_rejected():
+    # WP-046 section 21's required positive test, the real corpus shape:
+    # target = Corticospinal Tract, a distractor's own text ("Lateral
+    # Corticospinal Tract") contains the correct answer's own text - the
+    # exact, confirmed WP-045 live rejection shape.
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Corticospinal Tract", "Corticobulbar Tract", "Lateral Corticospinal Tract", "Medial Lemniscus Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_correct_answer_containing_a_distractor_is_also_rejected():
+    # The reverse direction - the correct answer's own text contains a
+    # distractor's text - is the same structural risk, checked either way.
+    target = _target(topic="Anterior Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Anterior Corticospinal Tract", "Corticospinal Tract", "Corticobulbar Tract", "Spinothalamic Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_unrelated_distractors_are_accepted():
+    # WP-046's required negative/regression test, the real corpus shape:
+    # target = Corticospinal Tract, distractors chosen with no textual
+    # overlap at all - the exact WP-045 live round-4 acceptance shape.
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Corticospinal Tract", "Corticobulbar Tract", "Medial Lemniscus Tract", "Spinothalamic Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_pica_style_duplicate_entity_never_chosen_as_a_distractor_is_accepted():
+    # WP-046's required false-positive control, the real corpus shape WP-045
+    # found unsafe for a pre-generation, category-wide signal: the target
+    # itself textually overlaps with a DIFFERENT inventory concept
+    # elsewhere in the category ("Posterior inferior cerebellar artery
+    # (PICA)"), but that concept was never actually chosen as one of this
+    # candidate's own four answer choices - the post-generation check must
+    # not fire merely because a confusable concept exists somewhere in the
+    # broader category; only an actually-chosen distractor matters.
+    target = _target(topic="Inferior Cerebellar Artery (PICA)", named_entity_target=True)
+    response = _generated_response(
+        answers=[
+            "Inferior Cerebellar Artery (PICA)",
+            "Superior Cerebellar Artery",
+            "Anterior Inferior Cerebellar Artery (AICA)",
+            "Posterior Cerebellar Artery",
+        ],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_non_named_entity_target_never_triggers_distractor_containment_check():
+    target = _target(topic="function description", named_entity_target=False)
+    response = _generated_response(
+        answers=["a broad description", "a broad description of something else", "third", "fourth"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_distractor_containment_check_never_consumes_a_second_llm_call():
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    provider = _provider(
+        _generated_response(
+            answers=["Corticospinal Tract", "Corticobulbar Tract", "Medial Lemniscus Tract", "Spinothalamic Tract"],
+            correct_answer=1,
+        )
+    )
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    assert provider.generate_structured.call_count == 1
+
+
+def test_distractor_containment_check_is_deterministic_never_an_llm_validator():
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_distractor_containment)
+    assert "generate_structured" not in source
+    assert "LLMProvider" not in source

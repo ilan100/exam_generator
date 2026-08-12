@@ -1287,7 +1287,11 @@ def test_target_answer_requirement_never_forces_a_specific_language(production_r
     for named in (True, False):
         target = _target(topic="Corpos Striatum", named_entity_target=named)
         rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
-        requirement_section = rendered.split("Answer-identity requirement:")[1].split("Possible competing concepts:")[0]
+        # Isolate only the answer-identity section - WP-041 later inserted
+        # a separate "Target-language requirement" section right after it,
+        # which legitimately does mention English/Hebrew (that is its own
+        # purpose); this test's scope is the answer-identity text alone.
+        requirement_section = rendered.split("Answer-identity requirement:")[1].split("Target-language requirement:")[0]
         assert "English" not in requirement_section
         assert "Hebrew" not in requirement_section
         assert "עברית" not in requirement_section
@@ -1302,6 +1306,227 @@ def test_format_target_answer_requirement_is_a_pure_deterministic_function():
     assert format_target_answer_requirement(named) == format_target_answer_requirement(named)
     assert "Putamen" in format_target_answer_requirement(named)
     assert format_target_answer_requirement(unnamed) == format_target_answer_requirement(_target())
+
+
+# ---------------------------------------------------------------------------
+# WP-041: deterministic English-first target-language requirement
+# ---------------------------------------------------------------------------
+
+
+def test_case1_english_and_hebrew_both_exist_uses_english(production_repository):
+    # The target's own canonical text is English (the only representation
+    # QuestionTarget carries); a Hebrew rendering of the same concept may
+    # appear elsewhere in the evidence, but the requirement must still
+    # select English - the target's own stored text is authoritative.
+    target = _target(
+        topic="Corpos Striatum",
+        named_entity_target=True,
+        factual_focus="Corpos Striatum הוא חלק מגרעיני הבסיס - קורפוס סטריאטום",
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target-language requirement:")[1].split("Tested relationship type:")[0]
+    assert "TARGET LANGUAGE = English" in section
+    assert "Corpos Striatum" in section
+
+
+def test_case2_english_only_uses_english(production_repository):
+    target = _target(topic="Medial Lemniscus Tract", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target-language requirement:")[1].split("Tested relationship type:")[0]
+    assert "TARGET LANGUAGE = English" in section
+
+
+def test_case3_hebrew_only_uses_hebrew():
+    # Synthetic: this shape never actually occurs via the real planner
+    # (pilot-category extraction only ever produces pure-ASCII topics),
+    # but the function must still handle it correctly and honestly per
+    # WP-041 section 19/20, rather than assuming it can never happen.
+    from exam_generator.prompts.formatting import format_target_language_requirement
+
+    target = _target(topic="מונח מסוים", named_entity_target=True)
+    rendered = format_target_language_requirement(target)
+    assert "TARGET LANGUAGE = Hebrew" in rendered
+    assert "do not invent" in rendered.lower() or "never invent" in rendered.lower() or "invent" in rendered.lower()
+
+
+def test_case4_bilingual_target_with_hebrew_surrounding_context_still_uses_english(production_repository):
+    target = _target(
+        topic="Superior cerebellar artery",
+        named_entity_target=True,
+        factual_focus=":עורקים מספקים דם לצרבלום Superior cerebellar artery מקור",
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target-language requirement:")[1].split("Tested relationship type:")[0]
+    assert "TARGET LANGUAGE = English" in section
+    assert "Superior cerebellar artery" in section
+
+
+def test_case6_hebrew_only_target_never_invents_an_english_form():
+    from exam_generator.prompts.formatting import format_target_language_requirement
+
+    target = _target(topic="מבנה עצבי מסוים", named_entity_target=True)
+    rendered = format_target_language_requirement(target)
+    assert "TARGET LANGUAGE = Hebrew" in rendered
+    assert "invent" in rendered.lower()
+    assert target.topic == "מבנה עצבי מסוים"  # untouched, never rewritten by the function
+
+
+def test_case7_unrelated_hebrew_text_elsewhere_is_never_associated_with_the_target():
+    # The decision must depend only on target.topic - never on
+    # factual_focus or any other field, so an unrelated Hebrew term
+    # elsewhere in the evidence can never be mistaken for "the" Hebrew
+    # representation of an English target.
+    from exam_generator.prompts.formatting import format_target_language_requirement
+
+    with_unrelated_hebrew = _target(
+        topic="Corpos Striatum", named_entity_target=True, factual_focus="גרעין הזנב הוא מבנה נפרד לגמרי"
+    )
+    without_it = _target(topic="Corpos Striatum", named_entity_target=True)
+    assert format_target_language_requirement(with_unrelated_hebrew) == format_target_language_requirement(without_it)
+
+
+def test_case8_ambiguous_relationship_never_guessed_since_no_search_is_ever_performed():
+    # There is no bilingual-pairing search of any kind in this function -
+    # the decision is purely structural (is target.topic itself
+    # English-representable), so there is no "ambiguous case" to resolve
+    # incorrectly; this test documents and locks in that design choice.
+    import inspect
+
+    from exam_generator.prompts import formatting as formatting_module
+
+    source = inspect.getsource(formatting_module.format_target_language_requirement)
+    source += inspect.getsource(formatting_module._is_english_representable)
+    assert "factual_focus" not in source
+    assert "ConceptIdentity" not in source
+    assert "explicitly_supported_language_forms" not in source
+
+
+def test_non_named_entity_target_renders_the_honest_no_requirement_sentinel(production_repository):
+    target = _target()  # named_entity_target defaults to False
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target-language requirement:")[1].split("Tested relationship type:")[0]
+    assert "No additional target-language requirement applies to this target" in section
+    assert "TARGET LANGUAGE" not in section
+
+
+def test_base_hebrew_language_default_is_preserved_for_non_named_targets(production_repository):
+    target = _target()
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "must be written in Hebrew" in rendered
+
+
+def test_wp040_answer_identity_requirement_still_present_alongside_the_new_section(production_repository):
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "TARGET CONCEPT = Putamen" in rendered
+    assert "TARGET LANGUAGE = English" in rendered
+
+
+def test_wp037_concept_anchored_evidence_variable_still_rendered(production_repository):
+    target = _target(topic="Putamen", named_entity_target=True, factual_focus="Putamen anchored context")
+    rendered = _rendered_generation_prompt(
+        production_repository, mode=GenerationMode.INDEPENDENT, target=target, evidence=(_chunk(text="Putamen anchored context"),)
+    )
+    assert "Putamen anchored context" in rendered
+
+
+def test_format_target_language_requirement_is_a_pure_deterministic_function():
+    from exam_generator.prompts.formatting import format_target_language_requirement
+
+    named = _target(topic="Lentiform", named_entity_target=True)
+    assert format_target_language_requirement(named) == format_target_language_requirement(named)
+
+
+# ---------------------------------------------------------------------------
+# WP-043 Part B: target evidence-role note
+# ---------------------------------------------------------------------------
+
+
+def test_source_role_target_prompt_states_the_role_explicitly(production_repository):
+    target = _target(topic="Basillar artery", named_entity_target=True, is_source_role=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "TARGET EVIDENCE ROLE = SOURCE" in rendered
+    assert "not as the entity being supplied, fed, or acted upon" in rendered
+
+
+def test_source_role_target_prompt_prohibits_the_downstream_question_shape(production_repository):
+    target = _target(topic="Basillar artery", named_entity_target=True, is_source_role=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target evidence role:")[1].split("Possible competing concepts:")[0]
+    assert "upstream/originating entity" in section or "source, origin, or starting point" in section
+
+
+def test_non_source_role_target_prompt_renders_the_honest_no_role_sentinel(production_repository):
+    target = _target(topic="Medial Lemniscus Tract", named_entity_target=True, is_source_role=False)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target evidence role:")[1].split("Possible competing concepts:")[0]
+    assert "No additional evidence-role note applies to this target" in section
+    assert "TARGET EVIDENCE ROLE" not in section
+
+
+def test_format_target_evidence_role_is_a_pure_deterministic_function():
+    from exam_generator.prompts.formatting import format_target_evidence_role
+
+    source_target = _target(topic="Basillar artery", is_source_role=True)
+    assert format_target_evidence_role(source_target) == format_target_evidence_role(source_target)
+    assert format_target_evidence_role(_target(is_source_role=False)) == format_target_evidence_role(_target())
+
+
+def test_source_role_target_with_known_downstream_entity_names_it_explicitly(production_repository):
+    target = _target(
+        topic="Basillar artery",
+        named_entity_target=True,
+        is_source_role=True,
+        source_relationship_entity="Superior cerebellar artery",
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target evidence role:")[1].split("Enumeration-member requirement:")[0]
+    assert "Superior cerebellar artery" in section
+    assert "Basillar artery" in section
+    assert "never Superior cerebellar artery" in section or "not Superior cerebellar artery" in section
+
+
+def test_source_role_target_without_known_downstream_entity_uses_the_generic_prose(production_repository):
+    target = _target(
+        topic="Basillar artery", named_entity_target=True, is_source_role=True, source_relationship_entity=None
+    )
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Target evidence role:")[1].split("Enumeration-member requirement:")[0]
+    assert "TARGET EVIDENCE ROLE = SOURCE" in section
+    assert "another, separately-named entity" in section
+
+
+# ---------------------------------------------------------------------------
+# WP-044 Part A: enumeration-member requirement
+# ---------------------------------------------------------------------------
+
+
+def test_enumeration_member_target_prompt_states_the_requirement_explicitly(production_repository):
+    target = _target(topic="Corpos Striatum", named_entity_target=True, is_enumeration_member=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Enumeration-member requirement:")[1].split("Tested relationship type:")[0]
+    assert "ENUMERATION-MEMBER TARGET = Corpos Striatum" in section
+    assert "generic membership question" in section
+
+
+def test_non_enumeration_member_target_prompt_renders_the_honest_no_requirement_sentinel(production_repository):
+    target = _target(topic="Medial Lemniscus Tract", named_entity_target=True, is_enumeration_member=False)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    section = rendered.split("Enumeration-member requirement:")[1].split("Tested relationship type:")[0]
+    assert "No additional enumeration-member note applies to this target" in section
+    assert "ENUMERATION-MEMBER TARGET" not in section
+
+
+def test_format_target_enumeration_requirement_is_a_pure_deterministic_function():
+    from exam_generator.prompts.formatting import format_target_enumeration_requirement
+
+    member_target = _target(topic="Putamen", is_enumeration_member=True)
+    assert format_target_enumeration_requirement(member_target) == format_target_enumeration_requirement(
+        member_target
+    )
+    assert format_target_enumeration_requirement(_target(is_enumeration_member=False)) == (
+        format_target_enumeration_requirement(_target())
+    )
 
 
 def test_existing_generation_mode_enum_is_reused():

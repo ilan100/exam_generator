@@ -110,6 +110,19 @@ class InventoryConcept(BaseModel):
     confidence score, since every extraction here is a clean structural
     match or it does not happen at all (WP-035's "never guess" principle
     admits no partial-confidence middle ground).
+
+    ``source_line_indices`` (WP-043) - empty by default - is populated
+    only when WP-039's trailing-truncation repair reconstructed
+    ``concept`` from more than one raw source line (e.g. "Corpos Str" +
+    "ia" + "tum"). It records every raw line index that contributed to
+    the reconstructed text, in ascending order, so
+    ``planning.concept_anchor.anchor_concept_evidence()`` can locate the
+    concept's true origin span directly, instead of searching for a
+    single raw line whose text exactly equals ``concept`` - a search that
+    always fails for a reconstructed concept, since no single raw line
+    ever contains its full reconstructed text verbatim (WP-043's own
+    root-cause finding for why anchoring silently produced a bare,
+    context-free ``factual_focus`` for such concepts).
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -118,6 +131,7 @@ class InventoryConcept(BaseModel):
     evidence_chunk_id: NonBlankStr
     factual_focus: NonBlankStr
     extraction_reason: NonBlankStr
+    source_line_indices: tuple[int, ...] = ()
 
 
 def normalize_concept_text(text: str) -> str:

@@ -1,0 +1,980 @@
+{
+  "אספקת דם": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Superior cerebellar artery",
+      "required_answer": "Superior cerebellar artery",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "3 \n:עורקים מספקים דם לצרבלום \n\nSuperior cerebellar artery\no\n מקור :",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+      "correct_answer_text": "Superior cerebellar artery",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+          "correct_answer_text": "Superior cerebellar artery",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence as it accurately reflects the blood supply to the upper surface of the cerebellum, specifically provided by the Superior cerebellar artery. The assessments of the answer choices confirm that only the first answer is supported by the evidence, while the others do not correctly answer the question."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them, the Superior cerebellar artery, is unambiguously the single best answer for supplying blood to the upper surface of the cerebellum. The other options are plausible distractors related to cerebellar blood supply, making them reasonable choices. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly asks about the artery that supplies blood to the superior surface of the cerebellum, which is a clear inquiry within the category of blood supply (אספקת דם). The answer options provided are all relevant to this topic."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically which artery supplies blood to the superior surface of the cerebellum. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, with clear answer choices listed. The Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 1
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "target": "Basillar artery",
+      "required_answer": "Basillar artery",
+      "target_role": "SOURCE",
+      "tested_relationship_downstream_entity": "Superior cerebellar artery",
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "o\n מקור :\nBasillar artery\no\n אזור אספקת דם :המשטח העליון של הצרבלום, גרעיני הצרבלום, ו-\nsuperior cerebellar peduncles",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק הוא המקור לעורק הסופריור צ'רבלר?",
+      "correct_answer_text": "Basillar artery",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזה עורק מהווה מקור לארטריה הסופריורית של הצרבלום?",
+          "correct_answer_text": "Basillar artery",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence, which clearly identifies the basilar artery as the source of the superior cerebellar artery. Additionally, both the first and third answers are supported by the evidence, while the second and fourth answers are not supported. This indicates that there are multiple correct answers to the question, contrary to the generator's claim of a single correct answer."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about the source of the superior artery of the cerebellum. Only one answer, the Basillar artery, is unambiguously the single best answer, as it is the correct source. The distractors are also plausible, making them reasonable choices without being trivially eliminable. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The question pertains to the source artery for the superior cerebellar artery, which directly relates to blood supply in the brain, fitting the requested category of אספקת דם."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the source artery for the superior cerebellar artery. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, with clear answer choices. The Hebrew is natural and grammatically sound, and the anatomical terminology is used correctly. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "NOT_FOUND"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence, which clearly identifies the basilar artery as the source of the superior cerebellar artery. Additionally, both the first and third answers are supported by the evidence, while the second and fourth answers are not supported. This indicates that there are multiple correct answers to the question, contrary to the generator's claim of a single correct answer."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": true,
+          "question": "איזה עורק הוא המקור לעורק הסופריור צ'רבלר?",
+          "correct_answer_text": "Basillar artery",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which clearly identifies the Basilar artery as the source of the Superior Cerebellar Artery. Answer 1 is supported, while the other answers do not correctly identify the source of the artery in question."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them (Basillar artery) is the correct answer to the question about the source of the superior cerebellar artery. The distractors are plausible and relevant to the topic, making them reasonable choices. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The question pertains to the source artery for the superior cerebellar artery, which directly relates to blood supply in the brain, fitting the requested category of אספקת דם."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking for the source artery of the superior cerebellar artery. A knowledgeable student could answer it based on the question as written. The multiple-choice format is appropriate for an exam, and the Hebrew language used is natural and grammatically sound, with correct anatomical terminology. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "NOT_FOUND"
+            }
+          }
+        }
+      ],
+      "attempt_count": 2
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Anterior Inferior Cerebellar Artery (AICA)",
+      "required_answer": "Anterior Inferior Cerebellar Artery (AICA)",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "superior cerebellar peduncles\n.\n\nAnterior Inferior Cerebellar Artery (AICA)\no\n מקור :",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם לאזור התחתון והקדמי של הצרבלום?",
+      "correct_answer_text": "Anterior Inferior Cerebellar Artery (AICA)",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "question": "איזה עורק מספק דם לאזור התחתון והקדמי של הצרבלום?",
+          "correct_answer_text": "Anterior Inferior Cerebellar Artery (AICA)",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which clearly states that the Anterior Inferior Cerebellar Artery supplies blood to the lower and anterior parts of the cerebellum. The assessments of the answer choices show that only the AICA correctly answers the question, while the others do not provide relevant information regarding the specified area of the cerebellum."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The question has exactly four answer choices, and only one of them, the Anterior Inferior Cerebellar Artery (AICA), is the correct answer for supplying blood to the lower anterior region of the cerebellum. The other options are plausible distractors related to cerebellar blood supply, making them reasonable choices. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the blood supply to a specific region of the brain, which aligns perfectly with the requested category of אספקת דם."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the artery supplying blood to the lower anterior region of the cerebellum. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 1
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 3,
+      "generation_mode": "INDEPENDENT",
+      "target": "Inferior Cerebellar Artery (PICA)",
+      "required_answer": "Inferior Cerebellar Artery (PICA)",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "middle cerebellar peduncles\n.\n\nInferior Cerebellar Artery (PICA)",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה עורק מספק דם למשטח התחתון והאחורי של הצרבלום?",
+      "correct_answer_text": "Inferior Cerebellar Artery (PICA)",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "question": "איזה עורק מספק דם למשטח התחתון והאחורי של הצרבלום?",
+          "correct_answer_text": "Inferior Cerebellar Artery (PICA)",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which clearly states the role of the Inferior Cerebellar Artery (PICA) in supplying blood to the lower and posterior surface of the cerebellum. The assessments of the answer choices confirm that only PICA correctly answers the question, while the others do not."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them, the Inferior Cerebellar Artery (PICA), is the unambiguously correct answer for supplying blood to the lower and posterior surface of the cerebellum. The other options are plausible distractors related to cerebellar blood supply, making them reasonable choices. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly asks about the artery that supplies blood to a specific part of the brain, which fits the requested category of blood supply (אספקת דם)."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the artery supplying blood to the lower and posterior surface of the cerebellum. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew is natural and grammatically correct, with anatomical terminology used accurately. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 1
+    }
+  ],
+  "גרעיני הבסיס": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Caudate Nucleus",
+      "required_answer": "Caudate Nucleus",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "o\nCaudate Nucleus\no",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה מבין הגרעינים הבאים הוא הCaudate Nucleus?",
+      "correct_answer_text": "Caudate Nucleus",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזה מהבאים הוא חלק מהגרעינים הבסיסיים במערכת האקסטרה-פירמידלית?",
+          "correct_answer_text": "Caudate Nucleus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about components of the basal nuclei, which are part of the extrapyramidal system. All relevant answer choices except for the general term 'גרעיני הבסיס' are supported by the evidence provided."
+            },
+            "mcq": {
+              "valid": false,
+              "reason": "While the candidate has exactly four answer choices, there are issues with the quality of the options. Answer 3, 'גרעיני הבסיס', is not a specific structure but rather a general term for the basal ganglia, making it less plausible as a correct answer compared to the other specific nuclei listed. Additionally, more than one answer choice (Answers 1, 2, and 4) could be defended as correct, as both the Caudate Nucleus and Putamen are indeed part of the basal ganglia, leading to ambiguity in the correct answer. Therefore, the structure is not valid."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the basal ganglia, as it asks for components of the extrapyramidal system, which includes the structures listed in the answers."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about components of the גרעינים הבסיסיים in the מערכת האקסטרה-פירמידלית. A knowledgeable student could answer it based on the question as written. The format is appropriate for a multiple-choice exam, and the Hebrew used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about components of the basal nuclei, which are part of the extrapyramidal system. All relevant answer choices except for the general term 'גרעיני הבסיס' are supported by the evidence provided.",
+            "mcq: While the candidate has exactly four answer choices, there are issues with the quality of the options. Answer 3, 'גרעיני הבסיס', is not a specific structure but rather a general term for the basal ganglia, making it less plausible as a correct answer compared to the other specific nuclei listed. Additionally, more than one answer choice (Answers 1, 2, and 4) could be defended as correct, as both the Caudate Nucleus and Putamen are indeed part of the basal ganglia, leading to ambiguity in the correct answer. Therefore, the structure is not valid."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": true,
+          "question": "איזה מבין הגרעינים הבאים הוא הCaudate Nucleus?",
+          "correct_answer_text": "Caudate Nucleus",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence as it accurately asks for the Caudate Nucleus, which is explicitly identified in the provided material as part of the basal nuclei. The assessments of the answer choices show that only the first answer is correct, while the others do not accurately respond to the question asked."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them (Answer 1: Caudate Nucleus) is unambiguously the single best answer. The distractors (Answers 2, 3, and 4) are plausible and relevant to the category of basal ganglia, making them reasonable choices. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the Caudate Nucleus, which is a component of the גרעיני הבסיס (basal ganglia). Therefore, it fits the requested canonical category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically for the identification of the Caudate Nucleus among the provided options. A knowledgeable student could answer it based on the question as written, as it directly relates to anatomical terminology. The multiple-choice format is appropriate for an exam setting, and the Hebrew used is natural and grammatically sound, with correct anatomical terminology. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 2
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "target": "Nucleus Accumbens",
+      "required_answer": "Nucleus Accumbens",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "o\nNucleus Accumbens\no\nutamen\nP",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזה גרעין בסיסי נחשב לגורם מפתח במערכת התגמול של המוח?",
+      "correct_answer_text": "Nucleus Accumbens",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "question": "איזה גרעין בסיסי נחשב לגורם מפתח במערכת התגמול של המוח?",
+          "correct_answer_text": "Nucleus Accumbens",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which identifies the Nucleus Accumbens as a key component of the reward system. The other answer choices do not fulfill this specific role according to the evidence provided."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. The Nucleus Accumbens is widely recognized as a key component in the brain's reward system, making it the single best answer. The other options, while related to the basal ganglia, do not serve as primary components of the reward system, thus avoiding ambiguity in the correct answer."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the topic of גרעיני הבסיס (basal nuclei), specifically asking about a key nucleus involved in the brain's reward system, which is relevant to the category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about a key nucleus in the brain's reward system. A knowledgeable student could answer it based on the question as written. The format is appropriate for a multiple-choice exam, with clear answer choices. The Hebrew is natural and grammatically sound, and the anatomical terminology is used correctly. There is no unnecessary ambiguity present."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 1
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Globus Pallidus",
+      "required_answer": "Globus Pallidus",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "utamen\nP\no\nGlobus Pallidus\n",
+      "accepted": false,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזה מבנה מהגרעינים הבסיסיים הוא ה-Globis Pallidus?",
+          "correct_answer_text": "1) Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which clearly identifies the Globus Pallidus as a component of the basal ganglia. The only correct answer is Answer 1, while the other options refer to different structures within the same category and are therefore not supported as correct answers."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them (Globus Pallidus) is unambiguously the correct answer. The distractors (Putamen, Caudate Nucleus, Subthalamic Nucleus) are all plausible and relevant structures within the basal ganglia, making them reasonable distractors. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the structures within the גרעיני הבסיס, specifically identifying the Globus Pallidus, which is a key component of this category."
+            },
+            "quality": {
+              "valid": false,
+              "reason": "Answer choices answer1, answer2, answer3, answer4 redundantly repeat leading enumeration numbering inside their own text (e.g. '1. ...'), duplicating the exam format's own answer numbering."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "quality: Answer choices answer1, answer2, answer3, answer4 redundantly repeat leading enumeration numbering inside their own text (e.g. '1. ...'), duplicating the exam format's own answer numbering."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": false,
+          "question": "איזה מבנה נמצא בקורפוס סטריאטום ומזוהה כגרעין בסיסי?",
+          "correct_answer_text": "Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about structures identified as part of the corpus striatum, which includes both the Globus Pallidus and the Nucleus Accumbens. Both of these structures are supported by the evidence provided. The other two options do not meet the criteria set by the question, as they are not classified as part of the corpus striatum."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible structures within the basal ganglia. Only one answer, Globus Pallidus, is unambiguously the single best answer to the question regarding the structure found in the corpus striatum identified as a basal ganglia nucleus. The other options, while related, do not fit the specific criteria of the question, ensuring clarity and coherence."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the structures identified as גרעיני הבסיס (basal ganglia), specifically asking about a structure within the קורפוס סטריאטום (corpus striatum) that is classified as a basal ganglion."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about a structure identified as a basal ganglia within the corpus striatum. A knowledgeable student could answer it based on the information provided. The multiple-choice format is appropriate for an exam, and the Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about structures identified as part of the corpus striatum, which includes both the Globus Pallidus and the Nucleus Accumbens. Both of these structures are supported by the evidence provided. The other two options do not meet the criteria set by the question, as they are not classified as part of the corpus striatum."
+          ]
+        },
+        {
+          "attempt_number": 3,
+          "accepted": false,
+          "question": "איזה מהמבנים הבאים הוא חלק מגרעיני הבסיס?",
+          "correct_answer_text": "Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about structures that are part of the Basal Nuclei, which are explicitly listed in the provided evidence. All four answer choices are supported as they are all recognized components of the Basal Nuclei according to the evidence."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. There is one unambiguously correct answer (Globus Pallidus), and the other options are also valid components of the basal ganglia, making them plausible distractors. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly asks about structures that are part of the גרעיני הבסיס, and all provided answers are recognized components of this anatomical category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking which structure is part of the גרעיני הבסיס. Each answer choice is a recognized anatomical term, and the question follows a natural multiple-choice format. The Hebrew is grammatically sound, and the anatomical terminology is used correctly. There is no unnecessary ambiguity present."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about structures that are part of the Basal Nuclei, which are explicitly listed in the provided evidence. All four answer choices are supported as they are all recognized components of the Basal Nuclei according to the evidence."
+          ]
+        }
+      ],
+      "attempt_count": 3
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "target": "Globus Pallidus",
+      "required_answer": "Globus Pallidus",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "utamen\nP\no\nGlobus Pallidus\n",
+      "accepted": false,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזה מהגרעינים הבאים הוא חלק מגרעיני הבסיס?",
+          "correct_answer_text": "Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about components of the Basal Nuclei, which are all listed in the provided evidence. All four answer choices are supported as they are all part of the Basal Nuclei according to the evidence."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. Only one answer, Globus Pallidus, is unambiguously the single best answer as it is a recognized part of the basal ganglia, while the others, although related, do not fit the specific classification as clearly. There are no obvious structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly asks about components of גרעיני הבסיס, and all provided answers are recognized parts of this anatomical category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking which of the listed structures is part of the גרעיני הבסיס. Each answer choice is a recognized anatomical term, and the question follows a natural multiple-choice format. The Hebrew is grammatically sound, and the anatomical terminology is used correctly. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about components of the Basal Nuclei, which are all listed in the provided evidence. All four answer choices are supported as they are all part of the Basal Nuclei according to the evidence."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": false,
+          "question": "איזה מבנה מוחי הוא חלק מהGlobus Pallidus?",
+          "correct_answer_text": "Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about a structure that is part of the Globus Pallidus, which is confirmed by the evidence. Both 'Globus Pallidus' and 'Globus Pallidus Internus' are supported as correct answers, while 'Nucleus Accumbens' and 'Basal Ganglia' do not correctly answer the question."
+            },
+            "mcq": {
+              "valid": false,
+              "reason": "While the candidate has exactly four answer choices, there are multiple plausible answers that could be defended as correct. Both 'Globus Pallidus' and 'Globus Pallidus Internus' refer to structures within the same anatomical region, making it unclear which is the single best answer. Additionally, the presence of two options related to the Globus Pallidus creates ambiguity, violating the requirement for a single best answer."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The question directly pertains to the Globus Pallidus, which is a component of the גרעיני הבסיס (Basal Ganglia), making it fit the requested category."
+            },
+            "quality": {
+              "valid": false,
+              "reason": "The question contains unnecessary ambiguity regarding the answer choices. Specifically, 'Globus Pallidus' and 'Globus Pallidus Internus' are both related to the same structure, which could confuse students. Additionally, the phrasing 'חלק מהGlobus Pallidus' is unclear, as it suggests a part of the structure rather than identifying it as a structure itself. This could lead to misinterpretation of what is being asked."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about a structure that is part of the Globus Pallidus, which is confirmed by the evidence. Both 'Globus Pallidus' and 'Globus Pallidus Internus' are supported as correct answers, while 'Nucleus Accumbens' and 'Basal Ganglia' do not correctly answer the question.",
+            "mcq: While the candidate has exactly four answer choices, there are multiple plausible answers that could be defended as correct. Both 'Globus Pallidus' and 'Globus Pallidus Internus' refer to structures within the same anatomical region, making it unclear which is the single best answer. Additionally, the presence of two options related to the Globus Pallidus creates ambiguity, violating the requirement for a single best answer.",
+            "quality: The question contains unnecessary ambiguity regarding the answer choices. Specifically, 'Globus Pallidus' and 'Globus Pallidus Internus' are both related to the same structure, which could confuse students. Additionally, the phrasing 'חלק מהGlobus Pallidus' is unclear, as it suggests a part of the structure rather than identifying it as a structure itself. This could lead to misinterpretation of what is being asked."
+          ]
+        },
+        {
+          "attempt_number": 3,
+          "accepted": false,
+          "question": "איזה מהמבנים הבאים מהווה חלק מגרעיני הבסיס?",
+          "correct_answer_text": "Globus Pallidus",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded as it accurately asks about structures that are part of the Basal Nuclei, which are clearly defined in the evidence. All answer choices are supported as they are all components of the Basal Nuclei according to the evidence provided."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. There is one unambiguously correct answer (Globus Pallidus), and the distractors (Caudate Nucleus, Putamen, Substantia Nigra) are also valid components of the basal ganglia, making them plausible. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly asks about structures that are part of the גרעיני הבסיס (basal ganglia), and all provided answers are recognized components of this anatomical category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking which structure is part of the גרעיני הבסיס. Each answer choice is a recognized anatomical term, and the question is formatted appropriately for a multiple-choice exam. The Hebrew is natural and grammatically correct, with anatomical terminology used consistently. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded as it accurately asks about structures that are part of the Basal Nuclei, which are clearly defined in the evidence. All answer choices are supported as they are all components of the Basal Nuclei according to the evidence provided."
+          ]
+        }
+      ],
+      "attempt_count": 3
+    }
+  ],
+  "מסילות עצביות": [
+    {
+      "round": 1,
+      "existing_questions_count": 0,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Spinothalamic Tract",
+      "required_answer": "Spinothalamic Tract",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "מסילות עולות  :\nSpinothalamic Tract",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מסילה אחראית על העברת תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+      "correct_answer_text": "Spinothalamic Tract",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": true,
+          "question": "איזו מסילה אחראית על העברת תחושות כאב וטמפרטורה מהפריפריה אל התלמוס?",
+          "correct_answer_text": "Spinothalamic Tract",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, which clearly identifies the Spinothalamic Tract as the pathway for pain and temperature sensations. The assessments of the answer choices confirm that only the first answer is correct, while the others do not relate to the question asked."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them, the Spinothalamic Tract, is unambiguously the single best answer for the question regarding the transmission of pain and temperature sensations. The other options are plausible distractors related to neural pathways but do not serve the same function, making them reasonable choices that could be confused with the correct answer. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the topic of nerve tracts, specifically asking about the spinothalamic tract's role in transmitting pain and temperature sensations, which fits the requested category of מסילות עצביות."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the tract responsible for transmitting pain and temperature sensations. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew is natural and grammatically correct, with anatomical terminology used accurately. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 1
+    },
+    {
+      "round": 2,
+      "existing_questions_count": 1,
+      "generation_mode": "INDEPENDENT",
+      "target": "Corticobulbar/Corticonuclear Tract",
+      "required_answer": "Corticobulbar/Corticonuclear Tract",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "המסילות היורדות כוללות \n:את:\n1.​\nCorticobulbar/Corticonuclear Tract\n – כוללת את העיצבוב של שרירי הפנים. היא מסתיימת \nבאיזשהו גרעין של עצב קרניאלי. אם התזוזה היא של שרירי \n,העין,",
+      "accepted": true,
+      "duplicate_replacement_attempts": 0,
+      "question": "איזו מהמסילות היורדות כוללת את העיצבוב של שרירי הפנים ומסתיימת בגרעין של עצב קרניאלי?",
+      "correct_answer_text": "Corticobulbar/Corticonuclear Tract",
+      "correct_answer_is_ascii_english": true,
+      "deterministic_alignment_preclassification": "ALIGNED",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזו מהמסילות היורדות כוללת את Corticobulbar/Corticonuclear Tract, שהיא המסילה שאחראית על העצבוב של שרירי הפנים?",
+          "correct_answer_text": "Corticobulbar/Corticonuclear Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence, which clearly states that the Corticobulbar/Corticonuclear Tract is responsible for innervating facial muscles. Both Answer 1 and Answer 3 are supported as correct, while Answers 2 and 4 are not relevant to the question asked."
+            },
+            "mcq": {
+              "valid": false,
+              "reason": "The candidate question has exactly four answer choices, but there are two identical options (Corticospinal Tract), which makes the structure invalid. Additionally, there are multiple plausible answers (Corticobulbar/Corticonuclear Tract and Corticobulbar Tract), leading to ambiguity about the single best answer."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the topic of neural tracts, specifically asking about the Corticobulbar/Corticonuclear Tract, which is a type of neural tract responsible for facial muscle innervation. This aligns perfectly with the requested category of 'מסילות עצביות'."
+            },
+            "quality": {
+              "valid": false,
+              "reason": "The question contains a factual inaccuracy regarding the answer choices, as 'Corticobulbar Tract' is listed as both the correct answer and a separate option, which creates confusion. Additionally, the answer choices include 'Corticospinal Tract' twice, which is redundant and poorly structured for a multiple-choice format. This affects clarity and answerability."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence, which clearly states that the Corticobulbar/Corticonuclear Tract is responsible for innervating facial muscles. Both Answer 1 and Answer 3 are supported as correct, while Answers 2 and 4 are not relevant to the question asked.",
+            "mcq: The candidate question has exactly four answer choices, but there are two identical options (Corticospinal Tract), which makes the structure invalid. Additionally, there are multiple plausible answers (Corticobulbar/Corticonuclear Tract and Corticobulbar Tract), leading to ambiguity about the single best answer.",
+            "quality: The question contains a factual inaccuracy regarding the answer choices, as 'Corticobulbar Tract' is listed as both the correct answer and a separate option, which creates confusion. Additionally, the answer choices include 'Corticospinal Tract' twice, which is redundant and poorly structured for a multiple-choice format. This affects clarity and answerability."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": true,
+          "question": "איזו מהמסילות היורדות כוללת את העיצבוב של שרירי הפנים ומסתיימת בגרעין של עצב קרניאלי?",
+          "correct_answer_text": "Corticobulbar/Corticonuclear Tract",
+          "validations": {
+            "grounding": {
+              "passed": true,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": true,
+              "reason": "The question is grounded in the evidence, as it accurately describes the function and endpoint of the Corticobulbar/Corticonuclear Tract, which is supported by multiple evidence items. The assessments of the answer choices show that only the first answer is correct, while the others do not meet the criteria set by the question."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them, 'Corticobulbar/Corticonuclear Tract', is unambiguously the single best answer as it directly relates to the innervation of facial muscles and terminates in a cranial nerve nucleus. The other options are plausible distractors but do not fit the question's criteria, ensuring that there is no ambiguity in the correct answer. Additionally, there are no structural clues that would give away the answer."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question pertains to descending tracts that innervate facial muscles, specifically referencing the corticobulbar tract, which is a type of nerve tract. This aligns directly with the requested category of 'מסילות עצביות' (nerve tracts)."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, allowing knowledgeable students to understand what is being asked. It reads naturally as a multiple-choice exam question, with appropriate phrasing and structure. The Hebrew language used is grammatically sound, and the anatomical terminology is correctly applied. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          }
+        }
+      ],
+      "attempt_count": 2
+    },
+    {
+      "round": 3,
+      "existing_questions_count": 2,
+      "generation_mode": "STYLE_SIMILAR",
+      "target": "Corticospinal Tract",
+      "required_answer": "Corticospinal Tract",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "לע\nהשריר\n2.​\nCorticospinal Tract\nלמסילות האלו יש כל מיני \n.תחנות. .במסילו\nהמוטוריו",
+      "accepted": false,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "איזו מהמסילות הבאות אחראית על העיבוד המוטורי לשרירי השלד והגפיים?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence, which clearly identifies the Corticospinal and Anterior Corticospinal Tracts as responsible for motor processing to skeletal muscles and limbs. Both these tracts are supported as correct answers, while the other two options do not meet the criteria set by the question."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, and only one of them, 'Corticospinal Tract', is unambiguously the single best answer for the question regarding the motor processing for skeletal muscles and limbs. The other options are plausible distractors related to motor pathways but do not serve the same primary function, making them reasonable distractors. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to neural tracts responsible for motor processing, which fits the requested category of 'מסילות עצביות'."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the tract responsible for motor processing to skeletal muscles and limbs. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, and the Hebrew is natural and grammatically sound, with anatomical terminology used correctly. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence, which clearly identifies the Corticospinal and Anterior Corticospinal Tracts as responsible for motor processing to skeletal muscles and limbs. Both these tracts are supported as correct answers, while the other two options do not meet the criteria set by the question."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": false,
+          "question": "איזו מהמסילות המוטוריות הבאות מתחילה מהקורטקס ומעבירה פקודות לשרירים?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence, which confirms that multiple motor tracts starting from the cortex are mentioned. The assessments show that three answer choices are correct, while one is not, indicating a broader understanding of the topic than just the intended answer."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about motor pathways originating from the cortex. The intended correct answer, 'Corticospinal Tract,' is unambiguously the single best answer, as it specifically refers to the tract that directly transmits commands to muscles from the cortex. The other options, while related, do not serve as direct answers to the question posed, thus avoiding ambiguity. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly addresses motor pathways that originate from the cortex and transmit commands to muscles, which fits the category of 'מסילות עצביות' (nerve tracts). The provided answers are all relevant to this category."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about motor pathways that originate from the cortex and transmit commands to muscles. A knowledgeable student could answer it based on the information provided. The question is appropriately phrased for a multiple-choice format, and the Hebrew is natural and grammatically sound, with correct use of anatomical terminology. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence, which confirms that multiple motor tracts starting from the cortex are mentioned. The assessments show that three answer choices are correct, while one is not, indicating a broader understanding of the topic than just the intended answer."
+          ]
+        },
+        {
+          "attempt_number": 3,
+          "accepted": false,
+          "question": "איזו מסילה מוטורית אחראית על העצבוב של שרירי השלד והגפיים?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately asks about the motor tract responsible for innervating skeletal muscles and limbs, which is supported by the evidence provided. Multiple answer choices (1, 3, and 4) are also supported as correct based on the evidence."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about motor pathways. The 'Corticospinal Tract' is the single best answer as it specifically refers to the tract responsible for innervating skeletal muscles, while the other options, although related, do not serve as the primary pathway for this function. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the topic of neural tracts, specifically motor pathways responsible for innervating skeletal muscles and limbs, which fits the requested category of 'מסילות עצביות'."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the motor tract responsible for innervating skeletal muscles and limbs. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, with clear answer choices that are relevant to the question. The Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity present."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately asks about the motor tract responsible for innervating skeletal muscles and limbs, which is supported by the evidence provided. Multiple answer choices (1, 3, and 4) are also supported as correct based on the evidence."
+          ]
+        }
+      ],
+      "attempt_count": 3
+    },
+    {
+      "round": 4,
+      "existing_questions_count": 2,
+      "generation_mode": "INDEPENDENT",
+      "target": "Corticospinal Tract",
+      "required_answer": "Corticospinal Tract",
+      "target_role": "ORDINARY",
+      "tested_relationship_downstream_entity": null,
+      "evidence_shape": "ORDINARY",
+      "factual_focus": "לע\nהשריר\n2.​\nCorticospinal Tract\nלמסילות האלו יש כל מיני \n.תחנות. .במסילו\nהמוטוריו",
+      "accepted": false,
+      "duplicate_replacement_attempts": 0,
+      "failure_type": "QuestionAttemptsExhaustedError",
+      "failure_message": "generation attempts exhausted without an accepted candidate (3 attempt(s) made)",
+      "attempts": [
+        {
+          "attempt_number": 1,
+          "accepted": false,
+          "question": "מהי המסילה המוטורית המתחילה ב-Precentral Gyrus ומעבירה פקודות מוטוריות לשרירים?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question's premise is supported by the evidence, which confirms that the Corticospinal Tract and its subdivisions originate in the precentral gyrus and are responsible for motor commands. Multiple answer choices are supported as correct based on the evidence provided."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about the motor pathway starting in the Precentral Gyrus. The 'Corticospinal Tract' is the single best answer as it is the primary pathway for motor commands to muscles, while the other options are specific branches or related tracts that do not serve as the main pathway. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the topic of neural tracts, specifically the motor pathways originating from the Precentral Gyrus, which fits the requested category of 'מסילות עצביות'."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the motor pathway originating in the Precentral Gyrus. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam, with clear answer choices that are relevant to the question. The Hebrew language used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity present."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question's premise is supported by the evidence, which confirms that the Corticospinal Tract and its subdivisions originate in the precentral gyrus and are responsible for motor commands. Multiple answer choices are supported as correct based on the evidence provided."
+          ]
+        },
+        {
+          "attempt_number": 2,
+          "accepted": false,
+          "question": "איזו מסילה מוטורית מתחילה ב-Precentral Gyrus ומסתיימת בשרירי השלד בפריפריה?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence, which confirms that the Corticospinal Tract and its subdivisions originate from the Precentral Gyrus and terminate in peripheral skeletal muscles. Multiple answer choices (1, 3, and 4) are supported by the evidence, indicating that the question has more than one correct answer despite the intended answer being Answer 1."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about motor pathways originating from the Precentral Gyrus. The 'Corticospinal Tract' is the most comprehensive and correct answer, as it encompasses both the Lateral and Anterior Corticospinal Tracts, making it the single best answer. The distractors are also valid pathways but do not serve as the best answer, ensuring clarity and coherence in the question structure."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to motor pathways that originate in the Precentral Gyrus and terminate in skeletal muscles, which is a fundamental aspect of the category 'מסילות עצביות' (nerve tracts). The question and answers are appropriately focused on the specific tracts involved."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about a motor pathway that starts in the Precentral Gyrus and ends in skeletal muscles. A knowledgeable student can answer it based on the information provided. The multiple-choice format is appropriate for an exam, and the Hebrew used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence, which confirms that the Corticospinal Tract and its subdivisions originate from the Precentral Gyrus and terminate in peripheral skeletal muscles. Multiple answer choices (1, 3, and 4) are supported by the evidence, indicating that the question has more than one correct answer despite the intended answer being Answer 1."
+          ]
+        },
+        {
+          "attempt_number": 3,
+          "accepted": false,
+          "question": "איזו מסילה אחראית על העצבוב המוטורי של שרירי השלד?",
+          "correct_answer_text": "Corticospinal Tract",
+          "validations": {
+            "grounding": {
+              "passed": false,
+              "grounded": true,
+              "correct_answer_supported": true,
+              "other_answers_not_equally_correct": false,
+              "reason": "The question is grounded in the evidence as it accurately reflects the role of the Corticospinal Tract in motor innervation of skeletal muscles. Both the Corticospinal Tract and the Lateral Corticospinal Tract are supported as correct answers, while the Corticobulbar Tract and Anterior Corticospinal Tract do not correctly answer the question as they pertain to different muscle groups or functions."
+            },
+            "mcq": {
+              "valid": true,
+              "reason": "The candidate question has exactly four answer choices, all of which are plausible and relevant to the question about motor innervation of skeletal muscles. The 'Corticospinal Tract' is the single best answer, as it is the primary pathway for motor control of skeletal muscles, while the other options, although related, do not serve this primary function. There are no structural clues that give away the correct answer, and all answer choices are coherent with the question."
+            },
+            "category": {
+              "valid": true,
+              "reason": "The candidate question directly pertains to the neural pathways responsible for motor innervation of skeletal muscles, which fits the requested category of 'מסילות עצביות' (neural tracts). The answer options provided are all relevant neural tracts involved in motor function."
+            },
+            "quality": {
+              "valid": true,
+              "reason": "The question is clearly worded and unambiguous, asking specifically about the tract responsible for motor innervation of skeletal muscles. A knowledgeable student could answer it based on the question as written, as it directly relates to the category of 'מסילות עצביות'. The multiple-choice format is appropriate for an exam, and the Hebrew used is natural and grammatically sound, with correct anatomical terminology. There is no unnecessary ambiguity in the question or answer choices."
+            },
+            "textbook": {
+              "status": "CONSISTENT"
+            }
+          },
+          "rejection_reasons": [
+            "grounding: The question is grounded in the evidence as it accurately reflects the role of the Corticospinal Tract in motor innervation of skeletal muscles. Both the Corticospinal Tract and the Lateral Corticospinal Tract are supported as correct answers, while the Corticobulbar Tract and Anterior Corticospinal Tract do not correctly answer the question as they pertain to different muscle groups or functions."
+          ]
+        }
+      ],
+      "attempt_count": 3
+    }
+  ]
+}

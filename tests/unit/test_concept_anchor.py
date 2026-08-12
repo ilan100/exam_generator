@@ -4,6 +4,9 @@ from exam_generator.planning.concept_anchor import (
     _is_likely_category_self_restatement,
     _looks_leading_truncated,
     anchor_concept_evidence,
+    detect_enumeration_member_shape,
+    is_enumeration_evidence_insufficient,
+    is_factual_focus_sufficient,
     refine_concept_inventory,
 )
 
@@ -404,5 +407,232 @@ def test_no_llm_or_embedding_call_in_trailing_repair_functions():
 
     source = inspect.getsource(concept_anchor_module._repair_trailing_truncations)
     source += inspect.getsource(concept_anchor_module._attempt_trailing_reconstruction)
+    assert "generate_structured" not in source
+    assert "embedding" not in source.lower()
+
+
+# ---------------------------------------------------------------------------
+# WP-043 Part A: anchoring span-fix for trailing-reconstructed concepts,
+# and deterministic evidence-sufficiency + broader fallback
+# ---------------------------------------------------------------------------
+
+
+def test_source_line_indices_locate_a_trailing_reconstructed_concepts_true_span():
+    # The exact real corpus shape: "Corpos Str" + "ia" + "tum" reconstructs
+    # to "Corpos Striatum", which never appears verbatim as one raw line -
+    # before WP-043, anchoring could not find it at all and silently fell
+    # back to the bare name. source_line_indices lets it locate the real span.
+    chunk = _chunk("מכילים מספר תתי מבנים \ntum\nia\nCorpos Str\n \nCaudate Nucleus")
+    refined = refine_concept_inventory((chunk,))
+    concept = next(c for c in refined if c.concept == "Corpos Striatum")
+    assert concept.source_line_indices != ()
+
+    focus = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices
+    )
+    assert focus != "Corpos Striatum"
+    assert "מכילים מספר תתי מבנים" in focus
+    assert "Caudate Nucleus" not in focus  # never crosses into a sibling concept
+
+
+def test_without_source_line_indices_a_trailing_reconstructed_concept_anchors_bare():
+    # Documents the exact WP-043 root-cause finding: omitting
+    # source_line_indices reproduces the pre-fix bare-fallback behavior,
+    # since no single raw line ever equals the reconstructed text verbatim.
+    chunk = _chunk("מכילים מספר תתי מבנים \ntum\nia\nCorpos Str\n \nCaudate Nucleus")
+    focus = anchor_concept_evidence(chunk_text=chunk.text, concept="Corpos Striatum")
+    assert focus == "Corpos Striatum"
+
+
+def test_is_factual_focus_sufficient_false_for_bare_concept():
+    assert is_factual_focus_sufficient(factual_focus="Corpos Striatum", concept="Corpos Striatum") is False
+
+
+def test_is_factual_focus_sufficient_true_with_any_real_context():
+    assert (
+        is_factual_focus_sufficient(factual_focus="something\nCorpos Striatum", concept="Corpos Striatum") is True
+    )
+
+
+def test_is_factual_focus_sufficient_normalizes_whitespace_and_case():
+    assert is_factual_focus_sufficient(factual_focus="  corpos   striatum  ", concept="Corpos Striatum") is False
+
+
+def test_real_corpus_isolated_concept_stays_insufficient_even_broad():
+    # The exact real corpus shape for "Anterior Corticospinal Tract": its
+    # own line is immediately bounded by two consecutive blank lines on
+    # each side - a genuine paragraph boundary broadening must never
+    # cross - so it honestly remains insufficient even with broad=True,
+    # confirmed live during this WP's own investigation (WP-043
+    # completion report).
+    chunk = _chunk(
+        "מסילות יורדות  :\n      \n \nract\nAnterior Corticospinal T\n                     \n          "
+    )
+    refined = refine_concept_inventory((chunk,))
+    concept = next(c for c in refined if c.concept == "Anterior Corticospinal Tract")
+    narrow = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices
+    )
+    assert is_factual_focus_sufficient(factual_focus=narrow, concept=concept.concept) is False
+    broad = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices, broad=True
+    )
+    assert is_factual_focus_sufficient(factual_focus=broad, concept=concept.concept) is False
+
+
+def test_broad_fallback_provides_richer_context_than_narrow_for_the_real_corpos_striatum_case():
+    # Real corpus finding (see WP-043 completion report): once narrow
+    # already finds some genuine context (via the source_line_indices
+    # span-fix), broad's widened max_lines/raw-scan bounds provide
+    # strictly more of it, still within the same paragraph boundary -
+    # richer evidence for generation, even though it cannot and does not
+    # need to flip the insufficient/sufficient determination itself.
+    chunk = _chunk(
+        ", אך מושג זה שגוי משום שגנגליה מתאר צבר גופי תאים במערכת\n"
+        ".העצבים ההיקפית, בעוד גרעיני הבסיס הם חלק ממערכת העצבים המרכזית \n"
+        " גרעיני הבסיס:מכילים מספר תתי מבנים \n\ntum\nia\nCorpos Str\n \no"
+    )
+    refined = refine_concept_inventory((chunk,))
+    concept = next(c for c in refined if c.concept == "Corpos Striatum")
+    narrow = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices
+    )
+    broad = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices, broad=True
+    )
+    assert is_factual_focus_sufficient(factual_focus=narrow, concept=concept.concept) is True
+    assert len(broad) > len(narrow)
+    assert narrow in broad or all(line in broad for line in narrow.splitlines())
+
+
+def test_broad_fallback_can_never_flip_insufficient_to_sufficient_when_immediately_boundary_blocked():
+    # Documents a real, deliberate design property (see WP-043 completion
+    # report's own honest discussion): when the concept's immediate
+    # neighbor in a direction is already a paragraph boundary (two
+    # consecutive blanks) or a sibling concept line, narrow and broad
+    # both stop at exactly the same point, since neither ever relaxes
+    # those two rules - widening only affects how much is collected once
+    # collection has already started, never whether it starts at all.
+    chunk = _chunk("Header Line One\n\n\nIsolated Concept\n\n\nFooter Line One")
+    narrow = anchor_concept_evidence(chunk_text=chunk.text, concept="Isolated Concept")
+    broad = anchor_concept_evidence(chunk_text=chunk.text, concept="Isolated Concept", broad=True)
+    assert narrow == broad == "Isolated Concept"
+
+
+def test_broad_fallback_never_crosses_a_genuine_paragraph_boundary():
+    # Two consecutive blank lines remain a hard stop even in broad mode -
+    # broadening only widens how much may be collected within one
+    # paragraph, never how far a real paragraph break may be crossed.
+    chunk = _chunk("Unrelated Document Header\n\n\nConcept Name\n\n\nUnrelated Trailing Text")
+    broad = anchor_concept_evidence(chunk_text=chunk.text, concept="Concept Name", broad=True)
+    assert "Unrelated Document Header" not in broad
+    assert "Unrelated Trailing Text" not in broad
+
+
+def test_broad_fallback_still_stops_before_a_sibling_concept_line():
+    chunk = _chunk("Some context line\nConcept Name\nSibling Concept Line Here")
+    broad = anchor_concept_evidence(chunk_text=chunk.text, concept="Concept Name", broad=True)
+    assert "Sibling Concept Line Here" not in broad
+
+
+def test_genuinely_isolated_concept_remains_insufficient_even_after_broad_fallback():
+    # No real content anywhere nearby - broad widening must never invent
+    # or manufacture content; the honest result is still insufficient.
+    chunk = _chunk("Header Line One\n\n\nIsolated Concept\n\n\nFooter Line One")
+    focus = anchor_concept_evidence(chunk_text=chunk.text, concept="Isolated Concept", broad=True)
+    assert is_factual_focus_sufficient(factual_focus=focus, concept="Isolated Concept") is False
+
+
+# ---------------------------------------------------------------------------
+# Enumeration-shaped evidence (WP-044 Part A)
+# ---------------------------------------------------------------------------
+
+
+def test_real_corpus_corpos_striatum_is_enumeration_insufficient():
+    # WP-044 section 23 Test 1/3: the exact real corpus shape (WP-043's
+    # own live pilot finding) - the anchored evidence is only ever the
+    # shared "basal nuclei contain several sub-structures" intro plus a
+    # bare bullet-marker fragment, never anything specific to Corpos
+    # Striatum itself. This is exactly the case WP-044 section 11 says
+    # must prefer "missing" over a known-ambiguous generic membership
+    # question.
+    chunk = _chunk(
+        ", אך מושג זה שגוי משום שגנגליה מתאר צבר גופי תאים במערכת\n"
+        ".העצבים ההיקפית, בעוד גרעיני הבסיס הם חלק ממערכת העצבים המרכזית \n"
+        " גרעיני הבסיס:מכילים מספר תתי מבנים \n\ntum\nia\nCorpos Str\n \no"
+    )
+    refined = refine_concept_inventory((chunk,))
+    concept = next(c for c in refined if c.concept == "Corpos Striatum")
+    focus = anchor_concept_evidence(
+        chunk_text=chunk.text, concept=concept.concept, source_line_indices=concept.source_line_indices
+    )
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept=concept.concept) is True
+
+
+def test_enumeration_with_unique_distinguishing_property_is_not_insufficient():
+    # WP-044 section 23 Test 2: the same enumeration-intro shape, but this
+    # member's own forward context carries a real, concept-specific
+    # distinguishing fact - generation should remain possible.
+    focus = (
+        " גרעיני הבסיס:מכילים מספר תתי מבנים \n"
+        "Corpos Striatum\n"
+        "אחראי על תפקוד ייחודי ומובחן מבין תתי המבנים"
+    )
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept="Corpos Striatum") is False
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Corpos Striatum") is True
+
+
+def test_no_enumeration_cue_is_never_flagged_insufficient_by_this_check():
+    # A concept anchored to genuinely concept-specific prose (no shared
+    # list-intro cue phrase at all) is not this function's concern - the
+    # existing is_factual_focus_sufficient() already covers plain sparse
+    # evidence; this check is narrowly about the enumeration shape only.
+    focus = "X is characterized by a unique distinguishing property.\nConcept Name"
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept="Concept Name") is False
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Concept Name") is False
+
+
+def test_enumeration_cue_present_but_bare_concept_alone_is_insufficient():
+    # No forward content whatsoever (concept is the very last line) -
+    # still insufficient, the same "nothing distinguishing" shape.
+    focus = "X contains several sub-structures:\nConcept Name"
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept="Concept Name") is True
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Concept Name") is True
+
+
+def test_enumeration_member_shape_true_even_when_insufficient():
+    # detect_enumeration_member_shape() only reports shape, never
+    # sufficiency - the planner is responsible for skipping an
+    # insufficient concept before this would ever be surfaced on a real
+    # QuestionTarget (see planning.planner), but the function itself must
+    # not conflate the two questions.
+    focus = "X contains several sub-structures:\nConcept Name\no"
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept="Concept Name") is True
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Concept Name") is True
+
+
+def test_enumeration_cue_far_from_concept_falls_outside_backward_context():
+    # The cue phrase must actually appear within the anchored backward
+    # context - a concept whose own anchoring never reached back far
+    # enough to include the cue is correctly not flagged as enumeration-
+    # shaped, since that anchored evidence genuinely does not contain it.
+    focus = "Some unrelated nearby line\nConcept Name\nSome specific distinguishing fact"
+    assert is_enumeration_evidence_insufficient(factual_focus=focus, concept="Concept Name") is False
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Concept Name") is False
+
+
+def test_english_enumeration_cue_phrases_are_also_detected():
+    focus = "The vertebral column consists of the following segments:\nConcept Name"
+    assert detect_enumeration_member_shape(factual_focus=focus, concept="Concept Name") is True
+
+
+def test_no_llm_or_embedding_call_in_enumeration_functions():
+    import inspect
+
+    import exam_generator.planning.concept_anchor as concept_anchor_module
+
+    source = inspect.getsource(concept_anchor_module.is_enumeration_evidence_insufficient) + inspect.getsource(
+        concept_anchor_module.detect_enumeration_member_shape
+    )
     assert "generate_structured" not in source
     assert "embedding" not in source.lower()

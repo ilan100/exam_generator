@@ -8,6 +8,7 @@ appear, in the order it should appear, and that order is preserved exactly.
 
 from __future__ import annotations
 
+import re
 from typing import Sequence
 
 from exam_generator.models import (
@@ -210,6 +211,220 @@ def format_target_answer_requirement(target: QuestionTarget) -> str:
         f"The question may still test any evidence-supported aspect of {topic} (its role, "
         "location, connections, or distinguishing characteristics) - the requirement is only "
         f"that the correct ANSWER choice itself names {topic}, not a description of it."
+    )
+
+
+#: WP-041: a deterministic "is this text already expressible in Latin/
+#: ASCII script" check - intentionally a separate, simpler definition
+#: from ``planning.concept_inventory._CANDIDATE_LINE_PATTERN`` (which
+#: additionally gates extraction-candidate-line detection with a
+#: narrower charset) rather than importing it: ``exam_generator.planning``
+#: already imports from ``exam_generator.prompts`` (established since
+#: WP-034's ``CategoryCoverage`` precedent), so importing the reverse
+#: direction here would create a circular import. The two checks serve
+#: different purposes and do not need to be byte-identical - this one
+#: only asks whether ``text`` can be represented without any non-ASCII
+#: (i.e. non-Latin/non-Hebrew-only) character, which is exactly the
+#: WP-041 question ("is an English representation available").
+_ASCII_PATTERN = re.compile(r"^[\x00-\x7f]+$")
+
+
+def _is_english_representable(text: str) -> bool:
+    """WP-041 section 7: true if ``text`` is already fully expressible in
+    Latin/ASCII script - never a translation judgment, purely whether the
+    text as given already IS an English/Latin representation. For every
+    real pilot-category ``named_entity_target=True`` target, this is true
+    by construction (``target.topic`` is always the concept's own
+    structurally-extracted, pure-ASCII text - the same invariant WP-040's
+    ``named_entity_target`` itself already relies on) - this function
+    re-derives it explicitly anyway, rather than trusting the invariant
+    blindly, so it degrades honestly rather than crashing or guessing if
+    ever called with a hypothetical non-ASCII target."""
+    stripped = text.strip()
+    return bool(stripped) and bool(_ASCII_PATTERN.match(stripped))
+
+
+_NO_TARGET_LANGUAGE_REQUIREMENT_TEXT = (
+    "No additional target-language requirement applies to this target - follow the general "
+    "Hebrew-language instructions above."
+)
+
+
+def format_target_language_requirement(target: QuestionTarget) -> str:
+    """WP-041: deterministically format the English-first target-language
+    requirement for ``target``, based only on ``target.named_entity_target``
+    and whether ``target.topic`` is already English-representable - never
+    a bilingual-pairing search, never a translation, never an LLM
+    judgment (section 5's explicit prohibition on fuzzy/semantic/
+    transliteration matching, and section 9's "if such an association
+    cannot be established safely, do not guess").
+
+    Honestly renders ``_NO_TARGET_LANGUAGE_REQUIREMENT_TEXT`` (never
+    silently omits the section) when ``target`` is not known to be a
+    named entity - the same fail-honest-sentinel convention
+    ``format_target_answer_requirement()`` already established.
+
+    When ``target`` is a named entity with an English-representable
+    topic (true for every real pilot-category target, by construction -
+    see ``_is_english_representable()``), states the requirement
+    explicitly: use the target's own English text verbatim, for both the
+    correct answer and any reference to the target within the question
+    itself, never translating or transliterating it into Hebrew - this
+    is the deterministic fix for the exact live-observed WP-040 case
+    (``Corpos Striatum`` correctly identified, but in Hebrew,
+    ``קורפוס סטריאטום``, which WP-038's coverage matching could not
+    recognize against the English-stored concept).
+
+    When ``target`` is a named entity whose topic is NOT English-
+    representable (never actually produced by the current pilot-category
+    extraction path, which only ever extracts pure-ASCII text - but
+    handled honestly rather than assumed impossible), states that Hebrew
+    is permitted and explicitly forbids inventing an English translation
+    that is not already present in the evidence.
+    """
+    if not target.named_entity_target:
+        return _NO_TARGET_LANGUAGE_REQUIREMENT_TEXT
+
+    topic = target.topic
+    if _is_english_representable(topic):
+        return (
+            f"TARGET LANGUAGE = English\n\n"
+            f"An English representation of TARGET CONCEPT is available: {topic}. Use it. The "
+            "question itself may still be written in Hebrew per the general instructions above, "
+            f"but wherever you reference TARGET CONCEPT by name within the question, and for the "
+            f"correct answer choice itself, use the English representation ({topic}) exactly as "
+            "given - do not translate or transliterate it into Hebrew, even though the "
+            "surrounding evidence and question text are primarily Hebrew. Do not substitute a "
+            f"different English form (an abbreviation or alternate spelling) than the one given "
+            f"here ({topic})."
+        )
+    return (
+        "TARGET LANGUAGE = Hebrew\n\n"
+        "No English representation is available for this target - the Hebrew representation "
+        "already present in the supplied evidence is required for the correct answer. Do not "
+        "invent or guess an English translation or transliteration that is not already present "
+        "in the evidence."
+    )
+
+
+_NO_TARGET_EVIDENCE_ROLE_TEXT = (
+    "No additional evidence-role note applies to this target - it is the subject of its own "
+    "descriptive evidence, per the general instructions above."
+)
+
+
+def format_target_evidence_role(target: QuestionTarget) -> str:
+    """WP-043 Part B: deterministically format an explicit note about the
+    target's own role within its evidence, based only on
+    ``target.is_source_role`` (see
+    ``planning.target_role.detect_source_evidence_role()`` - a narrow,
+    keyword-proximity check, never a general relationship extractor).
+
+    WP-042's diagnostic investigation found that when a target's evidence
+    positions it as the *source* of another, more salient described
+    entity (e.g. ``Basillar artery``, labeled as the "source:" of
+    ``Superior Cerebellar Artery`` in its own evidence), generation
+    repeatedly constructed a question of the form "which artery supplies
+    X" - a shape whose evidence-supported answer is the *other*, more
+    salient entity, not the assigned target - and grounding correctly and
+    repeatedly rejected it. This note makes the target's own evidence
+    role explicit so generation can construct a question the target's
+    evidence actually supports as an answer (e.g. "which artery is the
+    source/origin of Y"), without requiring a new validator, a relaxed
+    grounding check, or a general source/destination relationship
+    extractor.
+
+    Honestly renders ``_NO_TARGET_EVIDENCE_ROLE_TEXT`` (never silently
+    omits the section) for the ordinary case (``is_source_role=False`` -
+    true for the overwhelming majority of targets) - the same fail-
+    honest-sentinel convention every other WP-040/041 formatting function
+    already established.
+    """
+    if not target.is_source_role:
+        return _NO_TARGET_EVIDENCE_ROLE_TEXT
+
+    topic = target.topic
+    downstream = target.source_relationship_entity
+    if downstream is not None:
+        # WP-044 Part B: the concrete downstream entity name, deterministically
+        # identified by planning.target_role.extract_source_relationship_entity() -
+        # a structural strengthening of this same note (named, not merely
+        # described), per WP-044 section 6/13's "state the specific
+        # relationship, not just a role label" architectural direction.
+        return (
+            f"TARGET EVIDENCE ROLE = SOURCE\n\n"
+            f"The supplied evidence explicitly labels TARGET CONCEPT ({topic}) as the source/origin "
+            f"of a separately-named entity: {downstream}. Do not construct a question whose "
+            f"evidence-supported answer would be {downstream} rather than {topic} (for example, do "
+            f"not ask which entity supplies or produces {downstream} if the evidence instead "
+            f"supports {topic}, not {downstream}, as the upstream/originating entity for that "
+            f"relationship). Construct the question so its evidence-supported answer is {topic} - "
+            f"for example, which entity is the source or origin of {downstream}. The correct answer "
+            f"choice must name {topic}, never {downstream}."
+        )
+    return (
+        f"TARGET EVIDENCE ROLE = SOURCE\n\n"
+        f"The supplied evidence describes TARGET CONCEPT ({topic}) as the source/origin of "
+        "another, separately-named entity - not as the entity being supplied, fed, or acted upon. "
+        f"Do not construct a question whose natural evidence-supported answer would be that other "
+        f"entity rather than {topic} itself (for example, do not ask which entity supplies or "
+        f"produces some downstream effect if the evidence instead supports {topic} as the "
+        "upstream/originating entity for that effect). Construct the question around the "
+        f"relationship the evidence actually supports {topic} as the correct answer to - for "
+        f"example, which entity is the source, origin, or starting point of the described "
+        "downstream entity."
+    )
+
+
+_NO_ENUMERATION_REQUIREMENT_TEXT = (
+    "No additional enumeration-member note applies to this target - follow the general 'Testing "
+    "enumeration or classification targets' guidance above only if the evidence itself happens to "
+    "have that shape."
+)
+
+
+def format_target_enumeration_requirement(target: QuestionTarget) -> str:
+    """WP-044 Part A: deterministically format an explicit, target-specific
+    reinforcement of the existing general "testing enumeration or
+    classification targets" prompt guidance, based only on
+    ``target.is_enumeration_member`` (see
+    ``planning.concept_anchor.detect_enumeration_member_shape()`` - a
+    narrow, deterministic cue-phrase-proximity check, never a general
+    enumeration classifier).
+
+    WP-043's live pilot found the general, always-present prompt guidance
+    alone insufficient for a target whose own anchored evidence happens to
+    be exactly an enumeration-introduction sentence (the real corpus
+    ``Corpos Striatum`` shape) - this makes the target's own situation
+    explicit, the same "prompt instruction is no longer enough on its own,
+    make the specific case explicit" direction WP-043 Part B already
+    established for source-role targets (see
+    ``format_target_evidence_role()``).
+
+    Honestly renders ``_NO_ENUMERATION_REQUIREMENT_TEXT`` (never silently
+    omits the section) for the ordinary, non-enumeration case - the same
+    fail-honest-sentinel convention every WP-040/041/043 formatting
+    function already established. Never produced for a target whose
+    enumeration evidence provided no member-specific distinguishing
+    content at all - such a target is never built in the first place (see
+    ``planning.concept_anchor.is_enumeration_evidence_insufficient()``,
+    used by the planner to skip it entirely rather than assign it).
+    """
+    if not target.is_enumeration_member:
+        return _NO_ENUMERATION_REQUIREMENT_TEXT
+
+    topic = target.topic
+    return (
+        f"ENUMERATION-MEMBER TARGET = {topic}\n\n"
+        f"The supplied evidence introduces TARGET CONCEPT ({topic}) as one member of a list of "
+        f"several similarly-described items. Do not ask a generic membership question whose "
+        f"evidence-supported answer could equally be a different member of that same list (for "
+        f"example, do not ask 'which of the following belongs to X' if the evidence does not "
+        f"distinguish {topic} from its siblings for that exact question). Use only the evidence-"
+        f"supported information specific to {topic} itself (a distinguishing property, function, "
+        "location, or relationship) as required by the general 'Testing enumeration or "
+        f"classification targets' guidance above - this note only confirms that guidance applies "
+        f"to this specific target."
     )
 
 

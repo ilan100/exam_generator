@@ -94,6 +94,136 @@ def _resolve_generated_evidence_refs(
     return [source_evidence[ref - 1].chunk_id for ref in deduplicated_refs]
 
 
+def _normalize_answer_text(text: str) -> str:
+    """Deterministic normalization for the WP-044 target-role consistency
+    check below - collapse whitespace, case-fold. A small, local
+    implementation, not imported from
+    ``exam_generator.planning.concept_inventory.normalize_concept_text``
+    (which is byte-identical in behavior): ``exam_generator.planning``
+    already imports from ``exam_generator.generation`` (this module's own
+    ``InvalidGeneratedOutputError``/``MissingEvidenceError`` -
+    ``planning.planner``'s established WP-025 dependency direction), so
+    importing the reverse direction here would create a circular import -
+    the same reasoning ``prompts.formatting._is_english_representable()``'s
+    own docstring already documents for an analogous case."""
+    return " ".join(text.split()).casefold()
+
+
+def _validate_target_role_consistency(response: GeneratedQuestionResponse, *, target: QuestionTarget) -> None:
+    """WP-044 Part B: deterministic blueprint/target-role consistency
+    check - a structural extension of the existing blueprint mechanism
+    (WP-044 section 16: "extend blueprint validation... deterministic
+    validation where possible... do not add an LLM validator"), not a new
+    entry in the five-validator pipeline (``exam_generator.validation``,
+    untouched by this WP).
+
+    When ``target.is_source_role`` and a downstream entity was
+    deterministically identified (``target.source_relationship_entity`` -
+    see ``planning.target_role.extract_source_relationship_entity()``),
+    rejects a candidate whose own correct-answer text names that
+    downstream entity rather than the assigned target itself - the exact,
+    structurally-detectable shape of the failure WP-042/WP-043 diagnosed
+    (generation constructs a question whose evidence-supported answer is
+    the downstream entity, not the source-role target, even though the
+    target-answer-identity requirement asks for the target's own name).
+
+    Deterministic text comparison only (the same normalization shape
+    already used for concept-identity matching elsewhere in this
+    codebase) - never an LLM judgment, never inspecting the model's own
+    free-text blueprint reasoning (too unconstrained to match safely).
+    Raises the same ``InvalidGeneratedOutputError`` category
+    ``_validate_generated_provenance`` already raises for a fabricated
+    evidence claim, consuming this attempt exactly as that check already
+    does - no new retry loop, no relaxed or additional validator.
+
+    A no-op when ``target`` is not a source-role target, or when no
+    downstream entity could be identified (nothing to check against) -
+    the ordinary case for the overwhelming majority of targets.
+    """
+    if not target.is_source_role or target.source_relationship_entity is None:
+        return
+
+    correct_answer_text = response.answers[response.correct_answer - 1]
+    downstream_normalized = _normalize_answer_text(target.source_relationship_entity)
+    if downstream_normalized in _normalize_answer_text(correct_answer_text):
+        raise InvalidGeneratedOutputError(
+            f"Generated response's correct answer {correct_answer_text!r} names the downstream "
+            f"entity {target.source_relationship_entity!r} rather than the assigned source-role "
+            f"target {target.topic!r} - target/tested-relationship/required-answer inconsistency "
+            "(WP-044 Part B)"
+        )
+
+
+def _validate_distractor_containment(response: GeneratedQuestionResponse, *, target: QuestionTarget) -> None:
+    """WP-046: deterministic post-generation candidate-distractor
+    consistency check, for named-entity targets only.
+
+    WP-045's diagnosis found that a *pre-generation*, evidence-shape-only
+    signal for this ambiguity family (a target textually contained in, or
+    containing, another concept anywhere in the category's inventory) is
+    unsafe - it produces a confirmed false positive (`"Inferior Cerebellar
+    Artery (PICA)"` vs. `"Posterior inferior cerebellar artery (PICA)"`,
+    the same real entity extracted twice, not a genuine hierarchy) and
+    would also have blocked genuinely-successful generation attempts for
+    `Corticospinal Tract` (WP-045 section 4's own live counter-example: the
+    identical target, identical evidence, unmodified code, both failed and
+    succeeded across two rounds of the same pilot, depending only on which
+    distractors that specific attempt happened to choose).
+
+    WP-046's own generalization study found the *narrower*, *post*-
+    generation form of this same idea to be safe: checking only the
+    *actual, final* correct-answer text against the *actual, final*
+    distractor texts a candidate already contains - never the broader
+    category inventory - explains every real, confirmed ambiguity
+    rejection observed for `Corticospinal Tract` (both of WP-045's own
+    live rejections citing a shared child as also-supported involved a
+    distractor whose text contains the correct answer's own text, e.g.
+    `"Lateral Corticospinal Tract"` contains `"Corticospinal Tract"`), and
+    produces zero false positives against every other real accepted
+    candidate examined (including the exact `Inferior Cerebellar Artery
+    (PICA)` case the pre-generation signal incorrectly flagged - its own
+    actual generated distractors never included the confusable duplicate
+    entity, so this check correctly never fires for it).
+
+    Deterministic text comparison only (the same normalization and plain-
+    substring-containment shape `_validate_target_role_consistency()`
+    above already uses) - never an LLM judgment, never a semantic/fuzzy
+    match, never inspecting the model's own free-text blueprint reasoning.
+    Rejects a candidate when the correct answer's own text and any one
+    distractor's own text stand in a containment relationship in either
+    direction - the exact, evidence-confirmed shape of a real, structural
+    ambiguity risk (a more general or more specific form of the same named
+    entity chosen as both the answer and a distractor), not a general
+    "detect ambiguity" classifier. Raises the same
+    ``InvalidGeneratedOutputError`` category the existing provenance/
+    target-role checks already raise, consuming this attempt exactly as
+    those checks already do - no new retry loop, no validator change.
+
+    Scoped to ``target.named_entity_target`` only (the same precedent
+    every WP-040/043/044 mechanism already established): for a free-text,
+    non-named-entity answer, incidental substring overlap is far more
+    likely to be coincidental prose rather than a genuine shared-entity
+    risk, so this check would not be safely evidence-grounded there and
+    is not attempted.
+    """
+    if not target.named_entity_target:
+        return
+
+    correct_answer_text = response.answers[response.correct_answer - 1]
+    normalized_correct = _normalize_answer_text(correct_answer_text)
+    for position, answer_text in enumerate(response.answers, start=1):
+        if position == response.correct_answer:
+            continue
+        normalized_distractor = _normalize_answer_text(answer_text)
+        if normalized_distractor in normalized_correct or normalized_correct in normalized_distractor:
+            raise InvalidGeneratedOutputError(
+                f"Generated response's correct answer {correct_answer_text!r} and distractor "
+                f"{answer_text!r} stand in a textual containment relationship - a structural "
+                "ambiguity risk (one may be a more general or more specific form of the same "
+                "named entity), not a genuinely independent wrong answer (WP-046)"
+            )
+
+
 def _validate_generated_provenance(
     response: GeneratedQuestionResponse,
     *,
@@ -185,6 +315,14 @@ class QuestionGenerator:
         Makes exactly one LLM call (``LLMProfile.GENERATION``) - no semantic
         retry loop. Performs no grounding/MCQ/category/quality/textbook
         validation; the returned candidate is not yet exam-ready.
+
+        Since WP-044, also runs a deterministic target-role consistency
+        check (``_validate_target_role_consistency()``); since WP-046, also
+        runs a deterministic distractor-containment check
+        (``_validate_distractor_containment()``) - all alongside the
+        existing provenance check, all raising
+        ``InvalidGeneratedOutputError`` for a structurally-invalid
+        response, never a new validator.
         """
         if not isinstance(generation_mode, GenerationMode):
             raise GenerationContextError(f"Unsupported generation mode: {generation_mode!r}")
@@ -235,6 +373,8 @@ class QuestionGenerator:
             generation_mode=generation_mode,
             historical_reference=historical_reference,
         )
+        _validate_target_role_consistency(response, target=target)
+        _validate_distractor_containment(response, target=target)
 
         return CandidateQuestion(
             question=response.question,

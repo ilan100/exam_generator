@@ -1,0 +1,58 @@
+[
+  {
+    "category": "גרעיני הבסיס",
+    "target_topic": "Corpos Striatum",
+    "question": "איזה מהבאים מהווה את החלק העיקרי של גרעיני הבסיס הידוע בשם Corpos Striatum?",
+    "answers": [
+      "Corpos Striatum",
+      "Nucleus Accumbens",
+      "Caudate Nucleus",
+      "Putamen"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Corpos Striatum",
+    "correct_answer_is_ascii_english": true
+  },
+  {
+    "category": "מסילות עצביות",
+    "target_topic": "Medial Lemniscus Tract",
+    "question": "איזו מסילה אחראית על העברת תחושות מתקדמות מהפריפריה אל הקורטקס?",
+    "answers": [
+      "Medial Lemniscus Tract",
+      "Spinothalamic Tract",
+      "Corticobulbar Tract",
+      "Anterior Corticospinal Tract"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Medial Lemniscus Tract",
+    "correct_answer_is_ascii_english": true
+  },
+  {
+    "category": "אספקת דם",
+    "target_topic": "Superior cerebellar artery",
+    "question": "איזה עורק מספק דם למשטח העליון של הצרבלום?",
+    "answers": [
+      "Superior cerebellar artery",
+      "Anterior Inferior Cerebellar Artery",
+      "Posterior Inferior Cerebellar Artery",
+      "Basilar artery"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Superior cerebellar artery",
+    "correct_answer_is_ascii_english": true
+  },
+  {
+    "category": "מסילות עצביות",
+    "target_topic": "Anterior Corticospinal Tract",
+    "question": "איזו מסילה אחראית על עצבוב השרירים הפרוקסימליים בגוף?",
+    "answers": [
+      "Anterior Corticospinal Tract",
+      "Lateral Corticospinal Tract",
+      "Corticobulbar Tract",
+      "Corticospinal Tract"
+    ],
+    "correct_answer_position": 1,
+    "correct_answer_text": "Anterior Corticospinal Tract",
+    "correct_answer_is_ascii_english": true
+  }
+]

@@ -31,6 +31,9 @@ from exam_generator.prompts.formatting import (
     format_question_target,
     format_student_summary_evidence,
     format_target_answer_requirement,
+    format_target_enumeration_requirement,
+    format_target_evidence_role,
+    format_target_language_requirement,
 )
 
 
@@ -64,6 +67,25 @@ class GenerationPromptContext:
     ``exam_generator.prompts.formatting.format_target_answer_requirement()``) -
     derived purely from information the target already carries, never a
     new field on this context itself.
+
+    Since WP-041, ``render_variables()`` also renders an explicit
+    English-first target-language requirement (see
+    ``exam_generator.prompts.formatting.format_target_language_requirement()``) -
+    likewise derived purely from ``target.named_entity_target``/
+    ``target.topic``, never a new field on this context or on
+    ``QuestionTarget`` itself.
+
+    Since WP-043, ``render_variables()`` also renders an explicit target
+    evidence-role note (see
+    ``exam_generator.prompts.formatting.format_target_evidence_role()``) -
+    derived purely from ``target.is_source_role``, never a new field on
+    this context itself.
+
+    Since WP-044, ``render_variables()`` also renders an explicit
+    enumeration-member requirement (see
+    ``exam_generator.prompts.formatting.format_target_enumeration_requirement()``) -
+    derived purely from ``target.is_enumeration_member``, never a new field
+    on this context itself.
     """
 
     category: str
@@ -108,6 +130,9 @@ class GenerationPromptContext:
             "historical_reference": format_historical_reference(self.historical_reference),
             "question_target": format_question_target(self.target),
             "target_answer_requirement": format_target_answer_requirement(self.target),
+            "target_language_requirement": format_target_language_requirement(self.target),
+            "target_evidence_role": format_target_evidence_role(self.target),
+            "target_enumeration_requirement": format_target_enumeration_requirement(self.target),
             "relationship_type": self.relationship.relationship_type,
             "competitor_concepts": format_competitors(self.competitors),
         }

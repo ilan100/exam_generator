@@ -384,6 +384,7 @@ def _repair_trailing_truncations(
                         f"{item.extraction_reason} (WP-039: trailing fragment(s) restored from "
                         "adjacent continuation line(s) - unambiguous local reconstruction)"
                     ),
+                    "source_line_indices": tuple(sorted([concept_index, *discovered_indices])),
                 }
             )
         )
@@ -459,7 +460,28 @@ def refine_concept_inventory(source_evidence: Sequence[SourceEvidenceChunk]) -> 
     return tuple(repaired)
 
 
-def anchor_concept_evidence(*, chunk_text: str, concept: str) -> str:
+#: WP-043 Part A: the widened bounds ``anchor_concept_evidence(...,
+#: broad=True)`` uses for its deterministic broader-fallback pass - still
+#: the same source evidence, still the same stop rules: more *non-blank*
+#: lines may be collected in each direction (``_MAX_BROAD_ANCHOR_WALK_LINES``),
+#: and more *raw* lines may be scanned to reach them
+#: (``_MAX_BROAD_RAW_SCAN_LINES`` - relevant when single blank lines are
+#: interspersed with real content further away than the narrow pass's own
+#: raw-scan budget reaches). Deliberately does **not** widen the two-
+#: consecutive-blank-lines paragraph-boundary rule itself - found, during
+#: development, to matter: relaxing that boundary let the walk cross past
+#: a genuine paragraph break into unrelated document header/metadata text
+#: (course title, year, page number) for a real corpus chunk, which is
+#: not legitimate factual context about the concept. The paragraph
+#: boundary stays fixed in both modes; only how much may be collected,
+#: and how far the search may look, *within* one paragraph widens.
+_MAX_BROAD_ANCHOR_WALK_LINES = 6
+_MAX_BROAD_RAW_SCAN_LINES = 24
+
+
+def anchor_concept_evidence(
+    *, chunk_text: str, concept: str, source_line_indices: tuple[int, ...] = (), broad: bool = False
+) -> str:
     """WP-037 section 4: build a narrow, deterministic factual-focus
     context around ``concept``'s own line in ``chunk_text``, instead of
     ``concept_inventory``'s wide fixed-character window.
@@ -482,31 +504,209 @@ def anchor_concept_evidence(*, chunk_text: str, concept: str) -> str:
     ``_MAX_ANCHOR_WALK_LINES`` non-blank lines included in either
     direction, whichever comes first.
 
+    ``source_line_indices`` (WP-043) - when supplied (non-empty), a
+    concept reconstructed by WP-039's *trailing*-truncation repair from
+    more than one raw line (e.g. "Corpos Str" + "ia" + "tum") - walking
+    starts immediately outside this known span instead of searching for
+    a single raw line matching ``concept`` verbatim, which always fails
+    for such a concept (no single raw line ever contains the full
+    reconstructed text) and was, before this fix, silently falling back
+    to the concept's bare name with zero context (WP-043's own root-cause
+    finding). When empty (the default - true for every concept that
+    was not trailing-reconstructed), behavior is unchanged from WP-037.
+
+    ``broad`` (WP-043 Part A): when true, uses ``_MAX_BROAD_ANCHOR_WALK_LINES``
+    instead of the narrow ``_MAX_ANCHOR_WALK_LINES`` default - a
+    deterministic, still-bounded, same-source-evidence fallback for a
+    concept whose narrow anchor turned out to be evidence-insufficient
+    (see ``is_factual_focus_sufficient()``). Still stops at a sibling
+    candidate-concept line exactly as the narrow pass does, and still
+    stops at the same two-consecutive-blank-lines paragraph boundary -
+    broadening deliberately widens only how many non-blank lines may be
+    collected within one paragraph, never how far a genuine paragraph
+    break may be crossed (found, during development, to matter: crossing
+    it let the walk reach unrelated document header/metadata text for a
+    real corpus chunk with only single/double blank-line gaps between
+    otherwise-unrelated lines).
+
     Falls back to ``concept`` itself if no matching line can be found at
     all (should not happen in practice, but never raises - the same
     fail-honest-not-fail-loud convention ``concept_inventory``'s own
     fallback already uses).
     """
     lines = chunk_text.splitlines()
+    max_lines = _MAX_BROAD_ANCHOR_WALK_LINES if broad else _MAX_ANCHOR_WALK_LINES
+    max_raw_scan = _MAX_BROAD_RAW_SCAN_LINES if broad else _MAX_RAW_SCAN_LINES
+
+    if source_line_indices:
+        consumed = set(source_line_indices)
+        backward = _walk(
+            lines, start=min(source_line_indices), step=-1, consumed_indices=consumed,
+            max_lines=max_lines, max_raw_scan=max_raw_scan,
+        )
+        backward.reverse()
+        forward = _walk(
+            lines, start=max(source_line_indices), step=1, consumed_indices=consumed,
+            max_lines=max_lines, max_raw_scan=max_raw_scan,
+        )
+        anchored_lines = backward + [concept] + forward
+        return "\n".join(anchored_lines).strip()
+
     concept_index, consumed_neighbor_index = _find_concept_line_index(lines, concept)
     if concept_index is None:
         return concept
 
+    consumed = {consumed_neighbor_index} if consumed_neighbor_index is not None else set()
     backward = _walk(
-        lines, start=concept_index, step=-1, consumed_neighbor_index=consumed_neighbor_index
+        lines, start=concept_index, step=-1, consumed_indices=consumed,
+        max_lines=max_lines, max_raw_scan=max_raw_scan,
     )
     backward.reverse()
     forward = _walk(
-        lines, start=concept_index, step=1, consumed_neighbor_index=consumed_neighbor_index
+        lines, start=concept_index, step=1, consumed_indices=consumed,
+        max_lines=max_lines, max_raw_scan=max_raw_scan,
     )
 
     # Always display the caller-supplied concept text (already the
     # authoritative, possibly-reconstructed form) rather than the raw
     # source line - the two only ever differ by the reconstructed leading
-    # character(s), which the "consumed_neighbor_index" skip above already
-    # ensures is not also duplicated as separate context.
+    # character(s), which the "consumed" skip above already ensures is
+    # not also duplicated as separate context.
     anchored_lines = backward + [concept] + forward
     return "\n".join(anchored_lines).strip()
+
+
+def is_factual_focus_sufficient(*, factual_focus: str, concept: str) -> bool:
+    """WP-043 Part A section 7: the deterministic evidence-sufficiency
+    check. Conservative and structural, exactly as instructed: true
+    unless ``factual_focus`` (after the same whitespace/case
+    normalization already used for concept-identity comparison
+    elsewhere) contains nothing beyond the concept's own text - i.e.
+    ``anchor_concept_evidence()`` found zero surrounding context in
+    either direction. Never an LLM judgment, never a length/embedding
+    heuristic - a concept anchored with even one genuine neighboring
+    line is treated as sufficient; only the exact "nothing else was
+    found" case is insufficient.
+    """
+    return normalize_concept_text(factual_focus) != normalize_concept_text(concept)
+
+
+#: WP-044 Part A: Hebrew and English enumeration-introduction cue phrases -
+#: a small, explicit, extensible keyword table, the same shape and
+#: philosophy as this module's own ``_NAMING_CUE_PHRASES`` and
+#: ``target_role.py``'s ``_SOURCE_ROLE_CUE_PHRASES``. Chosen from the real
+#: corpus shape WP-043's live pilot surfaced ("גרעיני הבסיס:מכילים מספר
+#: תתי מבנים" - "the basal nuclei: contain several sub-structures",
+#: immediately introducing a bulleted list of named sub-structures) plus
+#: the English equivalents WP-044 section 8 itself suggests ("contains
+#: several...", "includes...", "consists of...", "the following...").
+#: Deliberately narrow and lexical - never a semantic/NLP classifier
+#: (WP-044 section 9's explicit prohibition).
+_ENUMERATION_INTRO_CUE_PHRASES: tuple[str, ...] = (
+    "מספר תתי",
+    "תתי מבנים",
+    "כוללים",
+    "כוללת",
+    "כולל ",
+    "מורכב מ",
+    "מורכבת מ",
+    "several",
+    "the following",
+    "consists of",
+    "includes",
+)
+
+#: WP-044 Part A: how many alphabetic characters the evidence following a
+#: concept's own occurrence (see ``_split_anchored_focus()``) must contain
+#: before it is trusted as genuine, concept-specific distinguishing
+#: content rather than trivial bullet-marker noise (e.g. a bare "o" list
+#: marker, ``alpha_char_count == 1``) - reuses
+#: ``concept_inventory._MIN_ALPHA_CHARS``'s own threshold (2) for the same
+#: purpose: the smallest amount of alphabetic content this corpus's own
+#: structural conventions treat as meaningful rather than layout noise.
+_MIN_ENUMERATION_DISTINGUISHING_ALPHA_CHARS = 2
+
+
+def _split_anchored_focus(factual_focus: str, concept: str) -> tuple[str, str]:
+    """Split an already-built ``factual_focus`` (``anchor_concept_evidence()``'s
+    own ``backward + [concept] + forward`` structure, joined by newlines)
+    back into its backward and forward portions, by locating the line
+    exactly equal to ``concept`` - always present as its own standalone
+    entry, since ``anchor_concept_evidence()`` inserts it as a single
+    unmodified list element between the backward and forward line lists.
+    Searches from the end, since a backward/forward context line
+    incidentally equal to ``concept``'s own text is not expected in
+    practice but would never be the *last* such line if it occurred at
+    all. Returns ``(factual_focus, "")`` (no split) if ``concept`` cannot
+    be found as its own line - never raises, matching this module's
+    established fail-honest-not-fail-loud convention for a purely
+    structural fallback."""
+    lines = factual_focus.split("\n")
+    for index in range(len(lines) - 1, -1, -1):
+        if lines[index] == concept:
+            return "\n".join(lines[:index]), "\n".join(lines[index + 1 :])
+    return factual_focus, ""
+
+
+def _has_enumeration_intro_cue(backward_context: str) -> bool:
+    return any(phrase in backward_context for phrase in _ENUMERATION_INTRO_CUE_PHRASES)
+
+
+def is_enumeration_evidence_insufficient(*, factual_focus: str, concept: str) -> bool:
+    """WP-044 Part A: true if ``factual_focus`` has enumeration shape - an
+    enumeration-introduction cue phrase (see
+    ``_ENUMERATION_INTRO_CUE_PHRASES``) appears in the evidence backward
+    (preceding) of ``concept``'s own anchored occurrence - **and** provides
+    no forward (following) content specific to this member beyond trivial
+    bullet-marker noise (fewer than
+    ``_MIN_ENUMERATION_DISTINGUISHING_ALPHA_CHARS`` alphabetic characters).
+
+    This is the real corpus shape WP-042/WP-043 diagnosed for ``Corpos
+    Striatum``: the concept's only anchored context is the shared
+    enumeration-introduction sentence every sibling in the same list would
+    equally anchor to (never genuinely distinguishing about this concept
+    specifically), plus a bare bullet-marker fragment ("o") that
+    ``anchor_concept_evidence()``'s own walk collects but that carries no
+    real content. A generic membership question built from such evidence
+    is inherently ambiguous - any sibling would equally satisfy it - so
+    WP-044 section 11's "prefer missing over wrong" principle applies: the
+    caller (``planning.planner._plan_targets_from_concept_inventory()``)
+    skips this concept entirely rather than build a target that could only
+    produce a known-ambiguous question.
+
+    Never true for a concept anchored to genuinely concept-specific
+    content, whether that content precedes or follows the concept's own
+    occurrence - only for the narrow "shared list intro, then nothing"
+    shape. Never true when no enumeration cue is present at all (the
+    ordinary, non-enumeration case) - existing evidence-sufficiency
+    handling (``is_factual_focus_sufficient()``) already covers that.
+    """
+    backward, forward = _split_anchored_focus(factual_focus, concept)
+    if not _has_enumeration_intro_cue(backward):
+        return False
+    forward_alpha_chars = sum(1 for character in forward if character.isalpha())
+    return forward_alpha_chars < _MIN_ENUMERATION_DISTINGUISHING_ALPHA_CHARS
+
+
+def detect_enumeration_member_shape(*, factual_focus: str, concept: str) -> bool:
+    """WP-044 Part A: true if ``factual_focus`` has enumeration shape (see
+    ``is_enumeration_evidence_insufficient()``'s docstring for the shared
+    cue-phrase detection this reuses) - regardless of whether forward
+    distinguishing content is present. Used only for concepts that have
+    already passed ``is_enumeration_evidence_insufficient()`` (i.e. a
+    target is actually being built for them - see
+    ``planning.planner._plan_targets_from_concept_inventory()``), to mark
+    ``QuestionTarget.is_enumeration_member`` so generation receives an
+    explicit, target-specific reinforcement of the existing general
+    "testing enumeration or classification targets" prompt guidance (see
+    ``prompts.formatting.format_target_enumeration_requirement()``) -
+    mirroring WP-043 Part B's ``is_source_role`` precedent of surfacing a
+    deterministically-detected evidence shape as an explicit note, rather
+    than relying on generation to notice it unprompted from the evidence
+    text alone.
+    """
+    backward, _ = _split_anchored_focus(factual_focus, concept)
+    return _has_enumeration_intro_cue(backward)
 
 
 #: Safety bound on how many raw lines ``_walk()`` will ever inspect in one
@@ -517,31 +717,41 @@ def anchor_concept_evidence(*, chunk_text: str, concept: str) -> str:
 _MAX_RAW_SCAN_LINES = 12
 
 
-def _walk(lines: list[str], *, start: int, step: int, consumed_neighbor_index: int | None) -> list[str]:
+def _walk(
+    lines: list[str],
+    *,
+    start: int,
+    step: int,
+    consumed_indices: set[int],
+    max_lines: int = _MAX_ANCHOR_WALK_LINES,
+    max_consecutive_blanks: int = 2,
+    max_raw_scan: int = _MAX_RAW_SCAN_LINES,
+) -> list[str]:
     """Walk from ``lines[start]`` in direction ``step`` (``-1`` for
     backward, ``1`` for forward), collecting non-blank, non-candidate-
     concept lines in the order visited (backward results are reversed by
-    the caller). Stops at two consecutive blank lines, at a candidate
-    concept line, once ``_MAX_ANCHOR_WALK_LINES`` lines have been
-    collected, or after ``_MAX_RAW_SCAN_LINES`` raw lines have been
-    inspected - whichever comes first. Skips ``consumed_neighbor_index``
-    (already absorbed into a reconstructed concept, see
-    ``_find_concept_line_index()``) without counting it as blank."""
+    the caller). Stops at ``max_consecutive_blanks`` consecutive blank
+    lines, at a candidate concept line, once ``max_lines`` lines have been
+    collected, or after ``max_raw_scan`` raw lines have been inspected -
+    whichever comes first. Skips any index in ``consumed_indices``
+    (already absorbed into a reconstructed concept - see
+    ``_find_concept_line_index()``/``anchor_concept_evidence()``'s
+    ``source_line_indices`` handling) without counting it as blank."""
     collected: list[str] = []
     consecutive_blanks = 0
     index = start + step
     raw_scanned = 0
 
-    while 0 <= index < len(lines) and raw_scanned < _MAX_RAW_SCAN_LINES and len(collected) < _MAX_ANCHOR_WALK_LINES:
+    while 0 <= index < len(lines) and raw_scanned < max_raw_scan and len(collected) < max_lines:
         raw_scanned += 1
-        if index == consumed_neighbor_index:
+        if index in consumed_indices:
             index += step
             continue
 
         line = lines[index]
         if not line.strip():
             consecutive_blanks += 1
-            if consecutive_blanks >= 2:
+            if consecutive_blanks >= max_consecutive_blanks:
                 break
             index += step
             continue

@@ -518,12 +518,21 @@ def test_pilot_category_target_uses_narrow_anchored_evidence_not_the_wide_window
 
 
 def test_pilot_category_excludes_a_category_self_restatement_concept():
+    # WP-044 note: a distinguishing forward line is appended after
+    # "Caudate Nucleus" (unrelated to what this WP-037 test itself
+    # verifies - self-restatement exclusion) so this fixture's incidental
+    # enumeration-intro shape ("...מכילים מספר תתי מבנים") does not also
+    # trip WP-044 Part A's separate insufficient-enumeration-evidence
+    # skip; without it, "Caudate Nucleus" would have no forward context
+    # at all here (end of chunk), which is a real WP-044 concern
+    # orthogonal to this test's own purpose.
     chunk = _chunk(
         chunk_id="STUDENT_SUMMARY:s1.pdf:0036:0001",
         text=(
             "גרעיני הבסיס נקראים גם\nThe Basal Ganglia\n"
             "אך מושג זה שגוי משום שגנגליה מתאר צבר גופי תאים במערכת העצבים ההיקפית\n"
-            "גרעיני הבסיס מכילים מספר תתי מבנים\n\nCaudate Nucleus"
+            "גרעיני הבסיס מכילים מספר תתי מבנים\n\nCaudate Nucleus\n"
+            "אחראי על תפקוד ייחודי ומובחן מבין תתי המבנים"
         ),
     )
     planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
@@ -600,3 +609,108 @@ def test_non_pilot_category_target_is_not_marked_a_named_entity_target():
     planner = _make_planner()
     targets = planner.plan_targets(category=CATEGORY, count=1)
     assert targets[0].named_entity_target is False
+
+
+# ---------------------------------------------------------------------------
+# WP-043: evidence sufficiency fallback and target evidence-role detection
+# ---------------------------------------------------------------------------
+
+
+def test_pilot_category_target_marked_source_role_when_evidence_labels_it_so():
+    # The default _pilot_planner() fixture chunk already contains the
+    # real corpus's own "מקור:" (source:) label immediately before
+    # "Basilar Artery" - the exact real shape WP-042 diagnosed.
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=2)
+    by_topic = {t.topic: t for t in targets}
+    assert by_topic["Basilar Artery"].is_source_role is True
+    assert by_topic["Superior Cerebellar Artery"].is_source_role is False
+
+
+def test_pilot_category_concept_with_insufficient_evidence_is_skipped_not_forced():
+    # A concept whose only possible anchor is its own bare name (no
+    # source_line_indices, no neighboring context in either direction,
+    # immediately bounded by blank lines) must never become a target -
+    # the planner should silently move to the next remaining concept.
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0200:0001",
+        text="Header Text\n\n\nIsolated Concept\n\n\nSuperior Cerebellar Artery\nמקור:\nBasilar Artery",
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=10)
+    topics = [t.topic for t in targets]
+    assert "Isolated Concept" not in topics
+    assert "Superior Cerebellar Artery" in topics
+    assert all(t.factual_focus.strip() != t.topic.strip() for t in targets)
+
+
+def test_pilot_category_all_concepts_insufficient_yields_empty_list_not_forced():
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0201:0001",
+        text="\n\nOnly Isolated Concept\n\n",
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert targets == []
+
+
+# ---------------------------------------------------------------------------
+# WP-044: enumeration-shape skip and structural source-role entity
+# ---------------------------------------------------------------------------
+
+
+def test_pilot_category_target_carries_deterministic_downstream_entity():
+    # The default _pilot_planner() fixture chunk already contains the
+    # real corpus's own "מקור:" (source:) label immediately before
+    # "Basilar Artery", preceded by "Superior Cerebellar Artery" - the
+    # exact real shape WP-044 Part B extracts.
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=2)
+    by_topic = {t.topic: t for t in targets}
+    assert by_topic["Basilar Artery"].source_relationship_entity == "Superior Cerebellar Artery"
+    assert by_topic["Superior Cerebellar Artery"].source_relationship_entity is None
+
+
+def test_pilot_category_real_corpos_striatum_enumeration_shape_is_skipped():
+    # WP-044 Part A: the exact real corpus shape (WP-043's own live pilot
+    # finding) - the only anchorable evidence for "Corpos Striatum" is the
+    # shared enumeration-intro sentence plus a bare bullet-marker fragment,
+    # never anything member-specific. This must now be skipped entirely
+    # rather than built into a target that could only produce a known-
+    # ambiguous generic membership question.
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0036:0001",
+        text=(
+            ", אך מושג זה שגוי משום שגנגליה מתאר צבר גופי תאים במערכת\n"
+            ".העצבים ההיקפית, בעוד גרעיני הבסיס הם חלק ממערכת העצבים המרכזית \n"
+            " גרעיני הבסיס:מכילים מספר תתי מבנים \n\ntum\nia\nCorpos Str\n \no\n\n"
+            "Caudate Nucleus"
+        ),
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=10)
+    topics = [t.topic for t in targets]
+    assert "Corpos Striatum" not in topics
+    assert "Caudate Nucleus" in topics
+
+
+def test_pilot_category_enumeration_member_with_distinguishing_content_is_marked_and_kept():
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0037:0001",
+        text=(
+            " גרעיני הבסיס:מכילים מספר תתי מבנים \n\n"
+            "Caudate Nucleus\n"
+            "אחראי על תפקוד ייחודי ומובחן מבין תתי המבנים"
+        ),
+    )
+    planner = _pilot_planner(index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)))
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=1)
+    assert len(targets) == 1
+    assert targets[0].topic == "Caudate Nucleus"
+    assert targets[0].is_enumeration_member is True
+
+
+def test_pilot_category_non_enumeration_target_is_not_marked_enumeration_member():
+    planner = _pilot_planner()
+    targets = planner.plan_targets(category=PILOT_CATEGORY, count=2)
+    assert all(t.is_enumeration_member is False for t in targets)

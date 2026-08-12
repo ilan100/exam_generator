@@ -131,14 +131,19 @@ def test_question_target_gained_no_new_field():
     # WP-030 section 3: extend QuestionTarget only where necessary - it
     # turned out not to be necessary at all for WP-030 itself. The
     # relationship is computed transiently by generation, never stored on
-    # the target. WP-040 later added named_entity_target, so this guard
-    # now reflects that field set, not zero fields since WP-025.
+    # the target. WP-040 added named_entity_target, WP-043 added
+    # is_source_role, and WP-044 added source_relationship_entity and
+    # is_enumeration_member, so this guard now reflects that field set,
+    # not zero fields since WP-025.
     assert set(QuestionTarget.model_fields) == {
         "target_id",
         "category",
         "topic",
         "factual_focus",
         "supporting_evidence_chunk_ids",
+        "is_source_role",
+        "source_relationship_entity",
+        "is_enumeration_member",
         "named_entity_target",
     }
 
