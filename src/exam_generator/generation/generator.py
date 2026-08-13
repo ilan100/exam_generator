@@ -224,6 +224,77 @@ def _validate_distractor_containment(response: GeneratedQuestionResponse, *, tar
             )
 
 
+def _validate_target_answer_identity(response: GeneratedQuestionResponse, *, target: QuestionTarget) -> None:
+    """WP-047: deterministic target-to-answer identity check, generalizing
+    WP-044 Part B's own `_validate_target_role_consistency()` pattern from
+    the narrow `is_source_role` case to every named-entity target.
+
+    WP-047's own investigation examined every real, historical target/
+    correct-answer pair recorded across WP-036 through WP-046's live
+    pilots (44 real post-WP-041 accepted candidates, plus the earlier
+    pre-WP-041 record for additional context) and found the existing,
+    already-shipped WP-040 answer-identity requirement
+    (`format_target_answer_requirement()`, `prompts/formatting.py`) is
+    already unconditional for every named-entity target: "the correct
+    answer choice itself names TARGET CONCEPT... not a description of
+    it" - regardless of the tested relationship type. **No real,
+    historically-accepted case was found anywhere in this project's own
+    data where a named-entity target's correct answer legitimately
+    identified a different entity** - every observed instance where it
+    did (`Basillar artery` answered as `Superior cerebellar artery`,
+    WP-036 pre-WP-043; `Corpos Str` answered as `Caudate Nucleus`,
+    WP-038 pre-WP-040; three separate `Corticospinal Tract` →
+    `Precentral Gyrus` instances, WP-043/046; one `Globus Pallidus` →
+    functional-description instance, WP-045) was already independently
+    diagnosed, at the time, as a genuine defect - never as a legitimate
+    relationship-driven exception. This is the deterministic contract
+    WP-040 already intends; this check is the first place it is
+    structurally, rather than only rhetorically, enforced for the
+    general case.
+
+    Deliberately **one-directional containment only** (the correct
+    answer's own text must contain the target's own topic text) - not
+    the bidirectional check `_validate_target_role_consistency()`/
+    `_validate_distractor_containment()` use for a different purpose
+    (detecting a risky relationship between two distinct named entities).
+    Here, the two directions are not symmetric risks: requiring the
+    target's own full name to appear literally within the answer
+    correctly accepts an answer that names the target plus incidental
+    surrounding text, while checking the reverse direction (target
+    contains answer) would incorrectly accept a bare, partial word
+    fragment of the target's own name as if it were a complete, correct
+    answer - never attempted.
+
+    Validated safe specifically because WP-041's own English-first
+    policy already guarantees that every named-entity target's own
+    `topic` is presented, and required, in exactly one language/script
+    (English/ASCII) for the correct answer - the historical cross-script
+    (Hebrew-transliteration) accepted answers this exact containment
+    check would have incorrectly flagged all predate WP-041 and are not
+    reproducible under the current architecture; this check would not
+    have been safe to add before WP-041 existed, and is not safe for any
+    target where `named_entity_target` is `False` (a free-text topic is
+    not an entity name to contain).
+
+    Deterministic text comparison only (the same normalization already
+    used throughout this module) - never an LLM judgment, never a new
+    validator. Raises the same ``InvalidGeneratedOutputError`` category
+    every other pre-validator check in this module already raises,
+    consuming this attempt exactly as those checks already do.
+    """
+    if not target.named_entity_target:
+        return
+
+    correct_answer_text = response.answers[response.correct_answer - 1]
+    normalized_topic = _normalize_answer_text(target.topic)
+    normalized_answer = _normalize_answer_text(correct_answer_text)
+    if normalized_topic not in normalized_answer:
+        raise InvalidGeneratedOutputError(
+            f"Generated response's correct answer {correct_answer_text!r} does not identify the "
+            f"assigned target {target.topic!r} - target-to-answer identity requirement violated (WP-047)"
+        )
+
+
 def _validate_generated_provenance(
     response: GeneratedQuestionResponse,
     *,
@@ -319,7 +390,9 @@ class QuestionGenerator:
         Since WP-044, also runs a deterministic target-role consistency
         check (``_validate_target_role_consistency()``); since WP-046, also
         runs a deterministic distractor-containment check
-        (``_validate_distractor_containment()``) - all alongside the
+        (``_validate_distractor_containment()``); since WP-047, also runs a
+        deterministic target-to-answer identity check
+        (``_validate_target_answer_identity()``) - all alongside the
         existing provenance check, all raising
         ``InvalidGeneratedOutputError`` for a structurally-invalid
         response, never a new validator.
@@ -375,6 +448,7 @@ class QuestionGenerator:
         )
         _validate_target_role_consistency(response, target=target)
         _validate_distractor_containment(response, target=target)
+        _validate_target_answer_identity(response, target=target)
 
         return CandidateQuestion(
             question=response.question,

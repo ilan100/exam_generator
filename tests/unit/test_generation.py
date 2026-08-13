@@ -938,3 +938,148 @@ def test_distractor_containment_check_is_deterministic_never_an_llm_validator():
     source = inspect.getsource(generator_module._validate_distractor_containment)
     assert "generate_structured" not in source
     assert "LLMProvider" not in source
+
+
+# ---------------------------------------------------------------------------
+# WP-047: deterministic target-to-answer identity check
+# ---------------------------------------------------------------------------
+
+
+def test_direct_target_identity_answer_is_accepted():
+    # Section 27 Test A: target = valid answer (verbatim) -> aligned.
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Corticospinal Tract", "Corticobulbar Tract", "Medial Lemniscus Tract", "Spinothalamic Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_whitespace_and_case_variation_of_the_target_name_is_still_accepted():
+    # Section 27 Test B: normalization (not a new alias mechanism) - the
+    # same normalized text, differing only in case/whitespace, is aligned.
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["corticospinal   tract", "Corticobulbar Tract", "Medial Lemniscus Tract", "Spinothalamic Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_answer_naming_the_target_plus_surrounding_text_is_still_accepted():
+    # One-directional containment: the target's own name appearing within
+    # a longer answer still identifies the target - never over-strict
+    # equality.
+    target = _target(topic="Basillar artery", named_entity_target=True)
+    response = _generated_response(
+        answers=["The Basillar artery", "Superior cerebellar artery", "Anterior choroidal artery", "Ophthalmic artery"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_corticospinal_tract_precentral_gyrus_substitution_is_rejected():
+    # Section 27 Test E, the mandatory real-corpus regression: the exact,
+    # real, twice-independently-observed WP-043/WP-046 failure shape -
+    # target = Corticospinal Tract, accepted answer = Precentral Gyrus (a
+    # different, related anatomical entity, not the target itself).
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Precentral Gyrus", "Corticobulbar Tract", "Postcentral Gyrus", "Lateral Lemniscus Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_globus_pallidus_functional_description_substitution_is_rejected():
+    # Section 27 Test D, the real WP-045 shape: target = Globus Pallidus,
+    # accepted answer = a Hebrew functional description, not the target's
+    # own name at all.
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=[
+            "מדכא את התלמוס ומפחית תנועה",
+            "מפעיל את התלמוס ומגביר תנועה",
+            "מאפשר תכנון תנועה",
+            "מגביר את התגובה החיובית במערכת התגמול",
+        ],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_different_named_sibling_entity_as_answer_is_rejected():
+    # The real, pre-WP-040 WP-038 shape: target answered with a different,
+    # unrelated sibling entity's own name entirely.
+    target = _target(topic="Corpos Striatum", named_entity_target=True)
+    response = _generated_response(
+        answers=["Caudate Nucleus", "Nucleus Accumbens", "Putamen", "Globus Pallidus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+def test_non_named_entity_target_never_triggers_target_answer_identity_check():
+    target = _target(topic="function of the basal nuclei", named_entity_target=False)
+    response = _generated_response(
+        answers=["controls voluntary movement", "second", "third", "fourth"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_target_answer_identity_check_never_consumes_a_second_llm_call():
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    provider = _provider(
+        _generated_response(
+            answers=["Corticospinal Tract", "Corticobulbar Tract", "Medial Lemniscus Tract", "Spinothalamic Tract"],
+            correct_answer=1,
+        )
+    )
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    assert provider.generate_structured.call_count == 1
+
+
+def test_target_answer_identity_check_is_deterministic_never_an_llm_validator():
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_target_answer_identity)
+    assert "generate_structured" not in source
+    assert "LLMProvider" not in source
+
+
+def test_target_answer_identity_check_coexists_with_distractor_containment_check():
+    # Section 26/27 F: WP-046's own mechanism must remain intact and keep
+    # firing independently - both checks active for the same candidate,
+    # neither suppressing the other.
+    target = _target(topic="Corticospinal Tract", named_entity_target=True)
+    response = _generated_response(
+        answers=["Corticospinal Tract", "Corticobulbar Tract", "Lateral Corticospinal Tract", "Medial Lemniscus Tract"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
