@@ -1083,3 +1083,188 @@ def test_target_answer_identity_check_coexists_with_distractor_containment_check
     generator = _make_generator(provider=_provider(response))
     with pytest.raises(InvalidGeneratedOutputError):
         generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+
+
+# ---------------------------------------------------------------------------
+# WP-054: narrow permanent identity-first strategy integration
+# ---------------------------------------------------------------------------
+
+BASAL_NUCLEI_CATEGORY = "גרעיני הבסיס"
+
+
+def _basal_nuclei_generator(*, provider) -> QuestionGenerator:
+    resolver = _resolver(categories=(BASAL_NUCLEI_CATEGORY,))
+    index = _StubIndex((RetrievalResult(chunk=_chunk(), score=0.5, rank=1),))
+    historical_repository = _historical_repository((), categories=(BASAL_NUCLEI_CATEGORY,))
+    return _make_generator(
+        resolver=resolver, index=index, historical_repository=historical_repository, provider=provider
+    )
+
+
+def _strategy_section(content: str) -> str:
+    # The general instructional prose above the rendered variables always
+    # mentions "GENERATION STRATEGY = IDENTITY_FIRST" as a worked example,
+    # regardless of the resolved preference - only the rendered
+    # "Generation strategy preference:" section reflects the real,
+    # per-generation-call resolved value.
+    return content.split("Generation strategy preference:")[1].split("Possible competing concepts:")[0]
+
+
+def test_caudate_nucleus_generation_reaches_the_llm_with_identity_first_instruction():
+    # WP-054 section 38's required integration test: identity-first context
+    # reaches generation for the approved pair, without a real API call.
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Caudate Nucleus")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content)
+
+
+def test_nucleus_accumbens_generation_reaches_the_llm_with_identity_first_instruction():
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Nucleus Accumbens")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content)
+
+
+def test_globus_pallidus_generation_now_receives_the_identity_first_instruction():
+    # WP-057: promoted from DEFAULT to IDENTITY_FIRST, per the WP-055
+    # diagnostic investigation, the WP-056 controlled experiment, and the
+    # WP-056 architecture review's explicit approval.
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Globus Pallidus")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content)
+
+
+def test_other_target_in_basal_nuclei_never_receives_the_identity_first_instruction():
+    # WP-054 section 37: prevents the rule from becoming category-global.
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Putamen")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" not in _strategy_section(content)
+
+
+def test_caudate_nucleus_outside_basal_nuclei_never_receives_the_identity_first_instruction():
+    # WP-054 section 36: prevents the rule from becoming target-global.
+    target = _target(category=CATEGORY, topic="Caudate Nucleus")
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" not in _strategy_section(content)
+
+
+def test_identity_first_strategy_adds_no_second_llm_call():
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Caudate Nucleus")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert provider.generate_structured.call_count == 1
+
+
+def test_identity_first_strategy_does_not_disable_existing_deterministic_checks():
+    # Existing validators/pre-validator checks (WP-046/047) must remain
+    # active for an identity-first target - the strategy preference is a
+    # prompt-only preference, never a validation bypass.
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Caudate Nucleus", named_entity_target=True)
+    response = _generated_response(answers=["Some unrelated named structure", "b", "c", "d"], correct_answer=1)
+    generator = _basal_nuclei_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+def test_question_target_gained_no_strategy_field():
+    # WP-054 section 13: strategy stays structurally separate from
+    # QuestionTarget - it must never become a target property.
+    assert "strategy" not in " ".join(QuestionTarget.model_fields).lower()
+
+
+def test_candidate_question_carries_no_strategy_field():
+    # WP-054 section 30: the strategy preference is internal generation
+    # metadata only - it must never appear in the product output schema.
+    assert "strategy" not in " ".join(CandidateQuestion.model_fields).lower()
+
+
+# ---------------------------------------------------------------------------
+# WP-057: permanent Globus Pallidus identity-first mapping
+# ---------------------------------------------------------------------------
+
+
+def test_globus_pallidus_outside_basal_nuclei_never_receives_the_identity_first_instruction():
+    # WP-057 section 22 (category isolation): the strategy decision is
+    # category + target, never target alone.
+    target = _target(category=CATEGORY, topic="Globus Pallidus")
+    provider = _provider()
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" not in _strategy_section(content)
+
+
+def test_globus_pallidus_externus_never_receives_the_identity_first_instruction():
+    # WP-057 section 23 (exact target matching): a related target whose
+    # name merely contains "Globus Pallidus" must not inherit the strategy.
+    target = _target(category=BASAL_NUCLEI_CATEGORY, topic="Globus Pallidus Externus")
+    provider = _provider()
+    generator = _basal_nuclei_generator(provider=provider)
+    generator.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    sent_messages = provider.generate_structured.call_args.kwargs["messages"]
+    content = next(m for m in sent_messages if m.role == MessageRole.USER).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" not in _strategy_section(content)
+
+
+def test_caudate_and_nucleus_accumbens_still_receive_identity_first_alongside_globus_pallidus():
+    # WP-057 section 20 (regression protection for existing mappings):
+    # adding Globus Pallidus must not disturb the two pre-existing
+    # approved targets.
+    provider_caudate = _provider()
+    generator_caudate = _basal_nuclei_generator(provider=provider_caudate)
+    generator_caudate.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY,
+        generation_mode=GenerationMode.INDEPENDENT,
+        target=_target(category=BASAL_NUCLEI_CATEGORY, topic="Caudate Nucleus"),
+    )
+    content_caudate = next(
+        m for m in provider_caudate.generate_structured.call_args.kwargs["messages"] if m.role == MessageRole.USER
+    ).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content_caudate)
+
+    provider_accumbens = _provider()
+    generator_accumbens = _basal_nuclei_generator(provider=provider_accumbens)
+    generator_accumbens.generate_candidate_question(
+        category=BASAL_NUCLEI_CATEGORY,
+        generation_mode=GenerationMode.INDEPENDENT,
+        target=_target(category=BASAL_NUCLEI_CATEGORY, topic="Nucleus Accumbens"),
+    )
+    content_accumbens = next(
+        m for m in provider_accumbens.generate_structured.call_args.kwargs["messages"] if m.role == MessageRole.USER
+    ).content
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content_accumbens)

@@ -9,6 +9,7 @@ from exam_generator.models import (
     CandidateQuestion,
     ExamQuestion,
     GenerationMode,
+    GenerationStrategyPreference,
     HistoricalStyleReference,
     QuestionTarget,
     SourceEvidenceChunk,
@@ -412,6 +413,7 @@ def test_blank_category_rejected_by_generation_context_even_though_generic_rende
             target=_target(),
             relationship=extract_relationship(_target()),
             competitors=(),
+            strategy_preference=GenerationStrategyPreference.DEFAULT,
         )
 
 
@@ -792,6 +794,7 @@ def _rendered_generation_prompt(
     historical_reference=None,
     evidence=None,
     target=None,
+    strategy_preference=None,
 ) -> str:
     resolved_target = target or _target()
     resolved_evidence = evidence or (_chunk(),)
@@ -805,6 +808,7 @@ def _rendered_generation_prompt(
         competitors=discover_competitors(
             target=resolved_target, relationship=resolved_relationship, source_evidence=resolved_evidence
         ),
+        strategy_preference=strategy_preference or GenerationStrategyPreference.DEFAULT,
         historical_reference=historical_reference,
     )
     template = production_repository.get(PromptId.QUESTION_GENERATION)
@@ -1175,6 +1179,7 @@ def test_style_similar_context_requires_historical_reference():
             target=_target(category="c"),
             relationship=extract_relationship(_target(category="c")),
             competitors=(),
+            strategy_preference=GenerationStrategyPreference.DEFAULT,
             historical_reference=None,
         )
 
@@ -1195,6 +1200,7 @@ def test_style_similar_keeps_historical_material_separate_from_factual_evidence(
         target=_target(category="c"),
         relationship=extract_relationship(_target(category="c")),
         competitors=(),
+        strategy_preference=GenerationStrategyPreference.DEFAULT,
         historical_reference=_historical_reference(question="historical passage"),
     )
     variables = context.render_variables()
@@ -1210,6 +1216,7 @@ def test_independent_accepts_no_historical_reference():
         target=_target(category="c"),
         relationship=extract_relationship(_target(category="c")),
         competitors=(),
+        strategy_preference=GenerationStrategyPreference.DEFAULT,
         historical_reference=None,
     )
     assert context.historical_reference is None
@@ -1230,6 +1237,7 @@ def test_invalid_mode_reference_combination_fails_independent_with_reference():
             target=_target(category="c"),
             relationship=extract_relationship(_target(category="c")),
             competitors=(),
+            strategy_preference=GenerationStrategyPreference.DEFAULT,
             historical_reference=_historical_reference(),
         )
 
@@ -1529,6 +1537,80 @@ def test_format_target_enumeration_requirement_is_a_pure_deterministic_function(
     )
 
 
+# ---------------------------------------------------------------------------
+# WP-054: generation strategy preference
+# ---------------------------------------------------------------------------
+
+
+def test_generation_template_requires_target_strategy_requirement(production_repository):
+    template = production_repository.get(PromptId.QUESTION_GENERATION)
+    assert "target_strategy_requirement" in template.required_variables
+
+
+def test_identity_first_target_prompt_states_the_preference_explicitly(production_repository):
+    target = _target(topic="Caudate Nucleus", named_entity_target=True)
+    rendered = _rendered_generation_prompt(
+        production_repository,
+        mode=GenerationMode.INDEPENDENT,
+        target=target,
+        strategy_preference=GenerationStrategyPreference.IDENTITY_FIRST,
+    )
+    section = rendered.split("Generation strategy preference:")[1].split("Possible competing concepts:")[0]
+    assert "GENERATION STRATEGY = IDENTITY_FIRST" in section
+    assert "Caudate Nucleus" in section
+    assert "does not relax, replace, or override" in section
+
+
+def test_default_strategy_prompt_renders_the_honest_no_preference_sentinel(production_repository):
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    rendered = _rendered_generation_prompt(
+        production_repository,
+        mode=GenerationMode.INDEPENDENT,
+        target=target,
+        strategy_preference=GenerationStrategyPreference.DEFAULT,
+    )
+    section = rendered.split("Generation strategy preference:")[1].split("Possible competing concepts:")[0]
+    assert "No additional generation-strategy preference applies to this target" in section
+    assert "GENERATION STRATEGY" not in section
+
+
+def test_strategy_preference_does_not_alter_any_unrelated_prompt_section(production_repository):
+    # WP-054 section 21/22: the preference must be isolated to its own
+    # section only - the default (unmodified) prompt template is never
+    # mutated, and no unrelated section changes between the two conditions.
+    target = _target(topic="Caudate Nucleus", named_entity_target=True, category="גזע המוח")
+    default_rendered = _rendered_generation_prompt(
+        production_repository,
+        mode=GenerationMode.INDEPENDENT,
+        target=target,
+        strategy_preference=GenerationStrategyPreference.DEFAULT,
+    )
+    identity_first_rendered = _rendered_generation_prompt(
+        production_repository,
+        mode=GenerationMode.INDEPENDENT,
+        target=target,
+        strategy_preference=GenerationStrategyPreference.IDENTITY_FIRST,
+    )
+    assert default_rendered.split("Generation strategy preference:")[0] == (
+        identity_first_rendered.split("Generation strategy preference:")[0]
+    )
+    assert default_rendered.split("Possible competing concepts:")[1] == (
+        identity_first_rendered.split("Possible competing concepts:")[1]
+    )
+
+
+def test_format_target_strategy_requirement_is_a_pure_deterministic_function():
+    from exam_generator.prompts.formatting import format_target_strategy_requirement
+
+    target = _target(topic="Caudate Nucleus")
+    assert format_target_strategy_requirement(
+        GenerationStrategyPreference.IDENTITY_FIRST, target
+    ) == format_target_strategy_requirement(GenerationStrategyPreference.IDENTITY_FIRST, target)
+    assert format_target_strategy_requirement(GenerationStrategyPreference.DEFAULT, target) == (
+        format_target_strategy_requirement(GenerationStrategyPreference.DEFAULT, _target())
+    )
+
+
 def test_existing_generation_mode_enum_is_reused():
     context = GenerationPromptContext(
         category="c",
@@ -1537,6 +1619,7 @@ def test_existing_generation_mode_enum_is_reused():
         target=_target(category="c"),
         relationship=extract_relationship(_target(category="c")),
         competitors=(),
+        strategy_preference=GenerationStrategyPreference.DEFAULT,
     )
     assert isinstance(context.generation_mode, GenerationMode)
 

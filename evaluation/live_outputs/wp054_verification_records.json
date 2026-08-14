@@ -1,0 +1,230 @@
+[
+  {
+    "target": "Caudate Nucleus",
+    "resolved_strategy": "IDENTITY_FIRST",
+    "accepted": true,
+    "attempt_count": 1,
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": true,
+        "question": "איזה מבנה במערכת העצבים המרכזית נקרא Caudate Nucleus?",
+        "answers": [
+          "Caudate Nucleus",
+          "Putamen",
+          "Globus Pallidus",
+          "Nucleus Accumbens"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Caudate Nucleus",
+        "validations": {
+          "grounding": {
+            "passed": true,
+            "reason": "The question is grounded as it accurately asks about the Caudate Nucleus, which is explicitly identified in the evidence as part of the basal nuclei. The only correct answer is the Caudate Nucleus itself, while the other options are distinct structures that do not answer the question."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, and only one of them (Answer 1: Caudate Nucleus) is unambiguously the correct answer. The distractors (Putamen, Globus Pallidus, Nucleus Accumbens) are all plausible structures within the basal ganglia, making them reasonable distractors. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly pertains to the Caudate Nucleus, which is a component of the basal ganglia (גרעיני הבסיס), making it appropriate for the requested category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking specifically for the structure in the central nervous system known as the Caudate Nucleus. A knowledgeable student can answer it based on the question as written. The format is appropriate for a multiple-choice exam, with clear answer choices. The Hebrew language used is natural and grammatically sound, with correct anatomical terminology. There is no unnecessary ambiguity present."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "target": "Nucleus Accumbens",
+    "resolved_strategy": "IDENTITY_FIRST",
+    "accepted": true,
+    "attempt_count": 2,
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": false,
+        "question": "איזה מהמבנים הבאים הוא חלק מגרעיני הבסיס וממוקם בחלק הסטריאטלי של המוח?",
+        "answers": [
+          "Nucleus Accumbens",
+          "Caudate Nucleus",
+          "Putamen",
+          "Globus Pallidus"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Nucleus Accumbens",
+        "validations": {
+          "grounding": {
+            "passed": false,
+            "reason": "The question is grounded in the evidence as it accurately asks about structures that are part of the basal nuclei, which are clearly defined in the provided evidence. All four answer choices are supported as they are all components of the basal nuclei located in the striatal part of the brain."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. The question clearly asks for a structure that is part of the basal ganglia and located in the striatal region, and the answer choices provided are all relevant. Only one answer, the Nucleus Accumbens, is the most appropriate response to the question as it is specifically located in the striatal part of the brain, making it the single best answer."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly asks about structures that are part of the גרעיני הבסיס (basal ganglia) and lists relevant anatomical components, making it appropriate for the requested category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly and unambiguously worded, asking specifically about a structure that is part of the גרעיני הבסיס located in the סטריאטלי part of the brain. A knowledgeable student could answer it based on the information provided. The format is appropriate for a multiple-choice exam question, and the Hebrew used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      },
+      {
+        "attempt_number": 2,
+        "accepted": true,
+        "question": "איזה מבנה מהגרעינים הבסיסיים נקרא Nucleus Accumbens?",
+        "answers": [
+          "Nucleus Accumbens",
+          "Caudate Nucleus",
+          "Putamen",
+          "Globus Pallidus"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Nucleus Accumbens",
+        "validations": {
+          "grounding": {
+            "passed": true,
+            "reason": "The question is grounded in the evidence as it accurately asks about the Nucleus Accumbens, which is explicitly listed as part of the basal nuclei. The only correct answer is the first one, while the other options refer to different structures and do not answer the question correctly."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. The intended correct answer, 'Nucleus Accumbens,' is unambiguously the single best answer, as it directly corresponds to the question asked. The distractors (Caudate Nucleus, Putamen, and Globus Pallidus) are all valid components of the basal ganglia, making them reasonable distractors. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly pertains to the Nucleus Accumbens, which is a structure within the basal ganglia (גרעינים הבסיסיים), making it appropriate for the requested category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking specifically about the structure known as Nucleus Accumbens among the options provided. A knowledgeable student could answer it based on the question as written, as it directly relates to the category of גרעיני הבסיס. The format is appropriate for a multiple-choice exam question, and the Hebrew language used is natural and grammatically sound, with anatomical terminology applied correctly. There is no unnecessary ambiguity in the question or answer choices."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "target": "Globus Pallidus",
+    "resolved_strategy": "DEFAULT",
+    "accepted": false,
+    "attempt_count": 3,
+    "attempts": [
+      {
+        "attempt_number": 1,
+        "accepted": false,
+        "question": "איזה מבנה הוא חלק מגרעיני הבסיס ומסייע בוויסות תנועות מוטוריות?",
+        "answers": [
+          "Globus Pallidus",
+          "Putamen",
+          "Caudate Nucleus",
+          "Substantia Nigra"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Globus Pallidus",
+        "validations": {
+          "grounding": {
+            "passed": false,
+            "reason": "The question is grounded in the evidence as it accurately reflects the role of the basal nuclei in motor regulation. All four answer choices are supported by the evidence as they are all components of the basal nuclei and contribute to motor functions."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures related to the basal ganglia. There is one unambiguously correct answer (Globus Pallidus) that is widely recognized as part of the basal ganglia involved in motor regulation. The distractors (Putamen, Caudate Nucleus, Substantia Nigra) are also valid components of the basal ganglia, making them plausible but incorrect options. There are no structural clues that give away the correct answer, and the question and answer choices are coherent with one another."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly pertains to the structures that are part of the גרעיני הבסיס (basal ganglia) and asks about their role in regulating motor movements, which aligns perfectly with the requested category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking specifically about a structure that is part of the גרעיני הבסיס and its role in regulating motor movements. Each answer choice is a valid anatomical term related to the question, and the language used is natural and grammatically sound in Hebrew. The question reads as a well-formed multiple-choice exam question, with no unnecessary ambiguity present."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      },
+      {
+        "attempt_number": 2,
+        "accepted": false,
+        "question": "איזה מבנה מהווה חלק מגרעיני הבסיס?",
+        "answers": [
+          "Globus Pallidus",
+          "Nucleus Accumbens",
+          "Caudate Nucleus",
+          "Putamen"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Globus Pallidus",
+        "validations": {
+          "grounding": {
+            "passed": false,
+            "reason": "The question is grounded as it accurately asks about structures that are part of the Basal Nuclei, which are clearly defined in the evidence. All four answer choices are supported as they are all listed as components of the Basal Nuclei in the provided evidence."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. Only one answer, Globus Pallidus, is the unambiguously correct answer, as it is a well-known component of the basal ganglia. The other options, while also parts of the basal ganglia, do not create ambiguity regarding the best answer. There are no structural clues that give away the correct answer, and all choices are coherent with the question."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly asks about structures that are part of the גרעיני הבסיס, and all provided answers are recognized components of this anatomical category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, asking which structure is part of the גרעיני הבסיס. Each answer choice is a valid anatomical term, and the question is formatted appropriately for a multiple-choice exam. The Hebrew used is natural and grammatically correct, with anatomical terminology applied consistently. There is no unnecessary ambiguity in the question or answer choices."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      },
+      {
+        "attempt_number": 3,
+        "accepted": false,
+        "question": "איזה מהבאים הוא גרעין הנמצא בתוך הגרעינים הבסיסיים?",
+        "answers": [
+          "Globus Pallidus",
+          "Nucleus Accumbens",
+          "Putamen",
+          "Caudate Nucleus"
+        ],
+        "correct_answer_position": 1,
+        "correct_answer_text": "Globus Pallidus",
+        "validations": {
+          "grounding": {
+            "passed": false,
+            "reason": "The question is grounded in the evidence as it accurately asks about the components of the basal nuclei, which are clearly defined in the provided student-summary evidence. All four answer choices are supported as they are all part of the basal nuclei as listed in the evidence."
+          },
+          "mcq": {
+            "valid": true,
+            "reason": "The candidate question has exactly four answer choices, all of which are plausible structures of the basal ganglia. Only one answer, 'Globus Pallidus', is the unambiguous single best answer to the question, as it is indeed a part of the basal ganglia. The other options are also valid components of the basal ganglia, but they do not serve as the best answer to the specific question asked."
+          },
+          "category": {
+            "valid": true,
+            "reason": "The candidate question directly pertains to the topic of גרעיני הבסיס (basal ganglia), as it asks about a specific nucleus located within this anatomical structure, and all provided answer options are relevant to this category."
+          },
+          "quality": {
+            "valid": true,
+            "reason": "The question is clearly worded and unambiguous, allowing knowledgeable students to answer it based on the information provided. It follows a natural multiple-choice format, with appropriate phrasing and structure. The Hebrew language used is grammatically sound, and the anatomical terminology is correctly applied. There is no unnecessary ambiguity in the question or answer choices."
+          },
+          "textbook": {
+            "status": "CONSISTENT"
+          }
+        }
+      }
+    ]
+  }
+]

@@ -16,6 +16,7 @@ from exam_generator.models import (
     CategoryCoverage,
     CompetitorCandidate,
     ExamQuestion,
+    GenerationStrategyPreference,
     HistoricalStyleReference,
     QuestionTarget,
     SourceEvidenceChunk,
@@ -425,6 +426,60 @@ def format_target_enumeration_requirement(target: QuestionTarget) -> str:
         "location, or relationship) as required by the general 'Testing enumeration or "
         f"classification targets' guidance above - this note only confirms that guidance applies "
         f"to this specific target."
+    )
+
+
+_NO_STRATEGY_PREFERENCE_TEXT = (
+    "No additional generation-strategy preference applies to this target - follow the general "
+    "guidance above to choose whichever evidence-supported relationship produces the clearest, "
+    "single-best-answer question."
+)
+
+
+def format_target_strategy_requirement(
+    preference: GenerationStrategyPreference, target: QuestionTarget
+) -> str:
+    """WP-054: deterministically format the generation-strategy preference
+    for ``target``, based only on ``preference`` (see
+    ``exam_generator.generation.strategy.resolve_strategy_preference()`` -
+    a narrow, explicit (category, target-topic) mapping approved only for
+    two experimentally-validated targets: ``Caudate Nucleus``/``Nucleus
+    Accumbens`` within ``גרעיני הבסיס``. Never a general sparse-evidence
+    rule, never derived from a chunk count or historical failure count.
+
+    Honestly renders ``_NO_STRATEGY_PREFERENCE_TEXT`` (never silently
+    omits the section) for ``GenerationStrategyPreference.DEFAULT`` - the
+    ordinary case for every target except the two approved ones - the same
+    fail-honest-sentinel convention every other WP-040/041/043/044
+    formatting function in this module already established.
+
+    When ``preference`` is ``IDENTITY_FIRST``, states a preference (never
+    an exclusive requirement - WP-054 section 15: "IDENTITY_FIRST does not
+    mean IDENTITY_ONLY") for a question whose correct answer is determined
+    by the target's own identity/name, explicitly subordinate to every
+    other requirement stated elsewhere in this prompt (answer-identity,
+    target-language, target evidence-role, enumeration-member, and the
+    general single-best-answer/grounding requirements) - this note
+    narrows HOW to satisfy those requirements, it never relaxes or
+    replaces any of them.
+    """
+    if preference != GenerationStrategyPreference.IDENTITY_FIRST:
+        return _NO_STRATEGY_PREFERENCE_TEXT
+
+    topic = target.topic
+    return (
+        f"GENERATION STRATEGY = IDENTITY_FIRST\n\n"
+        f"Prefer constructing the question so that the correct answer is determined by "
+        f"{topic}'s own identity/name (for example, a phrasing that establishes which "
+        f"specific structure {topic} itself is), rather than by a distinguishing functional, "
+        "locational, or classificatory property. This is a preference, not an exclusive "
+        "requirement: only fall back to a property-based question if an identity-based "
+        "question genuinely cannot be constructed from the supplied evidence at all.\n"
+        "This preference does not relax, replace, or override any other requirement stated "
+        "elsewhere in this prompt - the answer-identity, target-language, target evidence-"
+        "role, and enumeration-member requirements below all still apply in full, and the "
+        "resulting question must still satisfy every general requirement above (single-best-"
+        "answer, factual grounding, and distractor correctness)."
     )
 
 

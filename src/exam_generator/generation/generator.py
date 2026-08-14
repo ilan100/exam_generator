@@ -31,6 +31,7 @@ from exam_generator.generation.errors import (
 )
 from exam_generator.generation.competitors import discover_competitors
 from exam_generator.generation.relationship import extract_relationship
+from exam_generator.generation.strategy import resolve_strategy_preference
 from exam_generator.historical import HistoricalQuestionRepository
 from exam_generator.llm import LLMProfile, LLMProvider, build_llm_provider
 from exam_generator.models import (
@@ -396,6 +397,14 @@ class QuestionGenerator:
         existing provenance check, all raising
         ``InvalidGeneratedOutputError`` for a structurally-invalid
         response, never a new validator.
+
+        Since WP-054, also deterministically resolves a
+        ``GenerationStrategyPreference`` for ``canonical_category``/
+        ``target.topic`` (``resolve_strategy_preference()``) and threads it
+        into the prompt context - a narrow, explicit preference for two
+        experimentally-approved targets only (see
+        ``exam_generator.generation.strategy``), never a new validator,
+        retry policy, or target filter.
         """
         if not isinstance(generation_mode, GenerationMode):
             raise GenerationContextError(f"Unsupported generation mode: {generation_mode!r}")
@@ -418,6 +427,7 @@ class QuestionGenerator:
             )
 
         relationship = extract_relationship(target)
+        strategy_preference = resolve_strategy_preference(category=canonical_category, topic=target.topic)
         context = GenerationPromptContext(
             category=canonical_category,
             generation_mode=generation_mode,
@@ -425,6 +435,7 @@ class QuestionGenerator:
             target=target,
             relationship=relationship,
             competitors=discover_competitors(target=target, relationship=relationship, source_evidence=source_evidence),
+            strategy_preference=strategy_preference,
             historical_reference=historical_reference,
         )
 

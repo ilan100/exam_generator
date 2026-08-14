@@ -13,6 +13,7 @@ from exam_generator.generation.relationship import (
     extract_relationship,
     keywords_for,
 )
+from exam_generator.generation.strategy import resolve_strategy_preference
 
 __all__ = [
     "GenerationContextError",
@@ -26,4 +27,5 @@ __all__ = [
     "discover_competitors",
     "extract_relationship",
     "keywords_for",
+    "resolve_strategy_preference",
 ]

@@ -21,6 +21,7 @@ from exam_generator.models.question import (
 )
 from exam_generator.models.relationship import QuestionRelationship
 from exam_generator.models.source import HistoricalStyleReference, SourceEvidenceChunk, SourceType
+from exam_generator.models.strategy import GenerationStrategyPreference
 from exam_generator.models.target import (
     PlannedQuestionTargetResponse,
     QuestionTarget,
@@ -53,6 +54,7 @@ __all__ = [
     "FailedQuestionAudit",
     "GeneratedQuestionResponse",
     "GenerationMode",
+    "GenerationStrategyPreference",
     "GroundingAnswerAssessment",
     "GroundingValidationResponse",
     "GroundingValidationResult",

@@ -46,6 +46,7 @@ Once a WP is supplied:
 - Update `docs/PROJECT_STATUS.md` only after successful completion.
 - Update `docs/ARCHITECTURE.md` only if the WP establishes/changes a durable architecture/interface decision.
 - Finish with a factual completion report: files changed, behavior implemented, tests/commands/results, status-document changes, known issues, and deferred items.
+- Create WP completion report in a markdown file.
 
 ## End-of-Session Rule
 Before intentionally ending a development session after completed work, confirm that `docs/PROJECT_STATUS.md` accurately reflects the repository's current state. A future Claude session must be able to resume from the repository without conversational memory.

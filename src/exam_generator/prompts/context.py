@@ -17,6 +17,7 @@ from exam_generator.models import (
     CategoryCoverage,
     CompetitorCandidate,
     GenerationMode,
+    GenerationStrategyPreference,
     HistoricalStyleReference,
     QuestionRelationship,
     QuestionTarget,
@@ -34,6 +35,7 @@ from exam_generator.prompts.formatting import (
     format_target_enumeration_requirement,
     format_target_evidence_role,
     format_target_language_requirement,
+    format_target_strategy_requirement,
 )
 
 
@@ -86,6 +88,15 @@ class GenerationPromptContext:
     ``exam_generator.prompts.formatting.format_target_enumeration_requirement()``) -
     derived purely from ``target.is_enumeration_member``, never a new field
     on this context itself.
+
+    Since WP-054, every generation call also carries an explicit
+    ``strategy_preference`` (see
+    ``exam_generator.generation.strategy.resolve_strategy_preference()``) -
+    a narrow, deterministic (category, target-topic) generation-policy
+    preference, kept structurally separate from ``QuestionTarget`` itself
+    (WP-054 section 13: strategy is "how generation should approach the
+    target", not an intrinsic property of the target). ``render_variables()``
+    renders it via ``format_target_strategy_requirement()``.
     """
 
     category: str
@@ -94,6 +105,7 @@ class GenerationPromptContext:
     target: QuestionTarget
     relationship: QuestionRelationship
     competitors: tuple[CompetitorCandidate, ...]
+    strategy_preference: GenerationStrategyPreference
     historical_reference: HistoricalStyleReference | None = None
 
     def __post_init__(self) -> None:
@@ -133,6 +145,9 @@ class GenerationPromptContext:
             "target_language_requirement": format_target_language_requirement(self.target),
             "target_evidence_role": format_target_evidence_role(self.target),
             "target_enumeration_requirement": format_target_enumeration_requirement(self.target),
+            "target_strategy_requirement": format_target_strategy_requirement(
+                self.strategy_preference, self.target
+            ),
             "relationship_type": self.relationship.relationship_type,
             "competitor_concepts": format_competitors(self.competitors),
         }
