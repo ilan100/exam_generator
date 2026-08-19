@@ -1268,3 +1268,270 @@ def test_caudate_and_nucleus_accumbens_still_receive_identity_first_alongside_gl
         m for m in provider_accumbens.generate_structured.call_args.kwargs["messages"] if m.role == MessageRole.USER
     ).content
     assert "GENERATION STRATEGY = IDENTITY_FIRST" in _strategy_section(content_accumbens)
+
+
+# ---------------------------------------------------------------------------
+# WP-058: deterministic target-language compliance check
+# ---------------------------------------------------------------------------
+
+
+def test_pure_english_correct_answer_is_accepted():
+    # The WP-057-observed real shape: Hebrew question stem, English target
+    # reference, English correct answer - fully compliant with WP-041's
+    # own documented scope (correct answer + in-question target reference
+    # only, never the rest of the question).
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["Globus Pallidus", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_hebrew_decorated_english_answer_is_rejected():
+    # The one real residual gap WP-047's own containment check does not
+    # exclude by itself: the required English text is present, but an
+    # accompanying non-English rendering is also present.
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["גלובוס פאלידום Globus Pallidus", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+def test_pure_hebrew_answer_still_rejected_by_existing_identity_check():
+    # WP-047's own pre-existing check already rejects this (no English
+    # substring at all) - confirms the two checks coexist without either
+    # masking the other's own reason.
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["גלובוס פאלידום", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+def test_hebrew_only_topic_exception_is_permitted():
+    # WP-058 section 20: a synthetic, structural test only - no real
+    # pilot-category concept is Hebrew-only (WP-041's own confirmed
+    # invariant; re-confirmed by this WP's diagnostic investigation, see
+    # WP-058_COMPLETION_REPORT.md). This exercises the code path honestly,
+    # not a claim that "עצם הצדע" is a verified real project item.
+    target = _target(topic="עצם הצדע", named_entity_target=True)
+    response = _generated_response(answers=["עצם הצדע", "מבנה אחר", "מבנה שלישי", "מבנה רביעי"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_non_named_entity_target_never_triggers_language_compliance_check():
+    target = _target(topic="function of the basal nuclei", named_entity_target=False)
+    response = _generated_response(answers=["תשובה בעברית בלבד", "second", "third", "fourth"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_language_compliance_check_never_consumes_a_second_llm_call():
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    provider = _provider(
+        _generated_response(
+            answers=["Globus Pallidus", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"], correct_answer=1
+        )
+    )
+    generator = _make_generator(provider=provider)
+    generator.generate_candidate_question(category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target)
+    assert provider.generate_structured.call_count == 1
+
+
+def test_language_compliance_check_is_deterministic_never_an_llm_validator():
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_target_language_compliance)
+    assert "generate_structured" not in source
+    assert "LLMProvider" not in source
+
+
+def test_language_compliance_check_coexists_with_target_answer_identity_check():
+    # Both checks active for the same candidate; a candidate failing the
+    # earlier identity check must still fail with that check's own reason
+    # (order-dependent, but both checks independently correct).
+    target = _target(topic="Corpos Striatum", named_entity_target=True)
+    response = _generated_response(
+        answers=["Caudate Nucleus", "Nucleus Accumbens", "Putamen", "Globus Pallidus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+# ---------------------------------------------------------------------------
+# WP-062: language-policy runtime enforcement broadened to all four answers
+# ---------------------------------------------------------------------------
+
+
+def test_hebrew_grammatical_prose_with_english_correct_answer_is_accepted():
+    # Hebrew question stem + English target/correct answer remains the
+    # expected, fully-compliant shape (docs/LANGUAGE_POLICY.md).
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        question=HEBREW_QUESTION_TEXT,
+        answers=["Globus Pallidus", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_hebrew_decorated_target_name_used_as_a_distractor_is_rejected():
+    # WP-062's own real extension: before WP-062 only the correct answer
+    # was checked - the identical Hebrew-decoration problem occurring in a
+    # DISTRACTOR (never the correct answer) was not excluded by any check.
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["Globus Pallidus", "גלובוס פאלידום Globus Pallidus", "Putamen", "Caudate Nucleus"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+def test_answer_choice_not_naming_the_target_is_never_checked_for_language():
+    # An answer that does not name the target at all is outside this
+    # check's reliable scope (docs/LANGUAGE_POLICY.md's own general stem/
+    # distractor terminology requirement remains prompt-instructed only -
+    # see the disclosed-limitation tests below).
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["Globus Pallidus", "מבנה אחר לגמרי", "Putamen", "Caudate Nucleus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_english_acronym_target_correct_answer_accepted():
+    # An acronym-shaped named-entity target is not a special case - the
+    # same ASCII-representability check already covers it.
+    target = _target(topic="CNS", named_entity_target=True)
+    response = _generated_response(answers=["CNS", "PNS", "ANS", "ENS"], correct_answer=1)
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_hebrew_expansion_of_english_acronym_target_is_rejected():
+    # Rejected via the pre-existing WP-047 target-answer-identity check
+    # (the Hebrew expansion does not contain "CNS" as a substring at all,
+    # so the language-compliance check itself never fires here - both
+    # checks independently guard the same underlying requirement).
+    target = _target(topic="CNS", named_entity_target=True)
+    response = _generated_response(
+        answers=["מערכת העצבים המרכזית", "PNS", "ANS", "ENS"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    with pytest.raises(InvalidGeneratedOutputError):
+        generator.generate_candidate_question(
+            category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+        )
+
+
+def test_entire_english_candidate_is_not_rejected_by_language_policy_alone():
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        question="Which of the following is Globus Pallidus?",
+        answers=["Globus Pallidus", "Nucleus Accumbens", "Putamen", "Caudate Nucleus"],
+        correct_answer=1,
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_language_compliance_check_now_scoped_to_all_four_answers_source_inspection():
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_target_language_compliance)
+    assert "response.answers" in source
+    assert "enumerate" in source
+
+
+# --- Disclosed limitations (WP-062 section 16: "document which cases are
+# enforced / not enforced / ambiguous" - never fabricate certainty) ---
+
+
+def test_disclosed_limitation_pure_hebrew_transliteration_distractor_not_caught():
+    # A distractor that is a PURE Hebrew rendering of the target's own
+    # name (no embedded ASCII at all) contains no detectable overlap with
+    # target.topic, so this check cannot reliably identify it as a
+    # violation without a transliteration table - explicitly out of scope
+    # (this project has repeatedly rejected fuzzy/transliteration
+    # matching, e.g. WP-038). Documented here as an honest, known gap,
+    # not silently assumed to be covered.
+    target = _target(topic="Globus Pallidus", named_entity_target=True)
+    response = _generated_response(
+        answers=["Globus Pallidus", "גלובוס פאלידום", "Putamen", "Caudate Nucleus"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_disclosed_limitation_non_named_entity_target_language_not_deterministically_enforced():
+    target = _target(topic="function of the basal nuclei", named_entity_target=False)
+    response = _generated_response(
+        answers=["שולט על תנועה רצונית", "תשובה שנייה", "תשובה שלישית", "תשובה רביעית"], correct_answer=1
+    )
+    generator = _make_generator(provider=_provider(response))
+    candidate = generator.generate_candidate_question(
+        category=CATEGORY, generation_mode=GenerationMode.INDEPENDENT, target=target
+    )
+    assert isinstance(candidate, CandidateQuestion)
+
+
+def test_disclosed_limitation_question_stem_terminology_never_inspected():
+    # Source-inspection: the check has structurally nowhere to read the
+    # question stem from (only response.answers), confirming stem
+    # terminology unrelated to the target is prompt-instructed only, per
+    # implementation/WP-062_LANGUAGE_ENFORCEMENT_COVERAGE.md.
+    import inspect
+
+    from exam_generator.generation import generator as generator_module
+
+    source = inspect.getsource(generator_module._validate_target_language_compliance)
+    assert "response.question" not in source

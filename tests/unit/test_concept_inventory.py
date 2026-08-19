@@ -178,8 +178,10 @@ def test_selection_returns_empty_when_inventory_is_fully_tested():
 # ---------------------------------------------------------------------------
 
 
-def test_pilot_categories_are_exactly_three():
-    assert PILOT_CATEGORIES == {"אספקת דם", "מסילות עצביות", "גרעיני הבסיס"}
+def test_pilot_categories_are_exactly_four():
+    # WP-063 added המערכת הלימבית as the first single-category post-WP-060
+    # pilot, alongside the original three WP-036 pilot categories.
+    assert PILOT_CATEGORIES == {"אספקת דם", "מסילות עצביות", "גרעיני הבסיס", "המערכת הלימבית"}
 
 
 def test_no_llm_or_embedding_call_in_concept_inventory_module():

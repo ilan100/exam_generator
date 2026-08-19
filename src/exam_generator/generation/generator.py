@@ -22,6 +22,8 @@ WP-010 and later.
 
 from __future__ import annotations
 
+import re
+
 from exam_generator.config import load_llm_config
 from exam_generator.generation.errors import (
     GenerationContextError,
@@ -296,6 +298,101 @@ def _validate_target_answer_identity(response: GeneratedQuestionResponse, *, tar
         )
 
 
+#: WP-058: the same "is this text expressible without any non-ASCII
+#: character" question ``prompts.formatting._is_english_representable()``
+#: already asks of a target's own topic - re-implemented locally rather
+#: than imported, following this module's own established precedent
+#: (see ``_normalize_answer_text``'s docstring above) for a small,
+#: self-contained duplicate rather than a cross-module private import.
+_NON_ASCII_PATTERN = re.compile(r"[^\x00-\x7f]")
+
+
+def _target_topic_requires_english(target: QuestionTarget) -> bool:
+    return bool(target.topic.strip()) and not _NON_ASCII_PATTERN.search(target.topic)
+
+
+def _validate_target_language_compliance(response: GeneratedQuestionResponse, *, target: QuestionTarget) -> None:
+    """Deterministic post-generation check enforcing the target-name half
+    of the project's language policy
+    (``docs/LANGUAGE_POLICY.md``, WP-061; originally WP-041's
+    ``prompts.formatting.format_target_language_requirement()``) at the
+    final accepted-output boundary - previously enforced only as an LLM
+    prompt instruction, with no deterministic verification of its own
+    (unlike the structurally analogous WP-040 answer-identity instruction,
+    which WP-047's ``_validate_target_answer_identity()`` above already
+    verifies deterministically).
+
+    Since WP-062, checked across **all four answer choices**, not only
+    the correct answer (WP-058's original scope) - ``docs/LANGUAGE_POLICY.md``
+    is explicit that the English-first rule is not restricted to the
+    correct answer or to the target. Whichever answer choice(s) actually
+    name the target (contain its own normalized topic text as a
+    substring - the same containment test
+    ``_validate_target_answer_identity()`` above already uses) must
+    express that name entirely in English when ``target.topic`` is
+    English-representable; an answer choice that does not name the target
+    at all is not touched by this check.
+
+    This remains deliberately narrower than the full ``docs/LANGUAGE_POLICY.md``
+    scope: it is the one item (the assigned target's own name) for which
+    this project has a reliable, existing, deterministic "does an English
+    representation exist" data source (``target.named_entity_target``/
+    ``.topic`` - the same invariant WP-041 already relies on, true only
+    for pilot-category named-entity targets). WP-062's own feasibility
+    investigation (see ``implementation/WP-062_COMPLETION_REPORT.md`` and
+    ``implementation/WP-062_LANGUAGE_ENFORCEMENT_COVERAGE.md``) found no
+    comparable reliable data source for: professional terminology
+    unrelated to the assigned target appearing in the question stem or in
+    a distractor, acronyms/symbols other than the target's own name, or
+    non-named-entity targets (free-text, LLM-authored ``topic``, not
+    guaranteed English-representable) - deterministically validating those
+    would require either an invented terminology database or fuzzy/
+    semantic matching, both explicitly rejected by this project's
+    established architecture (WP-038 and others). Those cases remain
+    prompt-instructed only (``prompts/generation/question.txt``'s own
+    broadened base rule), not deterministically enforced - a disclosed,
+    known limitation, not a silent gap.
+
+    ``_validate_target_answer_identity()`` above already deterministically
+    requires the CORRECT answer to CONTAIN the target's own English text
+    when ``named_entity_target`` is true - which already makes a purely-
+    Hebrew correct answer impossible to accept (a Hebrew string cannot
+    contain an ASCII substring). This check closes two residual gaps that
+    containment check's own deliberate "incidental surrounding text is
+    allowed" design (WP-046/WP-047) does not by itself exclude: (a) the
+    correct answer containing the required English text while ALSO
+    carrying an accompanying non-English rendering alongside it
+    (WP-058's original finding), and (b) since WP-062, the identical
+    problem occurring in a DISTRACTOR that happens to name the target
+    (e.g. a Hebrew-decorated rendering of the target's own name used as a
+    wrong answer) - neither ever actually observed in this project's real
+    data, but both reachable in principle and, before WP-062, not
+    excluded by any existing check for distractors.
+
+    A no-op for a non-named-entity target, or a named-entity target whose
+    own topic is not English-representable (a genuinely Hebrew-only
+    target legitimately requires - and is still permitted - a Hebrew
+    answer, per ``format_target_language_requirement()``'s own second
+    branch; no real pilot-category target currently has this shape, per
+    WP-041's own confirmed invariant, but this check honors it exactly as
+    honestly as ``format_target_language_requirement()`` itself does).
+    """
+    if not target.named_entity_target or not _target_topic_requires_english(target):
+        return
+
+    normalized_topic = _normalize_answer_text(target.topic)
+    for position, answer_text in enumerate(response.answers, start=1):
+        if normalized_topic not in _normalize_answer_text(answer_text):
+            continue  # this answer choice does not name the target at all - nothing to check
+        if _NON_ASCII_PATTERN.search(answer_text):
+            raise InvalidGeneratedOutputError(
+                f"Generated response's answer {position} ({answer_text!r}) names the assigned "
+                f"target {target.topic!r}, which has an established English representation, but "
+                "contains non-English text - wherever an answer choice names the target, it must "
+                "be expressible entirely in English (docs/LANGUAGE_POLICY.md; WP-041/WP-058/WP-062)"
+            )
+
+
 def _validate_generated_provenance(
     response: GeneratedQuestionResponse,
     *,
@@ -393,7 +490,10 @@ class QuestionGenerator:
         runs a deterministic distractor-containment check
         (``_validate_distractor_containment()``); since WP-047, also runs a
         deterministic target-to-answer identity check
-        (``_validate_target_answer_identity()``) - all alongside the
+        (``_validate_target_answer_identity()``); since WP-058 (scope
+        broadened to all four answer choices in WP-062), also runs a
+        deterministic target-language compliance check
+        (``_validate_target_language_compliance()``) - all alongside the
         existing provenance check, all raising
         ``InvalidGeneratedOutputError`` for a structurally-invalid
         response, never a new validator.
@@ -460,6 +560,7 @@ class QuestionGenerator:
         _validate_target_role_consistency(response, target=target)
         _validate_distractor_containment(response, target=target)
         _validate_target_answer_identity(response, target=target)
+        _validate_target_language_compliance(response, target=target)
 
         return CandidateQuestion(
             question=response.question,

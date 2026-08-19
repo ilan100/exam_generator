@@ -36,19 +36,26 @@ from pydantic import BaseModel, ConfigDict
 from exam_generator.models import SourceEvidenceChunk
 from exam_generator.models._common import NonBlankStr
 
-#: The exact three categories WP-036 pilots concept-inventory-constrained
-#: planning for - chosen from WP-035's real-evidence study
-#: (`implementation/WP-035_ARCHITECTURE_INVESTIGATION.md` sections 2.1/2.3
-#: plus a follow-up check of `גרעיני הבסיס`, whose top-scoring chunk is an
-#: equally clean bulleted list of named sub-structures). Deliberately not
-#: "all categories with English-list-shaped evidence" - WP-036 section 2
-#: explicitly limits the pilot to three, to keep the blast radius small
-#: and measurable.
+#: The four categories piloting concept-inventory-constrained planning.
+#: The original three (WP-036) were chosen from WP-035's real-evidence
+#: study (`implementation/WP-035_ARCHITECTURE_INVESTIGATION.md` sections
+#: 2.1/2.3 plus a follow-up check of `גרעיני הבסיס`, whose top-scoring
+#: chunk is an equally clean bulleted list of named sub-structures).
+#: `המערכת הלימבית` was added by WP-063 - the first single-category
+#: post-WP-060 pilot, selected via a direct 9-criterion evaluation
+#: (`implementation/WP-063_CATEGORY_SELECTION.md`) over two other
+#: WP-060-spot-checked candidates, for having the cleanest, most directly
+#: source-verified inventory of the three (no numbering-fragment junk
+#: entries or category leakage, unlike the rejected alternatives).
+#: Deliberately not "all categories with English-list-shaped evidence" -
+#: WP-036 section 2's original blast-radius discipline, and WP-063's own
+#: "exactly one additional category" constraint, both still apply.
 PILOT_CATEGORIES: frozenset[str] = frozenset(
     {
         "אספקת דם",
         "מסילות עצביות",
         "גרעיני הבסיס",
+        "המערכת הלימבית",
     }
 )
 

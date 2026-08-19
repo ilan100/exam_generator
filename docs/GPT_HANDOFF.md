@@ -23,6 +23,7 @@ The project is a Python application that generates Hebrew neuroanatomy multiple-
 - Exactly one best/correct answer.
 - Preserve natural Hebrew/English anatomical terminology conventions found in historical questions.
 - Categories are fixed and originate from the historical Excel `category` column.
+- **Language policy (WP-061, authoritative)**: see `docs/LANGUAGE_POLICY.md`. Question prose is Hebrew; every professional/technical/terminological item (anatomical names, acronyms, symbols, etc.) must use English whenever an English representation exists, and Hebrew only when none exists. This applies to the question stem, correct answer, and distractors alike - not only the target's own name. Whole-question English is not required. Any future WP touching generation/prompts/target planning/normalization/validation/output/terminology should reference this document rather than restating or narrowing the rule.
 
 ### Generation modes
 Questions alternate between:

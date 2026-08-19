@@ -714,3 +714,131 @@ def test_pilot_category_non_enumeration_target_is_not_marked_enumeration_member(
     planner = _pilot_planner()
     targets = planner.plan_targets(category=PILOT_CATEGORY, count=2)
     assert all(t.is_enumeration_member is False for t in targets)
+
+
+# ---------------------------------------------------------------------------
+# WP-063: first single-category post-WP-060 deterministic-planning pilot
+# (המערכת הלימבית added to PILOT_CATEGORIES)
+# ---------------------------------------------------------------------------
+
+LIMBIC_CATEGORY = "המערכת הלימבית"
+
+
+def _limbic_planner(*, provider=None, index=None, pilot_categories=None):
+    # Fixture text mirrors the real corpus shape WP-063's own category
+    # selection directly verified: a Hebrew descriptive sentence followed
+    # by standalone-line English named entities.
+    resolver = _resolver(categories=(LIMBIC_CATEGORY,))
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0210:0001",
+        text="המערכת הלימבית כוללת מבנים הקשורים לזיכרון:\nHippocampus\nמבנה הקשור לרגש:\nAmygdala\nמסילת חומר לבן:\nFornix",
+    )
+    return _make_planner(
+        resolver=resolver,
+        index=index if index is not None else _StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)),
+        provider=provider,
+        pilot_categories=pilot_categories,
+    )
+
+
+def test_limbic_category_resolves_correctly():
+    resolver = _resolver(categories=(LIMBIC_CATEGORY,))
+    assert resolver.resolve(LIMBIC_CATEGORY) == LIMBIC_CATEGORY
+
+
+def test_limbic_category_now_takes_the_deterministic_path_via_real_default_pilot_categories():
+    # No pilot_categories override - exercises the real, production-default
+    # PILOT_CATEGORIES (imported from planning.concept_inventory), proving
+    # WP-063's production change actually routes המערכת הלימבית through
+    # the zero-LLM-call deterministic path, not merely that the frozenset
+    # contains its name.
+    provider = _provider()
+    planner = _limbic_planner(provider=provider)
+    targets = planner.plan_targets(category=LIMBIC_CATEGORY, count=1)
+    assert provider.generate_structured.call_count == 0
+    assert len(targets) == 1
+    assert targets[0].topic == "Hippocampus"
+    assert targets[0].category == LIMBIC_CATEGORY
+
+
+def test_limbic_target_carries_genuine_evidence_chunk_id_provenance():
+    planner = _limbic_planner()
+    targets = planner.plan_targets(category=LIMBIC_CATEGORY, count=1)
+    assert targets[0].supporting_evidence_chunk_ids == ("STUDENT_SUMMARY:s1.pdf:0210:0001",)
+
+
+def test_limbic_target_is_marked_a_named_entity_target():
+    planner = _limbic_planner()
+    targets = planner.plan_targets(category=LIMBIC_CATEGORY, count=1)
+    assert targets[0].named_entity_target is True
+
+
+def test_limbic_category_respects_coverage_exclusion():
+    from exam_generator.models import CategoryCoverage
+
+    planner = _limbic_planner()
+    coverage = CategoryCoverage(tested_concepts=("Hippocampus",))
+    targets = planner.plan_targets(category=LIMBIC_CATEGORY, count=1, coverage=coverage)
+    assert len(targets) == 1
+    assert targets[0].topic == "Amygdala"
+
+
+def test_limbic_inventory_extraction_is_deterministic_and_reproducible():
+    # Calling the real, unmodified refine_concept_inventory() twice against
+    # identical evidence must yield an identical result - WP-063 section 28's
+    # "inventory is deterministic/reproducible" requirement, verified
+    # directly for the newly-selected category's own evidence shape rather
+    # than merely relied upon by analogy with the pre-existing categories.
+    from exam_generator.planning.concept_anchor import refine_concept_inventory
+
+    chunk = _chunk(
+        chunk_id="STUDENT_SUMMARY:s1.pdf:0210:0001",
+        text="המערכת הלימבית כוללת מבנים הקשורים לזיכרון:\nHippocampus\nמבנה הקשור לרגש:\nAmygdala\nמסילת חומר לבן:\nFornix",
+    )
+    first = refine_concept_inventory((chunk,))
+    second = refine_concept_inventory((chunk,))
+    assert first == second
+    assert [c.concept for c in first] == ["Hippocampus", "Amygdala", "Fornix"]
+
+
+def test_existing_three_pilot_categories_still_take_the_deterministic_path_unchanged():
+    # WP-063 section 31: adding a fourth category must not alter the
+    # existing three's own behavior. Exercised the same way production
+    # wiring would - no pilot_categories override.
+    for category, chunk_text in (
+        ("גרעיני הבסיס", "גרעיני הבסיס:\nCaudate Nucleus"),
+        ("אספקת דם", "אספקת הדם:\nSuperior Cerebellar Artery"),
+        ("מסילות עצביות", "מסילות עצביות:\nCorticospinal Tract"),
+    ):
+        provider = _provider()
+        resolver = _resolver(categories=(category,))
+        chunk = _chunk(chunk_id=f"STUDENT_SUMMARY:s1.pdf:0001:0001", text=chunk_text)
+        planner = _make_planner(
+            resolver=resolver,
+            index=_StubIndex((RetrievalResult(chunk=chunk, score=0.5, rank=1),)),
+            provider=provider,
+        )
+        targets = planner.plan_targets(category=category, count=1)
+        assert provider.generate_structured.call_count == 0, category
+        assert len(targets) == 1, category
+
+
+def test_non_selected_category_still_uses_llm_planning_unchanged():
+    # עצבים קרניאליים was directly evaluated and rejected during WP-063's
+    # own category selection (implementation/WP-063_CATEGORY_SELECTION.md)
+    # - it must remain on the unchanged LLM-based path, not be silently
+    # swept into deterministic planning alongside the selected category.
+    provider = _provider()
+    resolver = _resolver(categories=("עצבים קרניאליים",))
+    planner = _make_planner(resolver=resolver, provider=provider)
+    targets = planner.plan_targets(category="עצבים קרניאליים", count=1)
+    assert provider.generate_structured.call_count == 1
+    assert len(targets) == 1
+
+
+def test_pilot_categories_constructor_default_now_includes_the_limbic_category():
+    from exam_generator.planning.concept_inventory import PILOT_CATEGORIES
+
+    planner = _make_planner()
+    assert planner._pilot_categories == PILOT_CATEGORIES
+    assert LIMBIC_CATEGORY in planner._pilot_categories

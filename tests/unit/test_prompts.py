@@ -1446,6 +1446,73 @@ def test_format_target_language_requirement_is_a_pure_deterministic_function():
 
 
 # ---------------------------------------------------------------------------
+# WP-062: broadened language-policy runtime enforcement (prompt wording)
+#
+# WP-061's docs/LANGUAGE_POLICY.md made English-first terminology a
+# requirement for the whole question - stem, correct answer, and all three
+# distractors alike - not only the assigned target's own name. These tests
+# verify the generation prompt's instructions were broadened accordingly,
+# that the now-superseded narrow-scope wording is gone, and that the one
+# deterministic per-target rendering (format_target_language_requirement)
+# was deliberately left unchanged - only the surrounding instructions that
+# apply to the rest of the question, by the model's own judgment, changed.
+# ---------------------------------------------------------------------------
+
+
+def test_base_language_rule_now_covers_the_stem_and_all_four_answers(production_repository):
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "all three incorrect answer choices alike" in rendered
+    assert "not only to the correct answer or to the assigned target's own name" in rendered
+
+
+def test_target_language_section_no_longer_exempts_other_terminology(production_repository):
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert (
+        "does not exempt any other terminology in the question from the same underlying principle"
+        in rendered
+    )
+
+
+def test_blueprint_checklist_now_covers_all_four_answers_not_only_correct_answer(production_repository):
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "not only the correct answer - uses its established English/Latin form" in rendered
+
+
+def test_superseded_narrow_scope_wording_no_longer_present_anywhere_in_the_prompt(production_repository):
+    # WP-058/WP-041 originally scoped the language requirement to only the
+    # correct answer and the target's own in-question reference, and said so
+    # explicitly. WP-062 broadened the policy, so none of that superseded
+    # wording should remain anywhere in the rendered prompt - a leftover
+    # fragment would silently re-narrow the instruction back to the
+    # pre-WP-061 scope.
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    assert "for nothing else" not in rendered
+    assert "governs only the two things named above" not in rendered
+    assert "does not change the general Hebrew" not in rendered
+
+
+def test_target_language_requirement_rendering_itself_is_unchanged_by_wp062(production_repository):
+    # WP-062 broadened the surrounding instructions but deliberately left
+    # format_target_language_requirement() itself untouched - the
+    # deterministic per-target TARGET LANGUAGE decision remains the one
+    # narrow, reliable case handled without any judgment call; broadening
+    # only the wrapping instructions extends guidance to the rest of the
+    # question via the model's own judgment, not via a new deterministic
+    # mechanism.
+    from exam_generator.prompts.formatting import format_target_language_requirement
+
+    target = _target(topic="Putamen", named_entity_target=True)
+    rendered = _rendered_generation_prompt(production_repository, mode=GenerationMode.INDEPENDENT, target=target)
+    label = "Target-language requirement:\n"
+    start = rendered.index(label) + len(label)
+    assert rendered[start:].startswith(format_target_language_requirement(target))
+
+
+# ---------------------------------------------------------------------------
 # WP-043 Part B: target evidence-role note
 # ---------------------------------------------------------------------------
 

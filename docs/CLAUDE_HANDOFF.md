@@ -13,12 +13,13 @@ Before doing any implementation:
 
 1. Read `docs/MASTER_PROJECT_BRIEF.md` completely.
 2. Read `docs/ARCHITECTURE.md` completely.
-3. Read `docs/PROJECT_STATUS.md` completely.
-4. Inspect the current repository structure.
-5. Read the relevant existing code and tests needed to understand the current implementation state.
-6. Do not modify any files yet.
-7. Do not start the next Work Package yet.
-8. Do not rely on memory from previous Claude sessions. The repository and project documents are the source of truth.
+3. Read `docs/LANGUAGE_POLICY.md` completely.
+4. Read `docs/PROJECT_STATUS.md` completely.
+5. Inspect the current repository structure.
+6. Read the relevant existing code and tests needed to understand the current implementation state.
+7. Do not modify any files yet.
+8. Do not start the next Work Package yet.
+9. Do not rely on memory from previous Claude sessions. The repository and project documents are the source of truth.
 
 Report back with:
 - your understanding of the project's purpose and non-negotiable source/grounding rules;
@@ -38,6 +39,7 @@ Wait for the next Work Package instruction after reporting. Do not implement any
 ## Normal Work Package Rules
 Once a WP is supplied:
 - Read it fully before editing.
+- If the WP can affect generation, prompts, target planning, question normalization, validation, output, or terminology, read `docs/LANGUAGE_POLICY.md` first - it is the authoritative, project-wide language policy (WP-061), independent of category/target/strategy. If the WP's own wording conflicts with it, stop and report the conflict before implementing.
 - Implement only that WP.
 - Do not implement future WPs early.
 - Do not redesign architecture silently.
